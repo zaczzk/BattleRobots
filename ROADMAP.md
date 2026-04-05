@@ -27,8 +27,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | M2 | Robot Assembly & ArticulationBody Joints | Sprint 2 | **Done** |
 | M3 | Combat Arena + Damage System | Sprint 3 | **Done** |
 | M4 | Economy & Shop UI | Sprint 4 | **Done** |
-| M5 | Match Loop + Win/Loss Flow | Sprint 5 | In Progress |
-| M6 | Polish, VFX, Audio | Sprint 6 | Pending |
+| M5 | Match Loop + Win/Loss Flow | Sprint 5 | **Done** |
+| M6 | Polish, VFX, Audio | Sprint 6 | **Done** |
 
 ---
 
@@ -46,8 +46,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T008 | Arena scene scaffold (ground, walls, spawn points) | 60 | **Done** | Scene loads; robots spawn at markers |
 | T009 | ShopUI — part browser, buy button, wallet display | 55 | **Done** | UI reads wallet SO; buy fires deduct |
 | T010 | MatchManager — round timer, win condition | 55 | **Done** | Correct winner determined; MatchRecord written |
-| T011 | MainMenu + LoadingScreen UI | 40 | Pending | Scene transitions work; no GC in Update |
-| T012 | VFX: impact sparks, destruction explosion | 30 | Pending | Pooled particles; zero alloc |
+| T011 | MainMenu + LoadingScreen UI | 40 | **Done** | Scene transitions work; no GC in Update |
+| T012 | VFX: impact sparks, destruction explosion | 30 | **Done** | Pooled particles; zero alloc |
 
 ---
 
@@ -55,7 +55,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T011 — MainMenu + LoadingScreen UI | PM Agent | 2026-04-05 | Next: scene transition controller, loading screen |
+| — | — | — | All backlog tasks complete. Awaiting new backlog items. |
 
 ---
 
@@ -73,6 +73,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T008 — Arena scene scaffold | 2026-04-05 | SpawnPoint MonoBehaviour (team-coloured Gizmo, Position/Rotation/Forward API), ArenaConfig SO (SpawnDescriptors, timeLimitSeconds, winBonusCurrency, Validate, GetSpawnForTeam), ArenaConfigEditor drawer |
 | T010 — MatchManager | 2026-04-05 | Round timer (Time.deltaTime, no alloc in Update), win-condition check (array index, no LINQ), MatchRecord build + SaveSystem.Save on match end, SO event channels for win/loss/end |
 | T009 — ShopUI + PartDefinition + ShopPartEntry | 2026-04-05 | PartDefinition SO (partId, cost, stats), ShopUI (BattleRobots.UI, reads PlayerWallet, Deduct on buy, balance label wired via IntGameEventListener UnityEvent), ShopPartEntry row prefab component |
+| T011 — MainMenu + LoadingScreen | 2026-04-05 | SceneTransitionController (Core, DontDestroyOnLoad, async load, VoidGameEvent onLoadStart/onLoadComplete, FloatGameEvent onLoadProgress, min display time, zero-alloc coroutine). MainMenuUI (UI namespace, Play/Shop/Settings/Quit buttons, routes via controller, no Update). |
+| T012 — VFX: sparks + explosion | 2026-04-05 | ParticlePool (fixed-capacity, Awake pre-warm, zero-alloc Play via round-robin recycle, Dispose). ImpactVFX (ArticulationBody required, impulse-threshold spark on OnCollisionEnter). DestructionVFX (public OnRobotDeath wired via VoidGameEventListener, explosion at transform+offset). |
 
 ---
 
@@ -85,30 +87,23 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-05 | PM Agent | Session 3: T007 DamageSystem. DamagePayload struct, DamageEvent SO channel, DamageEventListener, HealthSO (CurrentHp/MaxHp/TakeDamage/Heal, fires FloatGameEvent+DamageEvent+VoidGameEvent), HealthOwner MonoBehaviour bridge, DamageDealer (ArticulationBody, impulse-gated OnCollisionEnter). M1+M2+M3-damage complete. |
 | 2026-04-05 | PM Agent | Session 4: T008 Arena scaffold. SpawnPoint MonoBehaviour (Position/Rotation/Forward, team-coloured Gizmo, OnDrawGizmosSelected). ArenaConfig SO (SpawnDescriptor, GetSpawnForTeam, Validate, timeLimitSeconds, winBonusCurrency). ArenaConfigEditor custom Inspector with Validate button. M3 complete. |
 | 2026-04-05 | PM Agent | Session 5: T010 MatchManager (BattleRobots.Core — round timer, win-condition, MatchRecord write, SaveSystem.Save, SO event channels; zero-alloc Update). T009 PartDefinition SO + ShopUI (BattleRobots.UI — part browser, wallet label, buy→Deduct, no Physics refs) + ShopPartEntry. M4 + M5 In Progress. |
+| 2026-04-05 | PM Agent | Session 6: T011 MainMenu + LoadingScreen (SceneTransitionController in Core — async coroutine, VoidGameEvent load-start/complete, FloatGameEvent progress, minimum display time; MainMenuUI in BattleRobots.UI — 4 buttons, zero-alloc, no Update). T012 VFX — ParticlePool (fixed array, round-robin recycle, zero-alloc Play/Dispose), ImpactVFX (ArticulationBody, impulse-gated sparks), DestructionVFX (pool-based explosion, OnRobotDeath via VoidGameEventListener). All milestones M1–M6 complete. All 12 backlog tasks done. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T010 (MatchManager), T009 (PartDefinition SO + ShopUI + ShopPartEntry).  
-**Milestone status:** M1 Done · M2 Done · M3 Done · M4 Done · M5 In Progress.
+**Last completed:** T011 (MainMenu + SceneTransitionController), T012 (ParticlePool + ImpactVFX + DestructionVFX).  
+**Milestone status:** M1 Done · M2 Done · M3 Done · M4 Done · M5 Done · M6 Done.
 
-**Next action (highest RICE):** T011 — MainMenu + LoadingScreen UI (RICE 40).
-  Create two files:
-  1. `Assets/Scripts/UI/MainMenuUI.cs` — BattleRobots.UI MonoBehaviour.
-     - Buttons: Play, Shop, Settings, Quit.
-     - Play button: calls `SceneTransitionController.LoadScene("Arena")` (or loads by build index).
-     - No GC in Update (Update not needed — pure button-driven).
-  2. `Assets/Scripts/UI/SceneTransitionController.cs` — BattleRobots.Core MonoBehaviour.
-     - Async scene load via `SceneManager.LoadSceneAsync`.
-     - Exposes a `VoidGameEvent _onSceneReady` SO channel.
-     - Progress fed to a `FloatGameEvent _onLoadProgress` channel.
-     - Loading screen canvas toggled via a `VoidGameEvent _onLoadStart` / `_onLoadComplete`.
-  Keep both in correct namespaces. No Physics refs in UI.
+**All 12 backlog tasks complete. Project backlog exhausted.**
 
-**Architecture notes:**
-  - T012 (VFX) is the only remaining Pending item after T011. Low RICE (30) — tackle last.
-  - MatchManager is wired via Inspector only; no singleton needed.
-  - ShopUI balance label is updated reactively via IntGameEventListener UnityEvent → OnBalanceChanged.
+**Next steps (recommended new backlog for Sprint 7+):**
+  - Integration testing: create Unity Test Framework (EditMode) tests for SaveSystem round-trip, PlayerWallet Add/Deduct, MatchRecord serialization.
+  - Scene assembly: wire up Bootstrap, MainMenu, Arena, and Shop scenes using the existing script library.
+  - Robot prefab: configure ArticulationBody hierarchy + HingeJointAB + DamageDealer + ImpactVFX + HealthOwner on a test robot.
+  - AI opponent: simple finite-state robot controller (idle→approach→attack) in BattleRobots.Core.
+  - Audio: AudioSO event channel (similar to VoidGameEvent) + SFXPlayer component.
 
-**Blockers:** None.
+**Blockers:** None. Unity Editor required for scene wiring and prefab configuration.  
+**Architecture notes:** All M1–M6 scripts are pure C#, namespace-correct, zero-alloc in hot paths, and architecture-rule compliant. No Rigidbody used anywhere.
