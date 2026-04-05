@@ -2,7 +2,8 @@
     "name": "BattleRobots.Physics",
     "rootNamespace": "BattleRobots.Physics",
     "references": [
-        "BattleRobots.Core"
+        "BattleRobots.Core",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

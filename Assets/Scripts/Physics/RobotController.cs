@@ -57,6 +57,10 @@ namespace BattleRobots.Physics
         [Tooltip("When assigned, controller disables itself when IsAlive is false.")]
         [SerializeField] private HealthSO _ownHealth;
 
+        [Header("Settings (optional)")]
+        [Tooltip("When assigned, the InvertControls flag is read each FixedUpdate to flip the vertical axis.")]
+        [SerializeField] private SettingsSO _settings;
+
         // ── Unity Lifecycle ───────────────────────────────────────────────────
 
         private void FixedUpdate()
@@ -71,6 +75,10 @@ namespace BattleRobots.Physics
             // Read axes — float returns; zero GC.
             float fwd  = Input.GetAxis("Vertical");      //  1 = forward, -1 = reverse
             float turn = Input.GetAxis("Horizontal");    //  1 = right,   -1 = left
+
+            // Invert vertical axis when the player has opted in via SettingsSO.
+            if (_settings != null && _settings.InvertControls)
+                fwd = -fwd;
 
             ApplyDifferentialSteering(fwd, turn);
             UpdateWeapon();

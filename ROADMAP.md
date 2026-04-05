@@ -53,6 +53,10 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T015 | AudioSO event channel + SFXPlayer MonoBehaviour | 65 | **Done** | AudioClip plays via pooled AudioSource; no alloc in hot path |
 | T016 | RobotController — player input → HingeJointAB locomotion | 60 | **Done** | WASD/gamepad drives wheel joints; no alloc in Update |
 | T017 | Settings persistence (volume, invert controls) via SaveSystem | 45 | **Done** 2026-04-05 | Settings round-trip save/load; applied on load |
+| T018 | Integration tests — SettingsSO round-trip + MatchRecord pipeline | 85 | **Done** 2026-04-05 | SettingsSOTests (12 cases) + MatchRecordIntegrationTests (7 cases) |
+| T019 | Gamepad rumble on hit/death (InputSystem Gamepad.SetMotorSpeeds) | 55 | **Done** 2026-04-05 | Proportional intensity; timer-based stop; OnDisable safety cancel |
+| T020 | Match history UI (MatchHistoryUI + MatchHistoryEntryUI) | 50 | **Done** 2026-04-05 | ScrollList newest-first; summary bar; empty state; OnEnable refresh |
+| T021 | RobotController invert-controls via SettingsSO.InvertControls | 40 | **Done** 2026-04-05 | Polled in FixedUpdate; negates fwd axis; optional SettingsSO ref |
 
 ---
 
@@ -60,7 +64,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All Sprint 7 tasks complete; Sprint 8 planning needed |
+| — | — | — | All Sprint 8 tasks complete; Sprint 9 planning needed |
 
 ---
 
@@ -85,6 +89,10 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T015 — AudioSO + SFXPlayer | 2026-04-05 | AudioEvent SO channel (GameEvent<AudioClip>), AudioEventListener, SFXPlayer (fixed pool, round-robin steal, SetMasterVolume, zero-alloc Play). |
 | T016 — RobotController | 2026-04-05 | Player input (Input.GetAxis Vertical/Horizontal + Fire1) → differential steering via left/right HingeJointAB; weapon spin; OnDisable AllStop; health-death guard; zero-alloc FixedUpdate. |
 | T017 — Settings persistence | 2026-04-05 | SettingsData POCO in MatchRecord.cs + SaveData.settings field; SettingsSO (LoadFromData, BuildData, SetMasterVolume/SfxVolume/InvertControls, Apply via FloatGameEvent channels); SettingsUI (sliders + toggle, SetValueWithoutNotify on open, PersistSettings on change); GameBootstrapper extended to call LoadFromData on startup. |
+| T018 — Integration tests | 2026-04-05 | SettingsSOTests (12 cases: defaults, LoadFromData, BuildData, mutators, clamping, SaveSystem round-trip). MatchRecordIntegrationTests (7 cases: HealthSO win-condition gates; win/loss record persist; settings co-persist; history accumulation). |
+| T019 — GamepadRumble | 2026-04-05 | BattleRobots.Physics; InputSystem Gamepad.SetMotorSpeeds; proportional intensity via damage/maxDamage ratio; timer-based stop in Update (no alloc); OnDisable safety cancel; Physics asmdef updated with Unity.InputSystem reference. |
+| T020 — MatchHistoryUI | 2026-04-05 | BattleRobots.UI; MatchHistoryUI (OnEnable rebuild, newest-first, summary bar with win-rate %, empty-state label, close button). MatchHistoryEntryUI (result/date/duration/earnings/damage labels, win/loss background tint). |
+| T021 — RobotController invert-controls | 2026-04-05 | Optional SettingsSO field; FixedUpdate reads InvertControls and negates fwd axis; zero additional allocations. |
 
 ---
 
@@ -101,23 +109,24 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-05 | PM Agent | Session 7: Sprint 7 bootstrap. T013 EditMode tests — 4 assembly definition files (Core/Physics/UI/Editor + Tests.EditMode) + 4 test files (SaveSystemTests 5 cases, PlayerWalletTests 11 cases, HealthSOTests 13 cases, MatchRecordTests 5 cases). T014 RobotFSM — Idle/Approach/Attack FSM in BattleRobots.Physics; differential steering via HingeJointAB; zero-alloc FixedUpdate; SO event channels on state transitions; hysteresis bands. Extended backlog with T015–T017. |
 | 2026-04-05 | PM Agent | Session 8: T015 AudioSO — AudioEvent (GameEvent<AudioClip> SO channel), AudioEventListener (typed listener shim), SFXPlayer (Awake pre-warmed fixed pool, round-robin source selection with steal fallback, SetMasterVolume, zero-alloc Play). T016 RobotController — BattleRobots.Physics; WASD + gamepad via Input.GetAxis; differential steering (fwd+steer delta); Fire1 weapon spin; OnDisable AllStop; HealthSO death guard; zero-alloc FixedUpdate. T017 In Progress. |
 | 2026-04-05 | PM Agent | Session 9: T017 Settings persistence — SettingsData POCO added to MatchRecord.cs; SaveData.settings field added; SettingsSO (BattleRobots.Core) with LoadFromData/BuildData/Apply via FloatGameEvent channels; SettingsUI (BattleRobots.UI) with sliders + toggle, SetValueWithoutNotify on panel open, PersistSettings on every change; GameBootstrapper extended to load settings at startup. All T001–T017 complete. |
+| 2026-04-05 | PM Agent | Session 10: Sprint 8 complete. T018 SettingsSOTests (12 cases) + MatchRecordIntegrationTests (7 cases). T019 GamepadRumble (InputSystem, proportional damage intensity, OnDisable cancel, Physics.asmdef Unity.InputSystem ref). T020 MatchHistoryUI + MatchHistoryEntryUI (newest-first scroll list, summary bar, win-rate, empty state). T021 RobotController InvertControls (fwd-axis negation, optional SettingsSO ref). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T017 (Settings persistence — SettingsData, SettingsSO, SettingsUI, GameBootstrapper extension).  
-**Milestone status:** M1 Done · M2 Done · M3 Done · M4 Done · M5 Done · M6 Done. Sprint 7 complete (T013–T017 all done).
+**Last completed:** T018 (integration tests), T019 (GamepadRumble), T020 (MatchHistoryUI), T021 (RobotController invert-controls). All T001–T021 complete.  
+**Milestone status:** M1–M6 Done. Sprint 8 complete.
 
-**Next action (Sprint 8):** Plan new backlog items. Candidates:
-  - T018: Integration tests — test SettingsSO round-trip; test MatchManager win condition with fake HealthSOs.
-  - T019: Gamepad rumble on hit (ArticulationBody impulse magnitude → Gamepad.current.SetMotorSpeeds).
-  - T020: Leaderboard/Match history UI (reads SaveData.matchHistory; no Physics refs).
-  - T021: RobotController — invert-controls support (poll SettingsSO.InvertControls in FixedUpdate).
+**Next action (Sprint 9):** Candidates for new backlog items:
+  - T022: PlayMode tests — scene-level smoke tests for MatchManager lifecycle using UnityTest coroutines.
+  - T023: ArenaSelector UI — choose from multiple ArenaConfig SOs before a match; wired to MatchManager.
+  - T024: Part stat bonuses applied at spawn — robot spawner reads PartDefinition HP/speed/torque bonuses, calls HealthSO.Initialize with modified max, sets TorqueMultiplier on HingeJointAB.
+  - T025: Pause menu — ESC toggles pause (Time.timeScale=0); resume/quit buttons; no GC in Update.
 
 **Architecture notes:**
-  - All Sprint 7 namespaces respected. No BattleRobots.UI → BattleRobots.Physics references.
-  - SettingsUI calls SaveSystem.Load+Save on every interaction (cheap — only on user interaction).
-  - GameBootstrapper now loads wallet + settings in one pass from a single SaveSystem.Load call.
+  - GamepadRumble added Unity.InputSystem reference to BattleRobots.Physics.asmdef.
+  - MatchHistoryUI in BattleRobots.UI; reads SaveSystem directly (no Physics refs).
+  - RobotController SettingsSO field is optional — defaults gracefully when null.
 
-**Blockers:** None. All Sprint 7 tasks are pure C# — no Unity Editor / scene wiring required.
+**Blockers:** None. All Sprint 8 tasks are pure C# — no Unity Editor / scene wiring required.
