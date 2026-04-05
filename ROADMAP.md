@@ -25,8 +25,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 |---|-----------|--------|--------|
 | M1 | Core Foundation (SO bus, wallet, save) | Sprint 1 | **Done** |
 | M2 | Robot Assembly & ArticulationBody Joints | Sprint 2 | **Done** |
-| M3 | Combat Arena + Damage System | Sprint 3 | In Progress |
-| M4 | Economy & Shop UI | Sprint 4 | Pending |
+| M3 | Combat Arena + Damage System | Sprint 3 | **Done** |
+| M4 | Economy & Shop UI | Sprint 4 | In Progress |
 | M5 | Match Loop + Win/Loss Flow | Sprint 5 | Pending |
 | M6 | Polish, VFX, Audio | Sprint 6 | Pending |
 
@@ -43,7 +43,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T005 | RobotDefinition SO (part slots, base stats) | 75 | **Done** | Compiles; slots validated in Editor |
 | T006 | ArticulationBody joint wrapper (HingeJointAB) | 75 | **Done** | Drive applies torque; no Rigidbody |
 | T007 | DamageSystem — HealthSO + DamageEvent channel | 70 | **Done** | Damage reduces health SO; death event fires |
-| T008 | Arena scene scaffold (ground, walls, spawn points) | 60 | Pending | Scene loads; robots spawn at markers |
+| T008 | Arena scene scaffold (ground, walls, spawn points) | 60 | **Done** | Scene loads; robots spawn at markers |
 | T009 | ShopUI — part browser, buy button, wallet display | 55 | Pending | UI reads wallet SO; buy fires deduct |
 | T010 | MatchManager — round timer, win condition | 55 | Pending | Correct winner determined; MatchRecord written |
 | T011 | MainMenu + LoadingScreen UI | 40 | Pending | Scene transitions work; no GC in Update |
@@ -55,7 +55,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T008 — Arena scene scaffold | PM Agent | 2026-04-05 | Next: ArenaConfig SO + SpawnPoint MonoBehaviour |
+| T010 — MatchManager | PM Agent | 2026-04-05 | Next: round timer SO, win-condition logic, MatchRecord write |
 
 ---
 
@@ -70,6 +70,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T005 — RobotDefinition SO | 2026-04-05 | PartSlotType enum, PartSlot, Validate(); custom Editor drawer with auto-ID |
 | T006 — HingeJointAB | 2026-04-05 | RevoluteJoint wrapper; SetTargetVelocity/SetTargetAngle; no Rigidbody |
 | T007 — DamageSystem | 2026-04-05 | DamagePayload struct, DamageEvent SO channel, DamageEventListener, HealthSO (CurrentHp/MaxHp/TakeDamage/Heal/onDeath), HealthOwner bridge, DamageDealer (impulse-gated) |
+| T008 — Arena scene scaffold | 2026-04-05 | SpawnPoint MonoBehaviour (team-coloured Gizmo, Position/Rotation/Forward API), ArenaConfig SO (SpawnDescriptors, timeLimitSeconds, winBonusCurrency, Validate, GetSpawnForTeam), ArenaConfigEditor drawer |
 
 ---
 
@@ -80,18 +81,28 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-05 | PM Agent | Session 1: Repo bootstrap. Created ROADMAP.md, .gitignore, folder structure, Core SO event channel system (GameEvent, VoidGameEvent, GameEventListenerT), PlayerWallet SO, MatchRecord, XOR SaveSystem. |
 | 2026-04-05 | PM Agent | Session 2: T005 RobotDefinition SO (PartSlotType enum, PartSlot, Validate, RobotDefinitionEditor with auto-ID button). T006 HingeJointAB (RevoluteJoint wrapper, velocity+position drive, OnValidate). M1 milestone complete; starting M2. |
 | 2026-04-05 | PM Agent | Session 3: T007 DamageSystem. DamagePayload struct, DamageEvent SO channel, DamageEventListener, HealthSO (CurrentHp/MaxHp/TakeDamage/Heal, fires FloatGameEvent+DamageEvent+VoidGameEvent), HealthOwner MonoBehaviour bridge, DamageDealer (ArticulationBody, impulse-gated OnCollisionEnter). M1+M2+M3-damage complete. |
+| 2026-04-05 | PM Agent | Session 4: T008 Arena scaffold. SpawnPoint MonoBehaviour (Position/Rotation/Forward, team-coloured Gizmo, OnDrawGizmosSelected). ArenaConfig SO (SpawnDescriptor, GetSpawnForTeam, Validate, timeLimitSeconds, winBonusCurrency). ArenaConfigEditor custom Inspector with Validate button. M3 complete. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T007 (DamageSystem — DamagePayload, DamageEvent, DamageEventListener, HealthSO, HealthOwner, DamageDealer).  
-**Next action:** T008 — Arena scene scaffold. Create:
-  - `Assets/Scripts/Core/SpawnPoint.cs` — MonoBehaviour marker; exposes `Position` + `Rotation` properties; draws a Gizmo in the Editor.
-  - `Assets/Scripts/Core/ArenaConfig.cs` — SO listing spawn-point transforms (as Vector3/Quaternion pairs) and the arena name. Used by MatchManager to place robots.
-  - No scene wiring (Unity Editor not running); deliver C# types ready for a designer drag-in.  
-**Blockers:** None. M1 (Core Foundation), M2 (Robot Assembly), and M3 damage layer are code-complete.  
+**Last completed:** T008 (Arena scaffold — SpawnPoint, ArenaConfig, ArenaConfigEditor).  
+**Milestone status:** M1 Done · M2 Done · M3 Done. **M4 Economy & Shop UI** now In Progress.
+
+**Next action (highest RICE):** T010 — MatchManager (RICE 55, ties with T009 but unblocked by existing SOs).  
+  Create `Assets/Scripts/Core/MatchManager.cs`:
+  - MonoBehaviour (singleton or referenced by GameBootstrapper).
+  - Fields: `ArenaConfig _arenaConfig`, `HealthSO[] _robotHealthSOs`, `PlayerWallet _wallet`, `VoidGameEvent _onMatchEnd`.
+  - Round timer: counts down `_arenaConfig.TimeLimitSeconds`; uses `Time.deltaTime` in Update — cache delta, no string alloc.
+  - Win condition: check `HealthSO.IsAlive` each frame; first robot at HP=0 triggers loss; timer expiry = draw.
+  - On match end: build `MatchRecord`, call `SaveSystem.Save()`, fire `_onMatchEnd`.
+  - T009 ShopUI can follow immediately after — depends on PlayerWallet SO (done) and RobotDefinition SO (done).
+
 **Architecture notes:**
-  - `SpawnPoint` and `ArenaConfig` belong in `BattleRobots.Core` (no Physics or UI dependency).
-  - `ArenaConfig` SO holds plain `Vector3`/`Quaternion` so it round-trips through JsonUtility if needed.
-  - After T008, move to T009 (ShopUI) or T010 (MatchManager) — both depend on wallet SO + MatchRecord already done.
+  - MatchManager lives in `BattleRobots.Core` namespace.
+  - No `new` allocations in Update/FixedUpdate (cache the HealthSO array, no LINQ).
+  - `MatchRecord.timestamp` = `DateTime.UtcNow.ToString("o")`.
+  - `MatchRecord.equippedPartIds` populated from `RobotDefinition.PartSlots` list.
+
+**Blockers:** None.
