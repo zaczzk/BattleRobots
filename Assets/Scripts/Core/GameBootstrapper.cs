@@ -12,6 +12,10 @@ namespace BattleRobots.Core
         [Header("Economy")]
         [SerializeField] private PlayerWallet _playerWallet;
 
+        [Header("Settings")]
+        [Tooltip("SettingsSO — loaded from save file on startup, applied immediately.")]
+        [SerializeField] private SettingsSO _settings;
+
         [Header("Events")]
         [SerializeField] private VoidGameEvent _onGameBootstrapped;
 
@@ -33,6 +37,9 @@ namespace BattleRobots.Core
                 _playerWallet.LoadSnapshot(save.walletBalance > 0
                     ? save.walletBalance
                     : _playerWallet.Balance); // keeps starting balance on first launch
+
+            if (_settings != null)
+                _settings.LoadFromData(save.settings);
         }
 
         /// <summary>

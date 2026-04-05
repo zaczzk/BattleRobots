@@ -40,8 +40,25 @@ namespace BattleRobots.Core
     }
 
     /// <summary>
-    /// Top-level save file container. Holds the running wallet balance and
-    /// the full match history.
+    /// Persisted player settings — serialized inside SaveData so a single
+    /// XOR-encrypted file holds both economy state and preferences.
+    /// </summary>
+    [Serializable]
+    public sealed class SettingsData
+    {
+        /// <summary>Master audio volume [0, 1]. Applied to AudioListener.volume.</summary>
+        public float masterVolume = 1f;
+
+        /// <summary>SFX bus volume [0, 1]. Applied to SFXPlayer.SetMasterVolume.</summary>
+        public float sfxVolume = 1f;
+
+        /// <summary>When true, vertical camera/aim axis is inverted.</summary>
+        public bool invertControls = false;
+    }
+
+    /// <summary>
+    /// Top-level save file container. Holds the running wallet balance,
+    /// full match history, and player settings.
     /// </summary>
     [Serializable]
     public sealed class SaveData
@@ -51,5 +68,8 @@ namespace BattleRobots.Core
 
         /// <summary>All match records in chronological order.</summary>
         public List<MatchRecord> matchHistory = new List<MatchRecord>();
+
+        /// <summary>Persisted player settings (volume, input preferences).</summary>
+        public SettingsData settings = new SettingsData();
     }
 }

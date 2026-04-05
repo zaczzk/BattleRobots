@@ -52,7 +52,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T014 | AI robot FSM — RobotFSM (idle/approach/attack) | 80 | **Done** | Differential steering; zero-alloc FixedUpdate; SO event channels on transitions |
 | T015 | AudioSO event channel + SFXPlayer MonoBehaviour | 65 | **Done** | AudioClip plays via pooled AudioSource; no alloc in hot path |
 | T016 | RobotController — player input → HingeJointAB locomotion | 60 | **Done** | WASD/gamepad drives wheel joints; no alloc in Update |
-| T017 | Settings persistence (volume, invert controls) via SaveSystem | 45 | Pending | Settings round-trip save/load; applied on load |
+| T017 | Settings persistence (volume, invert controls) via SaveSystem | 45 | **Done** 2026-04-05 | Settings round-trip save/load; applied on load |
 
 ---
 
@@ -60,7 +60,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T017 — Settings persistence | PM Agent | 2026-04-05 | Sprint 7 |
+| — | — | — | All Sprint 7 tasks complete; Sprint 8 planning needed |
 
 ---
 
@@ -84,6 +84,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T014 — RobotFSM AI | 2026-04-05 | BattleRobots.Physics namespace; Idle/Approach/Attack states with hysteresis; differential steering via left/right HingeJointAB; weapon joint full-speed in Attack; zero-alloc FixedUpdate; SO event channels on state entry; ForceState/SetTarget runtime API. |
 | T015 — AudioSO + SFXPlayer | 2026-04-05 | AudioEvent SO channel (GameEvent<AudioClip>), AudioEventListener, SFXPlayer (fixed pool, round-robin steal, SetMasterVolume, zero-alloc Play). |
 | T016 — RobotController | 2026-04-05 | Player input (Input.GetAxis Vertical/Horizontal + Fire1) → differential steering via left/right HingeJointAB; weapon spin; OnDisable AllStop; health-death guard; zero-alloc FixedUpdate. |
+| T017 — Settings persistence | 2026-04-05 | SettingsData POCO in MatchRecord.cs + SaveData.settings field; SettingsSO (LoadFromData, BuildData, SetMasterVolume/SfxVolume/InvertControls, Apply via FloatGameEvent channels); SettingsUI (sliders + toggle, SetValueWithoutNotify on open, PersistSettings on change); GameBootstrapper extended to call LoadFromData on startup. |
 
 ---
 
@@ -99,23 +100,24 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-05 | PM Agent | Session 6: T011 MainMenu + LoadingScreen (SceneTransitionController in Core — async coroutine, VoidGameEvent load-start/complete, FloatGameEvent progress, minimum display time; MainMenuUI in BattleRobots.UI — 4 buttons, zero-alloc, no Update). T012 VFX — ParticlePool (fixed array, round-robin recycle, zero-alloc Play/Dispose), ImpactVFX (ArticulationBody, impulse-gated sparks), DestructionVFX (pool-based explosion, OnRobotDeath via VoidGameEventListener). All milestones M1–M6 complete. All 12 backlog tasks done. |
 | 2026-04-05 | PM Agent | Session 7: Sprint 7 bootstrap. T013 EditMode tests — 4 assembly definition files (Core/Physics/UI/Editor + Tests.EditMode) + 4 test files (SaveSystemTests 5 cases, PlayerWalletTests 11 cases, HealthSOTests 13 cases, MatchRecordTests 5 cases). T014 RobotFSM — Idle/Approach/Attack FSM in BattleRobots.Physics; differential steering via HingeJointAB; zero-alloc FixedUpdate; SO event channels on state transitions; hysteresis bands. Extended backlog with T015–T017. |
 | 2026-04-05 | PM Agent | Session 8: T015 AudioSO — AudioEvent (GameEvent<AudioClip> SO channel), AudioEventListener (typed listener shim), SFXPlayer (Awake pre-warmed fixed pool, round-robin source selection with steal fallback, SetMasterVolume, zero-alloc Play). T016 RobotController — BattleRobots.Physics; WASD + gamepad via Input.GetAxis; differential steering (fwd+steer delta); Fire1 weapon spin; OnDisable AllStop; HealthSO death guard; zero-alloc FixedUpdate. T017 In Progress. |
+| 2026-04-05 | PM Agent | Session 9: T017 Settings persistence — SettingsData POCO added to MatchRecord.cs; SaveData.settings field added; SettingsSO (BattleRobots.Core) with LoadFromData/BuildData/Apply via FloatGameEvent channels; SettingsUI (BattleRobots.UI) with sliders + toggle, SetValueWithoutNotify on panel open, PersistSettings on every change; GameBootstrapper extended to load settings at startup. All T001–T017 complete. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T015 (AudioEvent SO + AudioEventListener + SFXPlayer pool), T016 (RobotController — WASD/gamepad differential steering + weapon Fire1).  
-**Milestone status:** M1 Done · M2 Done · M3 Done · M4 Done · M5 Done · M6 Done. Sprint 7 tasks T015+T016 done.
+**Last completed:** T017 (Settings persistence — SettingsData, SettingsSO, SettingsUI, GameBootstrapper extension).  
+**Milestone status:** M1 Done · M2 Done · M3 Done · M4 Done · M5 Done · M6 Done. Sprint 7 complete (T013–T017 all done).
 
-**Next action:** T017 — Settings persistence.  
-  1. Add `SettingsData` class to `MatchRecord.cs` (or a new `SettingsData.cs`) — fields: `masterVolume` (float), `sfxVolume` (float), `invertControls` (bool).  
-  2. Add `settings` field to `SaveData`.  
-  3. Create `SettingsSO.cs` in Core — SO with the three fields; `Apply()` calls `SFXPlayer.SetMasterVolume` via a FloatGameEvent; load/save via SaveSystem.  
-  4. Create `SettingsUI.cs` in BattleRobots.UI — volume slider + invert-controls toggle; reads SettingsSO; saves on change.
+**Next action (Sprint 8):** Plan new backlog items. Candidates:
+  - T018: Integration tests — test SettingsSO round-trip; test MatchManager win condition with fake HealthSOs.
+  - T019: Gamepad rumble on hit (ArticulationBody impulse magnitude → Gamepad.current.SetMotorSpeeds).
+  - T020: Leaderboard/Match history UI (reads SaveData.matchHistory; no Physics refs).
+  - T021: RobotController — invert-controls support (poll SettingsSO.InvertControls in FixedUpdate).
 
 **Architecture notes:**
-  - SettingsSO is `BattleRobots.Core`; SettingsUI is `BattleRobots.UI` — no direct cross-namespace refs.
-  - SaveSystem.Load / Save already exist; just extend SaveData.
-  - SFXPlayer.SetMasterVolume already accepts float [0,1].
+  - All Sprint 7 namespaces respected. No BattleRobots.UI → BattleRobots.Physics references.
+  - SettingsUI calls SaveSystem.Load+Save on every interaction (cheap — only on user interaction).
+  - GameBootstrapper now loads wallet + settings in one pass from a single SaveSystem.Load call.
 
 **Blockers:** None. All Sprint 7 tasks are pure C# — no Unity Editor / scene wiring required.
