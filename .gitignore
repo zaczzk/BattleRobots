@@ -1,0 +1,56 @@
+# Unity generated folders
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+
+# Unity auto-generated VS solution & project files
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity3D generated meta files are required. Ignore other meta files.
+# *.meta
+
+# Unity3D generated file on crash reports
+sbugs/
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+__MACOSX
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# JetBrains IDEs
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Lock file (PM agent)
+_pm_lock.txt
+
+# Player save data (never commit)
+*.sav
+*.save
