@@ -50,8 +50,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T012 | VFX: impact sparks, destruction explosion | 30 | **Done** | Pooled particles; zero alloc |
 | T013 | EditMode unit tests (SaveSystem, PlayerWallet, HealthSO, MatchRecord) | 85 | **Done** | All tests pass; hermetic (SetUp/TearDown); asmdefs created |
 | T014 | AI robot FSM — RobotFSM (idle/approach/attack) | 80 | **Done** | Differential steering; zero-alloc FixedUpdate; SO event channels on transitions |
-| T015 | AudioSO event channel + SFXPlayer MonoBehaviour | 65 | Pending | AudioClip plays via pooled AudioSource; no alloc in hot path |
-| T016 | RobotController — player input → HingeJointAB locomotion | 60 | Pending | WASD/gamepad drives wheel joints; no alloc in Update |
+| T015 | AudioSO event channel + SFXPlayer MonoBehaviour | 65 | **Done** | AudioClip plays via pooled AudioSource; no alloc in hot path |
+| T016 | RobotController — player input → HingeJointAB locomotion | 60 | **Done** | WASD/gamepad drives wheel joints; no alloc in Update |
 | T017 | Settings persistence (volume, invert controls) via SaveSystem | 45 | Pending | Settings round-trip save/load; applied on load |
 
 ---
@@ -60,7 +60,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T015 — AudioSO + SFXPlayer | PM Agent | 2026-04-05 | Sprint 7 |
+| T017 — Settings persistence | PM Agent | 2026-04-05 | Sprint 7 |
 
 ---
 
@@ -82,6 +82,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T012 — VFX: sparks + explosion | 2026-04-05 | ParticlePool (fixed-capacity, Awake pre-warm, zero-alloc Play via round-robin recycle, Dispose). ImpactVFX (ArticulationBody required, impulse-threshold spark on OnCollisionEnter). DestructionVFX (public OnRobotDeath wired via VoidGameEventListener, explosion at transform+offset). |
 | T013 — EditMode unit tests | 2026-04-05 | 4 asmdefs (Core/Physics/UI/Editor/TestsEditMode). SaveSystemTests (5 cases: round-trip, multi-record, delete, null guard). PlayerWalletTests (11 cases: Reset, AddFunds, Deduct, LoadSnapshot, interactions). HealthSOTests (13 cases: Initialize, TakeDamage, Heal, re-init). MatchRecordTests (5 cases: defaults, JSON round-trip). |
 | T014 — RobotFSM AI | 2026-04-05 | BattleRobots.Physics namespace; Idle/Approach/Attack states with hysteresis; differential steering via left/right HingeJointAB; weapon joint full-speed in Attack; zero-alloc FixedUpdate; SO event channels on state entry; ForceState/SetTarget runtime API. |
+| T015 — AudioSO + SFXPlayer | 2026-04-05 | AudioEvent SO channel (GameEvent<AudioClip>), AudioEventListener, SFXPlayer (fixed pool, round-robin steal, SetMasterVolume, zero-alloc Play). |
+| T016 — RobotController | 2026-04-05 | Player input (Input.GetAxis Vertical/Horizontal + Fire1) → differential steering via left/right HingeJointAB; weapon spin; OnDisable AllStop; health-death guard; zero-alloc FixedUpdate. |
 
 ---
 
@@ -96,23 +98,24 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-05 | PM Agent | Session 5: T010 MatchManager (BattleRobots.Core — round timer, win-condition, MatchRecord write, SaveSystem.Save, SO event channels; zero-alloc Update). T009 PartDefinition SO + ShopUI (BattleRobots.UI — part browser, wallet label, buy→Deduct, no Physics refs) + ShopPartEntry. M4 + M5 In Progress. |
 | 2026-04-05 | PM Agent | Session 6: T011 MainMenu + LoadingScreen (SceneTransitionController in Core — async coroutine, VoidGameEvent load-start/complete, FloatGameEvent progress, minimum display time; MainMenuUI in BattleRobots.UI — 4 buttons, zero-alloc, no Update). T012 VFX — ParticlePool (fixed array, round-robin recycle, zero-alloc Play/Dispose), ImpactVFX (ArticulationBody, impulse-gated sparks), DestructionVFX (pool-based explosion, OnRobotDeath via VoidGameEventListener). All milestones M1–M6 complete. All 12 backlog tasks done. |
 | 2026-04-05 | PM Agent | Session 7: Sprint 7 bootstrap. T013 EditMode tests — 4 assembly definition files (Core/Physics/UI/Editor + Tests.EditMode) + 4 test files (SaveSystemTests 5 cases, PlayerWalletTests 11 cases, HealthSOTests 13 cases, MatchRecordTests 5 cases). T014 RobotFSM — Idle/Approach/Attack FSM in BattleRobots.Physics; differential steering via HingeJointAB; zero-alloc FixedUpdate; SO event channels on state transitions; hysteresis bands. Extended backlog with T015–T017. |
+| 2026-04-05 | PM Agent | Session 8: T015 AudioSO — AudioEvent (GameEvent<AudioClip> SO channel), AudioEventListener (typed listener shim), SFXPlayer (Awake pre-warmed fixed pool, round-robin source selection with steal fallback, SetMasterVolume, zero-alloc Play). T016 RobotController — BattleRobots.Physics; WASD + gamepad via Input.GetAxis; differential steering (fwd+steer delta); Fire1 weapon spin; OnDisable AllStop; HealthSO death guard; zero-alloc FixedUpdate. T017 In Progress. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T013 (EditMode unit tests — asmdefs + 34 test cases), T014 (RobotFSM AI — differential steering, 3 states, hysteresis).  
-**Milestone status:** M1 Done · M2 Done · M3 Done · M4 Done · M5 Done · M6 Done.
+**Last completed:** T015 (AudioEvent SO + AudioEventListener + SFXPlayer pool), T016 (RobotController — WASD/gamepad differential steering + weapon Fire1).  
+**Milestone status:** M1 Done · M2 Done · M3 Done · M4 Done · M5 Done · M6 Done. Sprint 7 tasks T015+T016 done.
 
-**Next action:** T015 — AudioSO + SFXPlayer. Create:
-  1. `Assets/Scripts/Core/AudioEvent.cs` — typed GameEvent<AudioClip> SO channel for playing one-shot sounds.
-  2. `Assets/Scripts/Core/SFXPlayer.cs` — MonoBehaviour with a fixed pool of AudioSource components (pre-warmed in Awake). `Play(AudioClip)` picks the next free source (round-robin). Zero alloc in hot path.
+**Next action:** T017 — Settings persistence.  
+  1. Add `SettingsData` class to `MatchRecord.cs` (or a new `SettingsData.cs`) — fields: `masterVolume` (float), `sfxVolume` (float), `invertControls` (bool).  
+  2. Add `settings` field to `SaveData`.  
+  3. Create `SettingsSO.cs` in Core — SO with the three fields; `Apply()` calls `SFXPlayer.SetMasterVolume` via a FloatGameEvent; load/save via SaveSystem.  
+  4. Create `SettingsUI.cs` in BattleRobots.UI — volume slider + invert-controls toggle; reads SettingsSO; saves on change.
 
 **Architecture notes:**
-  - AudioEvent uses `BattleRobots.Core` namespace; SFXPlayer also in Core (no Physics or UI refs).
-  - Pool size configurable in Inspector; warn if all sources busy (no silent failures).
-  - SFXPlayer should be placed on a DontDestroyOnLoad GameObject (same as SceneTransitionController pattern).
-  - T016 (RobotController) needs: player input (Input.GetAxis "Horizontal"/"Vertical") → left/right wheel HingeJointAB. Keep it in BattleRobots.Physics.
-  - T017 (Settings) extends SaveData: add `SettingsData` nested class with `masterVolume` (float 0-1) and `invertControls` (bool).
+  - SettingsSO is `BattleRobots.Core`; SettingsUI is `BattleRobots.UI` — no direct cross-namespace refs.
+  - SaveSystem.Load / Save already exist; just extend SaveData.
+  - SFXPlayer.SetMasterVolume already accepts float [0,1].
 
 **Blockers:** None. All Sprint 7 tasks are pure C# — no Unity Editor / scene wiring required.
