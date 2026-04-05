@@ -40,8 +40,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T002 | PlayerWallet ScriptableObject | 85 | Pending | SO mutates via AddFunds/Deduct; fires event |
 | T003 | MatchRecord data class + JSON shape | 85 | Pending | Serializable; round-trips clean |
 | T004 | XOR SaveSystem (save/load MatchRecord) | 80 | Pending | Encrypts file on disk; loads back intact |
-| T005 | RobotDefinition SO (part slots, base stats) | 75 | Pending | Compiles; slots validated in Editor |
-| T006 | ArticulationBody joint wrapper (HingeJointAB) | 75 | Pending | Drive applies torque; no Rigidbody |
+| T005 | RobotDefinition SO (part slots, base stats) | 75 | **Done** | Compiles; slots validated in Editor |
+| T006 | ArticulationBody joint wrapper (HingeJointAB) | 75 | **Done** | Drive applies torque; no Rigidbody |
 | T007 | DamageSystem — HealthSO + DamageEvent channel | 70 | Pending | Damage reduces health SO; death event fires |
 | T008 | Arena scene scaffold (ground, walls, spawn points) | 60 | Pending | Scene loads; robots spawn at markers |
 | T009 | ShopUI — part browser, buy button, wallet display | 55 | Pending | UI reads wallet SO; buy fires deduct |
@@ -55,7 +55,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T001 — SO Event Channel system | PM Agent | 2026-04-05 | First session; bootstrapping repo |
+| T007 — DamageSystem (HealthSO + DamageEvent) | PM Agent | 2026-04-05 | Session 2; M1 foundation complete |
 
 ---
 
@@ -63,7 +63,12 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Completed | Notes |
 |------|-----------|-------|
-| — | — | First session |
+| T001 — SO Event Channel system | 2026-04-05 | GameEvent<T>, VoidGameEvent, typed listeners; no Update allocs |
+| T002 — PlayerWallet SO | 2026-04-05 | AddFunds/Deduct; fires IntGameEvent; LoadSnapshot for save restore |
+| T003 — MatchRecord + SaveData | 2026-04-05 | Plain POCO; round-trips via JsonUtility |
+| T004 — XOR SaveSystem | 2026-04-05 | Atomic write via temp file; XOR key 0xAB |
+| T005 — RobotDefinition SO | 2026-04-05 | PartSlotType enum, PartSlot, Validate(); custom Editor drawer with auto-ID |
+| T006 — HingeJointAB | 2026-04-05 | RevoluteJoint wrapper; SetTargetVelocity/SetTargetAngle; no Rigidbody |
 
 ---
 
@@ -72,12 +77,17 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | Date | Agent | Summary |
 |------|-------|---------|
 | 2026-04-05 | PM Agent | Session 1: Repo bootstrap. Created ROADMAP.md, .gitignore, folder structure, Core SO event channel system (GameEvent, VoidGameEvent, GameEventListenerT), PlayerWallet SO, MatchRecord, XOR SaveSystem. |
+| 2026-04-05 | PM Agent | Session 2: T005 RobotDefinition SO (PartSlotType enum, PartSlot, Validate, RobotDefinitionEditor with auto-ID button). T006 HingeJointAB (RevoluteJoint wrapper, velocity+position drive, OnValidate). M1 milestone complete; starting M2. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T001 (SO Event Channel), T002 (PlayerWallet), T003 (MatchRecord), T004 (SaveSystem)  
-**Next action:** T005 — RobotDefinition SO. Create `Assets/Scripts/Core/RobotDefinition.cs` with part slot list and base stats (HP, speed, torque multiplier). Validate slot count in a custom Editor drawer.  
-**Blockers:** None. Unity Editor not available in remote env; all files are pure C# — no scene wiring needed for M1 tasks.  
-**Architecture notes:** All M1 scripts use `BattleRobots.Core` namespace. SaveSystem uses `Application.persistentDataPath`. XOR key is a const byte in SaveSystem (rotate in M5 for security pass).
+**Last completed:** T005 (RobotDefinition SO), T006 (HingeJointAB) — M1 + first M2 tasks done.  
+**Next action:** T007 — DamageSystem. Create:
+  - `Assets/Scripts/Core/HealthSO.cs` — SO with `CurrentHp`, `MaxHp`, `TakeDamage(float)`, `Heal(float)`. Fires `FloatGameEvent` on change; fires `VoidGameEvent` on death.
+  - `Assets/Scripts/Core/DamageEvent.cs` — typed `GameEvent<DamagePayload>` where `DamagePayload` holds `float amount` + `string sourceId`.
+  - Listener thin wrapper `DamageEventListener` in Core.
+  - Wire HealthSO to deduct from `TakeDamage` and fire death event when HP ≤ 0.  
+**Blockers:** None. All pure C# SO/MonoBehaviour — no scene wiring needed yet.  
+**Architecture notes:** HealthSO is a runtime SO (not saved directly; MatchRecord captures damageDone/damageTaken floats at match end). DamageEvent channel stays in `BattleRobots.Core`; visual feedback goes in `BattleRobots.UI` listening via SO channel — never direct reference.
