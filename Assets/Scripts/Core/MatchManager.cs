@@ -47,6 +47,11 @@ namespace BattleRobots.Core
         [Tooltip("Flat currency award on any win, before ArenaConfig.WinBonusCurrency is added.")]
         [SerializeField, Min(0)] private int _baseWinReward = 200;
 
+        [Header("Difficulty (optional)")]
+        [Tooltip("When assigned, scales AI aggression, damage, and time limit. " +
+                 "Leave null for unmodified match parameters.")]
+        [SerializeField] private DifficultySO _difficulty;
+
         [Header("Event Channels")]
         [Tooltip("Raised after every match ends (win, loss, or time-out draw).")]
         [SerializeField] private VoidGameEvent _onMatchEnd;
@@ -77,6 +82,10 @@ namespace BattleRobots.Core
 
         private float _elapsedSeconds;
         private bool  _matchActive;
+
+        // Effective time limit cached at StartMatch so Update reads a plain float.
+        // Pre-computing avoids per-frame property indirection and respects no-alloc rule.
+        private float _effectiveTimeLimitSeconds;
 
         // Max-HP snapshots taken at StartMatch — used to compute damage totals
         // at match end without subscribing to per-frame damage events.
@@ -110,8 +119,15 @@ namespace BattleRobots.Core
             _elapsedSeconds = 0f;
             _matchActive    = true;
 
+            // Cache effective time limit once so Update reads a plain float (no alloc).
+            float rawLimit = ActiveArena.TimeLimitSeconds;
+            _effectiveTimeLimitSeconds = (rawLimit > 0f && _difficulty != null)
+                ? rawLimit * _difficulty.TimeLimitScale
+                : rawLimit;
+
             Debug.Log($"[MatchManager] Match started. Arena: '{ActiveArena.ArenaName}' · " +
-                      $"Time limit: {ActiveArena.TimeLimitSeconds}s.");
+                      $"Difficulty: '{(_difficulty != null ? _difficulty.DifficultyName : "Default")}' · " +
+                      $"Effective time limit: {_effectiveTimeLimitSeconds}s.");
         }
 
         /// <summary>
@@ -150,9 +166,9 @@ namespace BattleRobots.Core
                 return;
             }
 
-            // Time-limit expiry (0 means no limit).
-            if (ActiveArena.TimeLimitSeconds > 0f &&
-                _elapsedSeconds >= ActiveArena.TimeLimitSeconds)
+            // Time-limit expiry (0 means no limit). Reads cached float — no alloc.
+            if (_effectiveTimeLimitSeconds > 0f &&
+                _elapsedSeconds >= _effectiveTimeLimitSeconds)
             {
                 EndMatch(playerWon: false); // draw → treated as loss for economy
             }
@@ -198,6 +214,7 @@ namespace BattleRobots.Core
                 currencyEarned  = currencyEarned,
                 walletSnapshot  = _wallet != null ? _wallet.Balance : 0,
                 equippedPartIds = BuildEquippedPartIds(),
+                difficultyName  = _difficulty != null ? _difficulty.DifficultyName : string.Empty,
             };
 
             // Append to persistent save data.

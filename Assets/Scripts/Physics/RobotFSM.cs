@@ -85,6 +85,11 @@ namespace BattleRobots.Physics
         [Tooltip("Weapon spin speed in Attack state (rad/s).")]
         [SerializeField, Min(0f)] private float _attackWeaponSpeedRadPerSec = 30f;
 
+        [Header("Difficulty (optional)")]
+        [Tooltip("When assigned, scales AI detection ranges and drive speed. " +
+                 "Leave null to use the raw inspector values.")]
+        [SerializeField] private DifficultySO _difficulty;
+
         [Header("State Event Channels (optional)")]
         [SerializeField] private VoidGameEvent _onEnterIdle;
         [SerializeField] private VoidGameEvent _onEnterApproach;
@@ -153,33 +158,41 @@ namespace BattleRobots.Physics
         /// </summary>
         private void TickState(float dist)
         {
+            // Apply difficulty scaling — all float ops, no allocation.
+            // Range formula: effectiveRange = base × (0.5 + aggressionScale).
+            // At aggressionScale=0.5 (Medium default) the multiplier is 1.0 (identity).
+            float aggrMult       = _difficulty != null ? (0.5f + _difficulty.AiAggressionScale) : 1f;
+            float approachRange  = _approachRange * aggrMult;
+            float attackRange    = _attackRange   * aggrMult;
+            float driveSpeed     = _driveSpeedRadPerSec * (_difficulty != null ? _difficulty.AiDriveSpeedScale : 1f);
+
             switch (_state)
             {
                 // ── Idle ──────────────────────────────────────────────────────
                 case RobotAIState.Idle:
                     AllStop();
 
-                    if (dist < _approachRange)
+                    if (dist < approachRange)
                         TransitionTo(RobotAIState.Approach);
                     break;
 
                 // ── Approach ──────────────────────────────────────────────────
                 case RobotAIState.Approach:
-                    DriveTowardTarget();
+                    DriveTowardTarget(driveSpeed);
                     _weaponJoint?.SetTargetVelocity(_idleWeaponSpeedRadPerSec);
 
-                    if (dist < _attackRange)
+                    if (dist < attackRange)
                         TransitionTo(RobotAIState.Attack);
-                    else if (dist > _approachRange * 1.25f) // hysteresis band
+                    else if (dist > approachRange * 1.25f) // hysteresis band
                         TransitionTo(RobotAIState.Idle);
                     break;
 
                 // ── Attack ────────────────────────────────────────────────────
                 case RobotAIState.Attack:
-                    DriveTowardTarget();
+                    DriveTowardTarget(driveSpeed);
                     _weaponJoint?.SetTargetVelocity(_attackWeaponSpeedRadPerSec);
 
-                    if (dist > _attackRange * 1.5f) // hysteresis band
+                    if (dist > attackRange * 1.5f) // hysteresis band
                         TransitionTo(RobotAIState.Approach);
                     break;
             }
@@ -189,9 +202,10 @@ namespace BattleRobots.Physics
 
         /// <summary>
         /// Differential steering: compute left/right wheel velocities to steer toward target.
+        /// <paramref name="driveSpeed"/> is the pre-scaled effective drive speed (rad/s).
         /// All arithmetic uses stack-allocated value types — no heap allocations.
         /// </summary>
-        private void DriveTowardTarget()
+        private void DriveTowardTarget(float driveSpeed)
         {
             // Project the direction-to-target onto the robot's local forward and right axes.
             Vector3 toTarget = _target.position - transform.position; // no normalise needed for Dot
@@ -200,8 +214,8 @@ namespace BattleRobots.Physics
 
             // Base speed proportional to how well we're facing the target.
             // clamp fwdDot so we always drive forward even when strafed.
-            float baseSpeed    = Mathf.Max(0.2f, fwdDot) * _driveSpeedRadPerSec;
-            float steerDelta   = rightDot * _steeringGain * _driveSpeedRadPerSec;
+            float baseSpeed  = Mathf.Max(0.2f, fwdDot) * driveSpeed;
+            float steerDelta = rightDot * _steeringGain * driveSpeed;
 
             float leftVel  = baseSpeed - steerDelta;
             float rightVel = baseSpeed + steerDelta;

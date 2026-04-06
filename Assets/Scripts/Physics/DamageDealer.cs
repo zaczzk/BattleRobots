@@ -27,13 +27,20 @@ namespace BattleRobots.Physics
                  "Prevents chip-damage from light grazes or resting contact.")]
         [SerializeField, Min(0f)] private float _minImpulseThreshold = 2f;
 
+        [Header("Difficulty (optional)")]
+        [Tooltip("When assigned, DamageMultiplier scales every impact's damage. " +
+                 "Leave null for unmodified damage.")]
+        [SerializeField] private DifficultySO _difficulty;
+
         private void OnCollisionEnter(Collision collision)
         {
             if (collision.impulse.magnitude < _minImpulseThreshold) return;
 
             HealthOwner target = collision.gameObject.GetComponentInParent<HealthOwner>();
-            if (target != null)
-                target.ApplyDamage(_damagePerImpact, gameObject.name);
+            if (target == null) return;
+
+            float damage = _damagePerImpact * (_difficulty != null ? _difficulty.DamageMultiplier : 1f);
+            target.ApplyDamage(damage, gameObject.name);
         }
     }
 }

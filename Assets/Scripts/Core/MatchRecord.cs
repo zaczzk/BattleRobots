@@ -37,6 +37,12 @@ namespace BattleRobots.Core
 
         /// <summary>Ordered list of part IDs the robot had equipped.</summary>
         public List<string> equippedPartIds = new List<string>();
+
+        /// <summary>
+        /// Display name of the <see cref="DifficultySO"/> preset active during this match.
+        /// Empty string when no difficulty SO was assigned.
+        /// </summary>
+        public string difficultyName;
     }
 
     // ── Loadout persistence ──────────────────────────────────────────────────
