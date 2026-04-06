@@ -3,7 +3,8 @@
     "rootNamespace": "BattleRobots.Tests",
     "references": [
         "UnityEngine.TestRunner",
-        "BattleRobots.Core"
+        "BattleRobots.Core",
+        "BattleRobots.Physics"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

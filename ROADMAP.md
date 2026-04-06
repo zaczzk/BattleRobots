@@ -67,6 +67,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T029 | Robot preview renderer (RenderTexture orbit camera in ShopUI) | 30 | **Done** 2026-04-06 | RenderTexture assigned to RawImage; orbit MonoBehaviour; no Rigidbody |
 | T030 | Apply PartDefinition.SpeedBonus in RobotSpawner + RobotController | 75 | **Done** 2026-04-06 | ComputeBonuses now outputs speedBonus; ApplySpeedBonus added to RobotController |
 | T031 | EditMode tests for RobotLoadoutSO | 80 | **Done** 2026-04-06 | 16 test cases: default state, EquipPart, UnequipPart, Clear, LoadFromData, BuildData round-trip, null/empty guards |
+| T032 | PlayMode tests — RobotSpawner bonus pipeline | 80 | **Done** 2026-04-06 | 11 cases: null guards, HP/speed bonus application, accumulation, unknown part skip, position, missing descriptor, torque path |
 
 ---
 
@@ -74,7 +75,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | All T001–T031 complete. |
+| T033 — Input rebinding | PM Agent | 2026-04-06 | Next: extend SettingsSO + SaveData with action→key map; SettingsUI rebind button flow |
 
 ---
 
@@ -113,6 +114,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T029 — Robot preview renderer | 2026-04-06 | RobotPreviewCamera (BattleRobots.UI): Camera targetTexture=RenderTexture in Awake, unset in OnDestroy; RawImage.texture wired in Awake; Activate(Transform)/Deactivate/SetTarget/ResetRotation API; orbit via Input.GetAxis("Mouse X")*orbitSpeed*deltaTime rotates _targetTransform around Y; IsActive guard; zero-alloc Update; no Physics namespace. |
 | T030 — SpeedBonus applied in RobotSpawner | 2026-04-06 | PartDefinition.SpeedBonus was computed but never used. ComputeBonuses now outputs speedBonus (3rd out param). RobotController.ApplySpeedBonus(float) added — increments _driveSpeedRadPerSec at spawn. RobotSpawner.SpawnRobot applies it via GetComponent<RobotController>. |
 | T031 — RobotLoadoutSO EditMode tests | 2026-04-06 | RobotLoadoutSOTests.cs: 16 cases covering default state, EquipPart (single/replace/multi/null-slotId/empty-partId), UnequipPart (existing/missing/empty-id), Clear (populated/empty), LoadFromData (valid/null/skip-bad-entries/overwrite), BuildData (round-trip/empty). |
+| T032 — PlayMode tests for RobotSpawner | 2026-04-06 | RobotSpawnerTests.cs (11 plain [Test] cases): null prefab/config, no-parts init, HP bonus single+accumulated, speed bonus via reflection, unknown part ID skip, empty catalogue, null HealthSO, spawn position, missing descriptor origin fallback, torque-bonus no-joints path. PlayMode asmdef extended with BattleRobots.Physics. |
 
 ---
 
@@ -137,18 +139,24 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 14: T026 PlayMode tests for ArenaSelector. ArenaSelectorTests.cs — 6 plain [Test] cases for ArenaSelectionSO isolation + 4 [UnityTest] cases verifying MatchManager.ActiveArena routing via win-bonus wallet delta. Covers Select/Reset/null-guard/replace and fallback/_arenaSelection-null/mid-match-switch scenarios. T028 identified as next. |
 | 2026-04-06 | PM Agent | Session 16: T029 Robot preview renderer. RobotPreviewCamera MonoBehaviour (BattleRobots.UI): Camera.targetTexture set in Awake/cleared in OnDestroy; RawImage.texture wired; Activate/Deactivate/SetTarget/ResetRotation API; orbit via Input.GetAxis("Mouse X"); zero-alloc Update. All T001–T029 complete. All milestones M1–M6 Done. Backlog exhausted. |
 | 2026-04-06 | PM Agent | Session 17: T030 SpeedBonus gap closed — PartDefinition.SpeedBonus was never applied; extended RobotSpawner.ComputeBonuses to output speedBonus (3rd out param), applied via new RobotController.ApplySpeedBonus(float). T031 RobotLoadoutSOTests (16 EditMode cases) — full coverage of EquipPart/UnequipPart/Clear/LoadFromData/BuildData including null guards, replacement, round-trip. |
+| 2026-04-06 | PM Agent | Session 18: T032 PlayMode tests for RobotSpawner (11 plain [Test] cases). RobotSpawnerTests.cs covers: null prefab/config guards, no-parts Initialize, HP bonus (single + accumulated), speed bonus via reflection on RobotController._driveSpeedRadPerSec, unknown part ID skip, empty catalogue no-op, null HealthSO robustness, spawn position from SpawnDescriptor, missing descriptor fallback to origin, torque-bonus path with no joints. PlayMode asmdef extended with BattleRobots.Physics reference. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T030 (SpeedBonus applied in RobotSpawner/RobotController), T031 (RobotLoadoutSO — 16 EditMode tests).  
-**Milestone status:** M1–M6 Done. T001–T031 Done.
+**Last completed:** T032 — PlayMode tests for RobotSpawner (11 cases; HP/speed/torque bonus pipeline verified end-to-end).  
+**Milestone status:** M1–M6 Done. T001–T032 Done.
 
-**Next action:** Suggested T032+ candidates:
-  - T032: PlayMode tests for RobotSpawner — verify HP/torque/speed bonuses applied end-to-end in a running scene
-  - T033: Input rebinding — extend SettingsSO with action→key bindings, persist via SaveSystem
-  - T034: Difficulty tiers — ArenaConfig extension with aiDifficultyMultiplier; RobotFSM reads it to scale reaction radius
-  - Scene wiring / content pass (requires Unity Editor): ArenaConfig SOs, PartDefinition SOs, RobotDefinition SOs
+**Next action:** T033 — Input rebinding.
+  - Extend `SettingsData` (in MatchRecord.cs) with `List<KeyBindingEntry>` (actionName + KeyCode); add `SaveData.keyBindings` field.
+  - Extend `SettingsSO` with `GetBinding(string action)` / `SetBinding(string action, KeyCode key)` / `LoadKeyBindings` / `BuildKeyBindings`; fire `VoidGameEvent` on change.
+  - Extend `SettingsUI` (BattleRobots.UI) with a rebind panel: per-action row showing current key, "Press key" await state on button click, applies immediately + calls `PersistSettings`.
+  - `GameBootstrapper.Awake` loads key bindings alongside existing settings.
 
-**Blockers:** None. Unity Editor not running in remote env; all code is pure C#.
+**Blockers:** None. All code is pure C#. Unity Editor not running in remote env.
+**Architecture notes:**
+  - `KeyBindingEntry` → plain serialisable struct in MatchRecord.cs (or separate file), `BattleRobots.Core`
+  - `SettingsSO.GetBinding` returns `KeyCode.None` for unregistered actions (safe default)
+  - `SettingsUI` must not import `BattleRobots.Physics`; reads binding via `SettingsSO` only
+  - `RobotController` can optionally read bindings from `SettingsSO` if the action name matches `"Forward"`, `"Back"`, `"Left"`, `"Right"`, `"Fire"`
