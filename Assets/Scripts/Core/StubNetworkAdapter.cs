@@ -48,8 +48,20 @@ namespace BattleRobots.Core
         private static readonly Dictionary<string, RoomEntry> s_ActiveRooms =
             new Dictionary<string, RoomEntry>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Remove all simulated rooms (call in TearDown).</summary>
-        public static void ClearRooms() => s_ActiveRooms.Clear();
+        /// <summary>
+        /// Server-side password store for private rooms. Never exposed to clients.
+        /// Keyed by normalised room code; only populated for rooms hosted with
+        /// <see cref="Host(string,int,bool,string)"/> where isPrivate = true.
+        /// </summary>
+        private static readonly Dictionary<string, string> s_RoomPasswords =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Remove all simulated rooms and their passwords (call in TearDown).</summary>
+        public static void ClearRooms()
+        {
+            s_ActiveRooms.Clear();
+            s_RoomPasswords.Clear();
+        }
 
         // ── INetworkAdapter callbacks ─────────────────────────────────────────
 
@@ -109,60 +121,106 @@ namespace BattleRobots.Core
         }
 
         /// <summary>
-        /// Register <paramref name="roomCode"/> in the shared room dictionary with the
-        /// default capacity (2 players) and invoke <see cref="OnRoomJoined"/>.
+        /// Register <paramref name="roomCode"/> as a public room with the default
+        /// capacity (2 players) and invoke <see cref="OnRoomJoined"/>.
         /// </summary>
         public void Host(string roomCode)
         {
-            Host(roomCode, maxPlayers: 2);
+            Host(roomCode, maxPlayers: 2, isPrivate: false, password: string.Empty);
         }
 
         /// <summary>
         /// Register <paramref name="roomCode"/> with an explicit <paramref name="maxPlayers"/>
-        /// capacity and invoke <see cref="OnRoomJoined"/> with the normalised code.
-        /// The host counts as the first player (playerCount = 1).
+        /// capacity as a public room and invoke <see cref="OnRoomJoined"/>.
         /// </summary>
         public void Host(string roomCode, int maxPlayers)
+        {
+            Host(roomCode, maxPlayers, isPrivate: false, password: string.Empty);
+        }
+
+        /// <summary>
+        /// Register <paramref name="roomCode"/> with an explicit capacity, privacy flag,
+        /// and server-side <paramref name="password"/>.
+        ///
+        /// When <paramref name="isPrivate"/> is true the password is stored server-side
+        /// (never broadcast) and verified by <see cref="Join(string,string)"/>.
+        /// The host counts as the first player (playerCount = 1).
+        /// </summary>
+        public void Host(string roomCode, int maxPlayers, bool isPrivate, string password)
         {
             string code = Normalise(roomCode);
             int    cap  = maxPlayers > 0 ? maxPlayers : 2;
 
-            LastRoomCode       = code;
-            s_ActiveRooms[code] = new RoomEntry(code, playerCount: 1, maxPlayers: cap);
+            LastRoomCode        = code;
+            s_ActiveRooms[code] = new RoomEntry(code, playerCount: 1, maxPlayers: cap,
+                                                isPrivate: isPrivate);
+
+            if (isPrivate && !string.IsNullOrEmpty(password))
+                s_RoomPasswords[code] = password;
+            else
+                s_RoomPasswords.Remove(code); // public or blank-password rooms have no entry
+
             OnRoomJoined?.Invoke(code);
         }
 
         /// <summary>
-        /// Join the room if it exists in <see cref="s_ActiveRooms"/> and is not full;
-        /// otherwise invoke <see cref="OnRoomJoinFailed"/> with a descriptive reason.
-        /// On a successful join the room's <c>playerCount</c> is incremented.
+        /// Join the room without a password. Succeeds for public rooms; fails with
+        /// "wrong password" for private rooms (equivalent to supplying an empty password).
         /// </summary>
         public void Join(string roomCode)
+        {
+            Join(roomCode, password: string.Empty);
+        }
+
+        /// <summary>
+        /// Join the room, supplying an optional <paramref name="password"/>.
+        ///
+        /// Failure reasons (in priority order):
+        ///   1. Room not found.
+        ///   2. Room is full.
+        ///   3. Room is private and <paramref name="password"/> does not match.
+        ///
+        /// On success the room's <c>playerCount</c> is incremented.
+        /// </summary>
+        public void Join(string roomCode, string password)
         {
             string code = Normalise(roomCode);
             LastRoomCode = code;
 
-            if (s_ActiveRooms.TryGetValue(code, out RoomEntry room))
-            {
-                if (room.IsFull)
-                {
-                    string reason = $"Room '{code}' is full ({room.playerCount}/{room.maxPlayers}).";
-                    Debug.Log($"[StubNetworkAdapter] Join failed: {reason}");
-                    OnRoomJoinFailed?.Invoke(reason);
-                }
-                else
-                {
-                    // Increment player count and write back (struct copy).
-                    s_ActiveRooms[code] = new RoomEntry(code, room.playerCount + 1, room.maxPlayers);
-                    OnRoomJoined?.Invoke(code);
-                }
-            }
-            else
+            if (!s_ActiveRooms.TryGetValue(code, out RoomEntry room))
             {
                 string reason = $"Room '{code}' not found.";
                 Debug.Log($"[StubNetworkAdapter] Join failed: {reason}");
                 OnRoomJoinFailed?.Invoke(reason);
+                return;
             }
+
+            if (room.IsFull)
+            {
+                string reason = $"Room '{code}' is full ({room.playerCount}/{room.maxPlayers}).";
+                Debug.Log($"[StubNetworkAdapter] Join failed: {reason}");
+                OnRoomJoinFailed?.Invoke(reason);
+                return;
+            }
+
+            if (room.isPrivate)
+            {
+                bool hasPassword = s_RoomPasswords.TryGetValue(code, out string stored);
+                bool correct     = hasPassword && stored == (password ?? string.Empty);
+
+                if (!correct)
+                {
+                    string reason = $"Room '{code}' requires a password.";
+                    Debug.Log($"[StubNetworkAdapter] Join failed: {reason}");
+                    OnRoomJoinFailed?.Invoke(reason);
+                    return;
+                }
+            }
+
+            // Successful join — increment player count and write back (struct copy).
+            s_ActiveRooms[code] = new RoomEntry(code, room.playerCount + 1, room.maxPlayers,
+                                                room.isPrivate);
+            OnRoomJoined?.Invoke(code);
         }
 
         /// <summary>

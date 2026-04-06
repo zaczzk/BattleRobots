@@ -39,6 +39,10 @@ namespace BattleRobots.UI
                  "Use a Text child labelled 'FULL' or a coloured overlay.")]
         [SerializeField] private GameObject _fullBadge;
 
+        [Tooltip("(Optional) GameObject shown when the room is private (requires a password). " +
+                 "Use a lock icon or Text labelled 'PRIVATE'.")]
+        [SerializeField] private GameObject _privateBadge;
+
         [Header("Action")]
         [Tooltip("Button the user presses to join this room. Disabled when the room is full.")]
         [SerializeField] private Button _joinButton;
@@ -85,10 +89,14 @@ namespace BattleRobots.UI
                     : entry.playerCount.ToString();
             }
 
-            bool isFull = entry.IsFull;
+            bool isFull    = entry.IsFull;
+            bool isPrivate = entry.isPrivate;
 
             if (_fullBadge != null)
                 _fullBadge.SetActive(isFull);
+
+            if (_privateBadge != null)
+                _privateBadge.SetActive(isPrivate);
 
             if (_joinButton != null)
                 _joinButton.interactable = !string.IsNullOrEmpty(_roomCode) && !isFull;

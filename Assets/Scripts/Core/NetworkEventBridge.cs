@@ -112,22 +112,33 @@ namespace BattleRobots.Core
         public void BeginConnectAsClient() => BeginConnect(NetworkRole.Client);
 
         /// <summary>
-        /// Tell the adapter to create a room with <paramref name="roomCode"/>
+        /// Tell the adapter to create a public room with <paramref name="roomCode"/>
         /// and the default capacity (2 players).
         /// The session must be in Connected state; call <see cref="BeginConnect"/>
         /// first and wait for the <c>onConnected</c> event before hosting.
         /// </summary>
         public void BeginHost(string roomCode)
         {
-            BeginHost(roomCode, maxPlayers: 2);
+            BeginHost(roomCode, maxPlayers: 2, isPrivate: false, password: string.Empty);
         }
 
         /// <summary>
-        /// Tell the adapter to create a room with an explicit player
+        /// Tell the adapter to create a public room with an explicit player
         /// <paramref name="maxPlayers"/> capacity. The session must be in Connected state.
         /// Values less than 1 are clamped to 2 by the adapter.
         /// </summary>
         public void BeginHost(string roomCode, int maxPlayers)
+        {
+            BeginHost(roomCode, maxPlayers, isPrivate: false, password: string.Empty);
+        }
+
+        /// <summary>
+        /// Tell the adapter to create a room with full control over capacity and privacy.
+        /// When <paramref name="isPrivate"/> is true, <paramref name="password"/> is stored
+        /// server-side; clients must supply it via <see cref="BeginJoin(string,string)"/>.
+        /// The session must be in Connected state.
+        /// </summary>
+        public void BeginHost(string roomCode, int maxPlayers, bool isPrivate, string password)
         {
             if (_session == null) return;
 
@@ -137,14 +148,25 @@ namespace BattleRobots.Core
                 return;
             }
 
-            _adapter?.Host(roomCode, maxPlayers);
+            _adapter?.Host(roomCode, maxPlayers, isPrivate, password);
         }
 
         /// <summary>
-        /// Tell the adapter to join the room identified by <paramref name="roomCode"/>.
+        /// Tell the adapter to join the room identified by <paramref name="roomCode"/>
+        /// without a password (suitable for public rooms).
         /// The session must be in Connected state.
         /// </summary>
         public void BeginJoin(string roomCode)
+        {
+            BeginJoin(roomCode, password: string.Empty);
+        }
+
+        /// <summary>
+        /// Tell the adapter to join the room with an optional <paramref name="password"/>.
+        /// Use this overload when joining a room that may be private.
+        /// The session must be in Connected state.
+        /// </summary>
+        public void BeginJoin(string roomCode, string password)
         {
             if (_session == null) return;
 
@@ -154,7 +176,7 @@ namespace BattleRobots.Core
                 return;
             }
 
-            _adapter?.Join(roomCode);
+            _adapter?.Join(roomCode, password);
         }
 
         /// <summary>

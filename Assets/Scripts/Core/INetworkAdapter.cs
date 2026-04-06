@@ -52,11 +52,34 @@ namespace BattleRobots.Core
         void Host(string roomCode, int maxPlayers);
 
         /// <summary>
+        /// Create and host a private room with an explicit player capacity and password.
+        /// When <paramref name="isPrivate"/> is true, clients must supply the matching
+        /// <paramref name="password"/> via <see cref="Join(string,string)"/> to enter.
+        /// The password is never broadcast to room-list clients — only the
+        /// <see cref="RoomEntry.isPrivate"/> flag is visible publicly.
+        /// Values of <paramref name="maxPlayers"/> &lt; 1 are clamped to 2.
+        /// Calls <see cref="OnRoomJoined"/> with the confirmed room code on success.
+        /// </summary>
+        void Host(string roomCode, int maxPlayers, bool isPrivate, string password);
+
+        /// <summary>
         /// Join an existing match room identified by <paramref name="roomCode"/>.
+        /// For public rooms the password is ignored. For private rooms an empty or
+        /// mismatched password results in <see cref="OnRoomJoinFailed"/>.
         /// Calls <see cref="OnRoomJoined"/> with the confirmed code on success,
-        /// or <see cref="OnRoomJoinFailed"/> if the room does not exist.
+        /// or <see cref="OnRoomJoinFailed"/> if the room does not exist, is full,
+        /// or the password is wrong.
         /// </summary>
         void Join(string roomCode);
+
+        /// <summary>
+        /// Join an existing room with an optional <paramref name="password"/>.
+        /// Use this overload when joining a room that may be private.
+        /// For public rooms the password argument is ignored.
+        /// Calls <see cref="OnRoomJoined"/> on success; <see cref="OnRoomJoinFailed"/>
+        /// on any failure (not found, full, wrong password).
+        /// </summary>
+        void Join(string roomCode, string password);
 
         // ── Room discovery ────────────────────────────────────────────────────
 

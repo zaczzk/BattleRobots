@@ -63,6 +63,13 @@ namespace BattleRobots.UI
         [Tooltip("When enabled, rooms that have reached capacity (IsFull) are hidden from the list.")]
         [SerializeField] private bool _filterFullRooms = false;
 
+        [Tooltip("When enabled, private rooms (password-protected) are hidden from the list.")]
+        [SerializeField] private bool _hidePrivateRooms = false;
+
+        [Tooltip("(Optional) InputField where the player enters a password before joining " +
+                 "a private room. When assigned the text value is forwarded to BeginJoin.")]
+        [SerializeField] private InputField _passwordInputField;
+
         // ── Runtime state ─────────────────────────────────────────────────────
 
         // Pool of active row instances; cleared and rebuilt on each Rebuild call.
@@ -134,6 +141,10 @@ namespace BattleRobots.UI
                 if (_filterFullRooms && entry.IsFull)
                     continue;
 
+                // Skip private rooms when the filter toggle is on.
+                if (_hidePrivateRooms && entry.isPrivate)
+                    continue;
+
                 RoomEntryUI row = Instantiate(_entryPrefab, _scrollContent);
                 row.Setup(entry, HandleJoinRequested);
                 _rows.Add(row);
@@ -142,7 +153,8 @@ namespace BattleRobots.UI
 
         /// <summary>
         /// Callback passed into each <see cref="RoomEntryUI"/> row's Setup call.
-        /// Delegates the join request to <see cref="NetworkEventBridge.BeginJoin"/>.
+        /// Forwards the join request — including any password entered in
+        /// <c>_passwordInputField</c> — to <see cref="NetworkEventBridge.BeginJoin(string,string)"/>.
         /// </summary>
         private void HandleJoinRequested(string roomCode)
         {
@@ -158,7 +170,8 @@ namespace BattleRobots.UI
                 return;
             }
 
-            _bridge.BeginJoin(roomCode);
+            string password = _passwordInputField != null ? _passwordInputField.text : string.Empty;
+            _bridge.BeginJoin(roomCode, password);
         }
 
 #if UNITY_EDITOR

@@ -23,17 +23,23 @@ namespace BattleRobots.Core
         [Tooltip("Maximum number of players allowed in this room.")]
         public int maxPlayers;
 
+        [Tooltip("When true this room requires a password to join. " +
+                 "The password itself is never transmitted to clients; only this flag is.")]
+        public bool isPrivate;
+
         /// <summary>
         /// Convenience constructor for use in tests and the stub adapter.
         /// </summary>
         /// <param name="roomCode">Four-character room identifier.</param>
         /// <param name="playerCount">Current number of players in the room.</param>
         /// <param name="maxPlayers">Capacity cap. Defaults to 2 (standard 1v1 match).</param>
-        public RoomEntry(string roomCode, int playerCount, int maxPlayers = 2)
+        /// <param name="isPrivate">Whether a password is required to join. Defaults to false.</param>
+        public RoomEntry(string roomCode, int playerCount, int maxPlayers = 2, bool isPrivate = false)
         {
             this.roomCode    = roomCode    ?? string.Empty;
             this.playerCount = playerCount;
             this.maxPlayers  = maxPlayers > 0 ? maxPlayers : 2;
+            this.isPrivate   = isPrivate;
         }
 
         /// <summary>
