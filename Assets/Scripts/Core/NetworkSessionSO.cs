@@ -18,6 +18,12 @@ namespace BattleRobots.Core
         Connected,
         /// <summary>Inside an active match room.</summary>
         InMatch,
+        /// <summary>
+        /// Connection dropped; a reconnection attempt is in-flight.
+        /// Transitions back to Connecting (and then Connected/InMatch) on success,
+        /// or to Disconnected on cancel/max-attempts exhausted.
+        /// </summary>
+        Reconnecting,
     }
 
     // ── Host / client role enum ───────────────────────────────────────────────
@@ -75,6 +81,14 @@ namespace BattleRobots.Core
         [Tooltip("Raised when ConnectionState returns to Disconnected.")]
         [SerializeField] private VoidGameEvent _onDisconnected;
 
+        [Tooltip("Raised when a reconnection attempt begins (state = Reconnecting).")]
+        [SerializeField] private VoidGameEvent _onReconnecting;
+
+        [Header("Reconnection")]
+        [Tooltip("Maximum number of reconnection attempts before giving up. " +
+                 "0 = unlimited. BeginReconnect() no-ops when this limit is reached.")]
+        [SerializeField, Min(0)] private int _maxReconnectAttempts = 3;
+
         // ── Runtime state ─────────────────────────────────────────────────────
 
         /// <summary>Current lifecycle state of the network session.</summary>
@@ -90,14 +104,25 @@ namespace BattleRobots.Core
         /// </summary>
         public string RoomCode { get; private set; } = string.Empty;
 
+        /// <summary>Number of reconnection attempts made in the current session.</summary>
+        public int ReconnectAttempts { get; private set; }
+
+        /// <summary>
+        /// Maximum allowed reconnection attempts as configured in the SO.
+        /// 0 means unlimited.
+        /// </summary>
+        public int MaxReconnectAttempts => _maxReconnectAttempts;
+
         /// <summary>
         /// True when <see cref="ConnectionState"/> is
-        /// <see cref="NetworkConnectionState.Connected"/> or
-        /// <see cref="NetworkConnectionState.InMatch"/>.
+        /// <see cref="NetworkConnectionState.Connected"/>,
+        /// <see cref="NetworkConnectionState.InMatch"/>, or
+        /// <see cref="NetworkConnectionState.Reconnecting"/>.
         /// </summary>
         public bool IsConnected =>
-            ConnectionState == NetworkConnectionState.Connected ||
-            ConnectionState == NetworkConnectionState.InMatch;
+            ConnectionState == NetworkConnectionState.Connected  ||
+            ConnectionState == NetworkConnectionState.InMatch    ||
+            ConnectionState == NetworkConnectionState.Reconnecting;
 
         /// <summary>
         /// True when <see cref="ConnectionState"/> is
@@ -183,17 +208,68 @@ namespace BattleRobots.Core
         /// <summary>
         /// Tear down the session from any state.
         /// Transitions to <see cref="NetworkConnectionState.Disconnected"/>,
-        /// clears role and room code, raises <see cref="_onDisconnected"/>.
+        /// clears role, room code, and reconnect counter, raises <see cref="_onDisconnected"/>.
         /// Safe to call from any state.
         /// </summary>
         public void Disconnect()
         {
-            Role            = NetworkRole.None;
-            RoomCode        = string.Empty;
-            ConnectionState = NetworkConnectionState.Disconnected;
+            Role              = NetworkRole.None;
+            RoomCode          = string.Empty;
+            ReconnectAttempts = 0;
+            ConnectionState   = NetworkConnectionState.Disconnected;
             _onDisconnected?.Raise();
 
             Debug.Log("[NetworkSessionSO] Disconnected.");
+        }
+
+        /// <summary>
+        /// Begin a reconnection attempt.
+        /// Valid from <see cref="NetworkConnectionState.Connected"/>,
+        /// <see cref="NetworkConnectionState.InMatch"/>, or
+        /// <see cref="NetworkConnectionState.Connecting"/>.
+        /// Increments <see cref="ReconnectAttempts"/> and transitions state to
+        /// <see cref="NetworkConnectionState.Reconnecting"/>.
+        /// Fires <see cref="_onReconnecting"/>.
+        ///
+        /// No-op (with warning) when:
+        ///   • Already in <see cref="NetworkConnectionState.Reconnecting"/> state.
+        ///   • Already <see cref="NetworkConnectionState.Disconnected"/>.
+        ///   • <see cref="MaxReconnectAttempts"/> is non-zero and
+        ///     <see cref="ReconnectAttempts"/> has reached that limit.
+        /// </summary>
+        public void BeginReconnect()
+        {
+            if (ConnectionState == NetworkConnectionState.Disconnected ||
+                ConnectionState == NetworkConnectionState.Reconnecting)
+            {
+                Debug.LogWarning($"[NetworkSessionSO] BeginReconnect() called while in state " +
+                                 $"{ConnectionState}. Ignored.", this);
+                return;
+            }
+
+            if (_maxReconnectAttempts > 0 && ReconnectAttempts >= _maxReconnectAttempts)
+            {
+                Debug.LogWarning($"[NetworkSessionSO] Maximum reconnection attempts " +
+                                 $"({_maxReconnectAttempts}) reached. Call Disconnect() to reset.", this);
+                return;
+            }
+
+            ReconnectAttempts++;
+            ConnectionState = NetworkConnectionState.Reconnecting;
+            _onReconnecting?.Raise();
+
+            Debug.Log($"[NetworkSessionSO] Reconnecting (attempt {ReconnectAttempts}" +
+                      (_maxReconnectAttempts > 0 ? $" of {_maxReconnectAttempts}" : string.Empty) + ").");
+        }
+
+        /// <summary>
+        /// Resets <see cref="ReconnectAttempts"/> to zero without changing
+        /// the connection state. Call after a successful reconnect to clear
+        /// the counter for future disconnects.
+        /// </summary>
+        public void ResetReconnectCount()
+        {
+            ReconnectAttempts = 0;
         }
     }
 }
