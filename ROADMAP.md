@@ -64,7 +64,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T026 | PlayMode tests for ArenaSelector (selection → MatchManager) | 75 | **Done** 2026-04-06 | 9 test cases: Select/Reset/null/replace (plain [Test]) + 4 [UnityTest] routing via win-bonus delta |
 | T027 | Robot loadout persistence — save/load equipped parts per slot | 85 | **Done** 2026-04-06 | RobotLoadoutSO + RobotLoadoutData; round-trips via SaveSystem; GameBootstrapper restores on startup |
 | T028 | Leaderboard / stats screen (wins, avg damage, total earnings) | 55 | **Done** 2026-04-06 | LeaderboardStats (readonly struct, single-pass Compute); LeaderboardUI (OnEnable, no Update); 12 EditMode tests |
-| T029 | Robot preview renderer (RenderTexture orbit camera in ShopUI) | 30 | Pending | RenderTexture assigned to RawImage; orbit MonoBehaviour; no Rigidbody |
+| T029 | Robot preview renderer (RenderTexture orbit camera in ShopUI) | 30 | **Done** 2026-04-06 | RenderTexture assigned to RawImage; orbit MonoBehaviour; no Rigidbody |
 
 ---
 
@@ -72,7 +72,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T029 — Robot preview renderer | PM Agent | 2026-04-06 | Next session |
+| — | — | All T001–T029 complete. |
 
 ---
 
@@ -108,6 +108,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T027 — Robot loadout persistence | 2026-04-06 | LoadoutEntry + RobotLoadoutData POCOs added to MatchRecord.cs; SaveData.robotLoadout field. RobotLoadoutSO: EquipPart/UnequipPart/GetEquippedPartId/IsEquipped/Clear/LoadFromData/BuildData; O(1) Dictionary lookup + ordered List; VoidGameEvent on change. GameBootstrapper: loads loadout in Awake; snapshots in RecordMatchAndSave. |
 | T026 — PlayMode tests for ArenaSelector | 2026-04-06 | ArenaSelectorTests.cs (9 cases). Plain [Test]: Default_HasNoSelection, Select_ValidArena, Select_NullIgnored, Reset_ClearsSelection, Reset_WhenEmpty, Select_ReplacesFirst. [UnityTest]: ActiveArena_WithSelection (win-bonus delta), ActiveArena_WithoutSelection (fallback), ActiveArena_NullSO (null guard), ActiveArena_ChangedMidMatch. Reuses BattleRobots.Tests.PlayMode asmdef. |
 | T028 — Leaderboard / stats screen | 2026-04-06 | LeaderboardStats readonly struct (Compute single-pass over List<MatchRecord>: MatchCount, Wins, Losses, WinRatePercent, AvgDamageDealt, AvgDamageTaken, TotalEarnings, AvgDurationSeconds). LeaderboardUI (BattleRobots.UI, OnEnable + Refresh, stats/empty panel toggle, 8 label fields, close button). LeaderboardStatsTests (12 EditMode cases: null/empty, single win/loss, mixed history, win-rate boundaries, avg damage, total earnings, avg duration). |
+| T029 — Robot preview renderer | 2026-04-06 | RobotPreviewCamera (BattleRobots.UI): Camera targetTexture=RenderTexture in Awake, unset in OnDestroy; RawImage.texture wired in Awake; Activate(Transform)/Deactivate/SetTarget/ResetRotation API; orbit via Input.GetAxis("Mouse X")*orbitSpeed*deltaTime rotates _targetTransform around Y; IsActive guard; zero-alloc Update; no Physics namespace. |
 
 ---
 
@@ -130,24 +131,20 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 13: T027 Robot loadout persistence. LoadoutEntry + RobotLoadoutData POCOs in MatchRecord.cs; SaveData.robotLoadout field. New RobotLoadoutSO (BattleRobots.Core): EquipPart/UnequipPart/GetEquippedPartId/IsEquipped/Clear/LoadFromData/BuildData; O(1) dict+ordered list; VoidGameEvent on change. GameBootstrapper extended with _robotLoadout field; loads on Awake, snapshots in RecordMatchAndSave. Extended backlog with T026–T029. |
 | 2026-04-06 | PM Agent | Session 15: T028 Leaderboard stats screen. LeaderboardStats readonly struct (single-pass Compute, 8 fields). LeaderboardUI (BattleRobots.UI, OnEnable/Refresh, stats+empty panels, 8 labels, close button). LeaderboardStatsTests (12 EditMode cases). |
 | 2026-04-06 | PM Agent | Session 14: T026 PlayMode tests for ArenaSelector. ArenaSelectorTests.cs — 6 plain [Test] cases for ArenaSelectionSO isolation + 4 [UnityTest] cases verifying MatchManager.ActiveArena routing via win-bonus wallet delta. Covers Select/Reset/null-guard/replace and fallback/_arenaSelection-null/mid-match-switch scenarios. T028 identified as next. |
+| 2026-04-06 | PM Agent | Session 16: T029 Robot preview renderer. RobotPreviewCamera MonoBehaviour (BattleRobots.UI): Camera.targetTexture set in Awake/cleared in OnDestroy; RawImage.texture wired; Activate/Deactivate/SetTarget/ResetRotation API; orbit via Input.GetAxis("Mouse X"); zero-alloc Update. All T001–T029 complete. All milestones M1–M6 Done. Backlog exhausted. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T028 (Leaderboard / stats screen — LeaderboardStats struct + LeaderboardUI + 12 tests).
-**Milestone status:** M1–M6 Done. T001–T028 Done.
+**Last completed:** T029 (RobotPreviewCamera — orbit preview with RenderTexture + RawImage).  
+**Milestone status:** M1–M6 Done. T001–T029 Done. **Backlog exhausted.**
 
-**Next action:** T029 — Robot preview renderer. Create:
-  - `Assets/Scripts/UI/RobotPreviewCamera.cs` — `BattleRobots.UI` namespace; controls a Camera that renders to a `RenderTexture`; orbit input (horizontal mouse/gamepad delta) rotates the robot preview; `RenderTexture` assigned to a `RawImage` in the Shop UI. No Rigidbody; no ArticulationBody; no Physics namespace import.
-  - Suggested fields: `_camera` (Camera), `_renderTexture` (RenderTexture), `_rawImage` (RawImage), `_orbitSpeed` (float), `_targetTransform` (Transform — root of preview robot GO). Orbit rotates `_targetTransform` around its Y axis using `Input.GetAxis("Mouse X")` scaled by `_orbitSpeed * Time.deltaTime`. No allocations in Update.
+**Next action:** Backlog is empty. Recommended next steps for future sessions:
+  1. Scene wiring — hook RobotPreviewCamera into the ShopUI scene prefab (assign _previewCamera, _renderTexture, _rawImage, _targetTransform in Inspector).
+  2. Play-test pass — verify MatchManager end-to-end (spawn → fight → record → save → leaderboard).
+  3. Build & profile — ArticulationBody physics step budget, GC alloc sweep in Unity Profiler.
+  4. Content pass — author 3+ ArenaConfig SOs, 4+ PartDefinition SOs, 2 RobotDefinition SOs.
+  5. If new features needed, add T030+ entries to the Active Backlog.
 
-**Architecture notes:**
-  - `RobotPreviewCamera` lives in `BattleRobots.UI`. It must NOT reference `BattleRobots.Physics`.
-  - The Camera's `targetTexture` should be set to `_renderTexture` in `Awake`; unset in `OnDestroy` to release the RT.
-  - The preview robot GameObject should be on its own Layer (e.g. "RobotPreview") so the preview Camera culls only that layer.
-  - `RenderTexture` should be created as an asset (256×256 or 512×512) and assigned in the Inspector — do not create it at runtime unless necessary.
-  - LeaderboardUI (`Assets/Scripts/UI/LeaderboardUI.cs`) and LeaderboardStats (`Assets/Scripts/Core/LeaderboardStats.cs`) are complete. Wire `LeaderboardUI` to the stats screen panel in the MainMenu scene.
-  - T029 (RobotPreviewRenderer) is lower RICE — do T028 first.
-
-**Blockers:** None. Pure C# + Unity UI work.
+**Blockers:** None. Unity Editor not running in remote env; all scripts are pure C#.
