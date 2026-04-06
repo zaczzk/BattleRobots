@@ -1,0 +1,105 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace BattleRobots.Core
+{
+    // ── RoomEntry ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Lightweight descriptor for a single network room visible in the browser.
+    /// Serializable so it can be passed through the event pipeline and stored
+    /// in a MatchRecord if needed in future.
+    /// </summary>
+    [Serializable]
+    public struct RoomEntry
+    {
+        [Tooltip("Four-character room code used to join the room.")]
+        public string roomCode;
+
+        [Tooltip("Number of players currently in the room.")]
+        public int playerCount;
+
+        /// <summary>
+        /// Convenience constructor for use in tests and the stub adapter.
+        /// </summary>
+        public RoomEntry(string roomCode, int playerCount)
+        {
+            this.roomCode    = roomCode    ?? string.Empty;
+            this.playerCount = playerCount;
+        }
+    }
+
+    // ── RoomListSO ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Runtime ScriptableObject that holds the current list of available network
+    /// rooms. Updated by the network layer (adapter / bridge); read by
+    /// <see cref="RoomListUI"/> to populate the room browser.
+    ///
+    /// Mutation is only allowed through the designated mutators
+    /// (<see cref="SetRooms"/> and <see cref="Clear"/>), which also fire
+    /// the <see cref="_onRoomsUpdated"/> SO event channel so that UI components
+    /// react without polling.
+    ///
+    /// ARCHITECTURE RULES:
+    ///   • Lives in BattleRobots.Core — safe to reference from UI.
+    ///   • No Physics references.
+    ///   • No heap allocations in Update (no Update defined here).
+    ///   • Read-only at runtime except through designated mutators.
+    ///
+    /// Create via:  Assets ▶ Create ▶ BattleRobots ▶ Network ▶ RoomListSO
+    /// </summary>
+    [CreateAssetMenu(menuName = "BattleRobots/Network/RoomListSO", order = 1)]
+    public sealed class RoomListSO : ScriptableObject
+    {
+        // ── Inspector ─────────────────────────────────────────────────────────
+
+        [Header("Event Channel")]
+        [Tooltip("Raised after SetRooms() or Clear() mutates the room list. " +
+                 "Wire a VoidGameEventListener to RoomListUI.OnRoomsUpdated().")]
+        [SerializeField] private VoidGameEvent _onRoomsUpdated;
+
+        // ── Runtime state ─────────────────────────────────────────────────────
+
+        // Pre-allocated; cleared and repopulated by SetRooms / Clear.
+        private readonly List<RoomEntry> _rooms = new List<RoomEntry>();
+
+        // ── Public API ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Read-only view of the current room list.
+        /// Never mutate the underlying list — call <see cref="SetRooms"/> instead.
+        /// </summary>
+        public IReadOnlyList<RoomEntry> Rooms => _rooms;
+
+        /// <summary>Number of rooms currently in the list.</summary>
+        public int Count => _rooms.Count;
+
+        // ── Mutators ──────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Replace the room list with <paramref name="rooms"/> and fire the
+        /// <see cref="_onRoomsUpdated"/> event channel.
+        /// Passing <c>null</c> is equivalent to calling <see cref="Clear"/>.
+        /// </summary>
+        public void SetRooms(List<RoomEntry> rooms)
+        {
+            _rooms.Clear();
+            if (rooms != null)
+                _rooms.AddRange(rooms);
+
+            _onRoomsUpdated?.Raise();
+        }
+
+        /// <summary>
+        /// Remove all entries from the room list and fire the
+        /// <see cref="_onRoomsUpdated"/> event channel.
+        /// </summary>
+        public void Clear()
+        {
+            _rooms.Clear();
+            _onRoomsUpdated?.Raise();
+        }
+    }
+}

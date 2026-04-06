@@ -77,6 +77,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T039 | Network reconnection flow (SessionTimeoutSO, Reconnecting state, ReconnectUI) | 85 | **Done** 2026-04-06 | SessionTimeoutSO; NetworkSessionSO.Reconnecting+BeginReconnect+ReconnectAttempts; ReconnectUI overlay; 20 EditMode test cases |
 | T040 | Network latency / ping display (PingSO, PingMonitor, PingDisplayUI) | 75 | **Done** 2026-04-06 | PingSO SO; PingMonitor polls adapter on interval; PingDisplayUI colour-coded label; INetworkAdapter.GetPingMs(); 16 EditMode tests |
 | T041 | Player connection status badge (ConnectionBadgeUI, ConnectionStateLabel) | 65 | **Done** 2026-04-06 | Coloured HUD badge + text label; event-driven via VoidGameEventListener channels; 10 EditMode tests |
+| T042 | Network room-list browser (RoomListSO, RoomEntryUI, RoomListUI) | 80 | **Done** 2026-04-06 | RoomListSO SO + RoomEntryUI row + RoomListUI scrollable browser; 12 EditMode tests |
 
 ---
 
@@ -84,7 +85,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T042 — (next task TBD) | PM Agent | 2026-04-06 | See Session Handoff |
+| T043 — (next task TBD) | PM Agent | 2026-04-06 | See Session Handoff |
 
 ---
 
@@ -133,6 +134,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T039 — Network reconnection flow | 2026-04-06 | SessionTimeoutSO (Core): configurable duration, Tick(float) countdown, VoidGameEvent _onTimeout, Reset()/Stop(), IsRunning/RemainingTime. NetworkSessionSO extended: Reconnecting enum value; _onReconnecting VoidGameEvent; _maxReconnectAttempts field; ReconnectAttempts/MaxReconnectAttempts; BeginReconnect() (Connected/InMatch/Connecting→Reconnecting, increments counter, guards max); ResetReconnectCount(); Disconnect() zeroes counter; IsConnected includes Reconnecting. ReconnectUI (BattleRobots.UI): overlay panel; OnReconnecting/OnConnectionRestored via VoidGameEventListener; attempt label ("Attempt N of Max"); Cancel→BeginDisconnect; Retry→BeginConnect(last role); Retry disabled at max; no Update/FixedUpdate. NetworkReconnectTests.cs (20 EditMode cases). |
 | T040 — Network latency / ping display | 2026-04-06 | INetworkAdapter.GetPingMs() added (interface extension). StubNetworkAdapter: FakePingMs configurable field, GetPingMs() returns it. PingSO (Core): CurrentPingMs int; SetPing(int) clamps ≥0 + fires IntGameEvent; Reset() zeros + fires. PingMonitor (Core MB): polls bridge.GetAdapterPingMs() every _pollIntervalSeconds via float timer in Update (no alloc); OnDisable calls pingSO.Reset(). NetworkEventBridge: GetAdapterPingMs() delegation method added. PingDisplayUI (BattleRobots.UI): Text label + colour (green/yellow/red/grey) via OnPingChanged(int) wired from IntGameEventListener; offline state hides label and shows optional offline label; no Update. PingTests.cs: 16 EditMode cases covering PingSO default/SetPing/Reset, StubAdapter FakePingMs, INetworkAdapter contract, NetworkEventBridge delegation, SetAdapter swap. |
 | T041 — Player connection status badge | 2026-04-06 | ConnectionBadgeUI (BattleRobots.UI): Image badge + Text label; CurrentState property; OnDisconnected/OnConnecting/OnConnected/OnMatchJoined/OnReconnecting callbacks; colour mapping (grey/yellow/green/darker-green/orange); no Update. ConnectionStateLabel (BattleRobots.UI): Text label; CurrentState + CurrentText properties; same 5 callbacks; configurable state strings. ConnectionBadgeTests.cs: 10 EditMode cases covering default state, state transitions (Connecting/Connected/InMatch/Reconnecting/Disconnected), and label text contracts. EditMode asmdef extended with BattleRobots.UI reference. |
+| T042 — Network room-list browser | 2026-04-06 | RoomEntry [Serializable] struct (roomCode, playerCount, constructor). RoomListSO (Core SO): List<RoomEntry> with SetRooms/Clear mutators; IReadOnlyList<RoomEntry> Rooms; Count; VoidGameEvent _onRoomsUpdated fires on every mutation; null-safe. RoomEntryUI (UI MB): row prefab component; Setup(RoomEntry, Action<string>) pushes data in; Join Button fires callback with roomCode; interactable=false on empty code; Awake AddListener, OnDestroy cleanup. RoomListUI (UI MB): rebuilds on OnRoomsUpdated() (wired via sibling VoidGameEventListener); instantiates RoomEntryUI prefab per room; HandleJoinRequested delegates to NetworkEventBridge.BeginJoin; empty-state label toggled; optional Refresh button; OnEnable rebuilds. RoomListTests.cs: 12 EditMode cases (DefaultState×2, SetRooms×5, Clear×2, RoomEntry struct×2). Scene .unity wiring deferred to Editor session. |
 
 ---
 
@@ -167,26 +169,28 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 25: T039 Network reconnection flow. SessionTimeoutSO (Core): _timeoutDuration/Reset()/Tick(deltaTime)/Stop()/IsRunning/RemainingTime; fires VoidGameEvent _onTimeout on expiry; no MonoBehaviour. NetworkSessionSO extended: Reconnecting enum value; _onReconnecting VoidGameEvent + _maxReconnectAttempts (default 3) inspector fields; ReconnectAttempts/MaxReconnectAttempts properties; BeginReconnect() guards (Disconnected/already-Reconnecting/max-reached), increments counter, fires channel; ResetReconnectCount(); Disconnect() now zeroes counter; IsConnected updated to include Reconnecting. ReconnectUI (BattleRobots.UI): overlay panel toggled by OnReconnecting/OnConnectionRestored via VoidGameEventListener; attempt counter label; Cancel→BeginDisconnect; Retry→BeginConnect using last role; Retry.interactable=false at max attempts; no Update/FixedUpdate. NetworkReconnectTests.cs: 20 EditMode cases covering all of the above. |
 | 2026-04-06 | PM Agent | Session 26: T040 Network latency / ping display. INetworkAdapter.GetPingMs() new method added. StubNetworkAdapter: FakePingMs int field + GetPingMs() implementation. PingSO (Core SO): CurrentPingMs; SetPing(int) clamps negatives to 0, fires IntGameEvent; Reset() zeroes + fires. PingMonitor (Core MB): float timer in Update (only per-frame work); polls bridge.GetAdapterPingMs() every _pollIntervalSeconds; OnEnable forces first poll; OnDisable calls pingSO.Reset(). NetworkEventBridge: GetAdapterPingMs() delegation method. PingDisplayUI (BattleRobots.UI): Text label + colour (green ≤80/yellow ≤150/red 151+/grey=offline); optional offline label; no Update; updated via OnPingChanged(int) from IntGameEventListener. PingTests.cs: 16 EditMode cases (PingSO default/SetPing/Reset, Stub FakePingMs, INetworkAdapter contract, Bridge delegation + SetAdapter swap). |
 | 2026-04-06 | PM Agent | Session 27: T041 Player connection status badge. ConnectionBadgeUI (BattleRobots.UI): Image badge + Text label; CurrentState property tracks NetworkConnectionState; OnDisconnected/OnConnecting/OnConnected/OnMatchJoined/OnReconnecting public callbacks wired via VoidGameEventListener; colour map (grey/yellow/green/dark-green/orange); Awake initialises to Disconnected; no Update. ConnectionStateLabel (BattleRobots.UI): Text label; same 5 callbacks; CurrentText property; configurable state strings per Inspector field. ConnectionBadgeTests.cs: 10 EditMode cases covering default state, all 5 state transitions for badge and label, text contract assertions. BattleRobots.Tests.EditMode.asmdef extended with BattleRobots.UI reference. |
+| 2026-04-06 | PM Agent | Session 28: T042 Network room-list browser. RoomEntry [Serializable] struct (roomCode string, playerCount int, convenience constructor) in RoomListSO.cs. RoomListSO (BattleRobots.Core SO): List<RoomEntry> backing store, IReadOnlyList<RoomEntry> Rooms + Count, SetRooms(List<RoomEntry>) null-safe + Clear() mutators, VoidGameEvent _onRoomsUpdated fires on both. RoomEntryUI (BattleRobots.UI MB): Setup(RoomEntry, Action<string>) pushes data in; Join Button wired in Awake, cleaned in OnDestroy; interactable=false on empty code; no Update. RoomListUI (BattleRobots.UI MB): Rebuild() destroys old rows and instantiates RoomEntryUI prefab per room; OnRoomsUpdated() public entry point (wired via VoidGameEventListener sibling); OnEnable rebuilds; HandleJoinRequested delegates to NetworkEventBridge.BeginJoin; empty-state label toggled; optional Refresh button. RoomListTests.cs: 12 EditMode cases (DefaultState×2, SetRooms×5, Clear×2, RoomEntry struct×2). Scene .unity wiring deferred to Editor session. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T041 — Player connection status badge (ConnectionBadgeUI, ConnectionStateLabel, 10 EditMode tests).  
-**Milestone status:** M1–M6 Done. T001–T041 Done.
+**Last completed:** T042 — Network room-list browser (RoomListSO, RoomEntryUI, RoomListUI, 12 EditMode tests).  
+**Milestone status:** M1–M6 Done. T001–T042 Done.
 
-**Next action:** T042 — Network room-list browser. Suggested deliverables:
-  - `RoomListSO.cs` (BattleRobots.Core) — runtime SO holding a `List<RoomEntry>` (roomCode + playerCount); mutators `SetRooms(List<RoomEntry>)` / `Clear()`; fires a `VoidGameEvent _onRoomsUpdated` channel; immutable from outside.
-  - `RoomEntryUI.cs` (BattleRobots.UI) — prefab row component: roomCode Text + playerCount Text + Join Button; `Setup(RoomEntry, Action<string>)` API; no direct SO reference (data pushed in, action pushed out).
-  - `RoomListUI.cs` (BattleRobots.UI) — scrollable list: rebuilds on `OnRoomsUpdated()` callback wired via `VoidGameEventListener`; instantiates `RoomEntryUI` prefab rows; join callback delegates to `NetworkEventBridge.BeginJoin(roomCode)`; clear-on-rebuild, empty-state label.
-  - `RoomListTests.cs` (EditMode) — 10 EditMode cases: default empty, SetRooms, Clear, event fires on update, RoomListUI row count matches, join callback invoked.
+**Next action:** T043 — Suggest: Room-list refresh polling (adapter side). Suggested deliverables:
+  - Extend `INetworkAdapter` with `void RequestRoomList()` and `Action<List<RoomEntry>> OnRoomListReceived` callback.
+  - `StubNetworkAdapter.RequestRoomList()` — immediately calls `OnRoomListReceived` with the current `s_ActiveRooms` list.
+  - `NetworkEventBridge.RequestRoomList()` — delegates to adapter; wires `OnRoomListReceived` to call `RoomListSO.SetRooms()`.
+  - A `RoomListRefreshButton.cs` (BattleRobots.UI) — optional MB with Refresh button that calls `NetworkEventBridge.RequestRoomList()`.
+  - Extend `RoomListTests.cs` or add `RoomListRefreshTests.cs` with 8+ EditMode cases.
 
-**Blockers:** None. Scene .unity wiring deferred to Editor session.  
+**Blockers:** None.  
 **Architecture notes:**
-  - `RoomListSO` → `BattleRobots.Core`; `RoomEntryUI` + `RoomListUI` → `BattleRobots.UI`
-  - No Physics references anywhere in this feature
-  - `RoomEntry` can be a simple `[Serializable]` struct alongside `RoomListSO.cs`
+  - `RoomEntry` struct is in `RoomListSO.cs` (BattleRobots.Core) — also import it in adapter/bridge.
+  - `RoomListUI.OnRoomsUpdated()` is already wired to `RoomListSO._onRoomsUpdated` channel — no changes needed.
   - Deferred Inspector wiring (carry-forward):
+      □ RoomListUI._roomList + _bridge + _entryPrefab + _scrollContent
       □ ConnectionBadgeUI: 5 VoidGameEventListeners → OnDisconnected/OnConnecting/OnConnected/OnMatchJoined/OnReconnecting
       □ ConnectionStateLabel: same 5 channels
       □ PingMonitor._pingSO + _networkBridge

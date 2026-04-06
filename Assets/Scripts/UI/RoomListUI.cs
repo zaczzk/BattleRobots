@@ -1,0 +1,169 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using BattleRobots.Core;
+
+namespace BattleRobots.UI
+{
+    /// <summary>
+    /// Network room browser UI. Rebuilds its list of <see cref="RoomEntryUI"/> rows
+    /// whenever the room list changes.
+    ///
+    /// Rebuild is triggered by <see cref="OnRoomsUpdated"/>, which should be wired
+    /// in the Inspector via a sibling <see cref="VoidGameEventListener"/> component
+    /// listening to <see cref="RoomListSO"/>'s <c>_onRoomsUpdated</c> channel.
+    ///
+    /// When a player presses Join on a row, the join request is delegated to
+    /// <see cref="NetworkEventBridge.BeginJoin(string)"/> — keeping all adapter
+    /// calls out of the UI layer.
+    ///
+    /// ARCHITECTURE RULES:
+    ///   • BattleRobots.UI namespace — no Physics references.
+    ///   • No per-frame cost — no Update / FixedUpdate defined.
+    ///   • All allocations occur during Rebuild (one per room entry); never in hot path.
+    ///   • <see cref="RoomListSO"/> is read-only here; never mutated by this class.
+    ///
+    /// Inspector wiring checklist:
+    ///   □ _roomList        → RoomListSO asset (shared with the network layer)
+    ///   □ _bridge          → NetworkEventBridge MonoBehaviour in scene
+    ///   □ _entryPrefab     → RoomEntryUI prefab to instantiate per room
+    ///   □ _scrollContent   → Transform (Content of the ScrollRect) rows are parented to
+    ///   □ _emptyStateLabel → Text shown when no rooms are available
+    ///   □ _refreshButton   → (optional) Button that manually triggers a refresh
+    ///
+    ///   VoidGameEventListener (same GameObject) wiring:
+    ///   □ onRoomsUpdated → RoomListUI.OnRoomsUpdated()
+    /// </summary>
+    public sealed class RoomListUI : MonoBehaviour
+    {
+        // ── Inspector ─────────────────────────────────────────────────────────
+
+        [Header("Data")]
+        [Tooltip("RoomListSO asset managed by the network layer. Read-only from this class.")]
+        [SerializeField] private RoomListSO _roomList;
+
+        [Tooltip("NetworkEventBridge MonoBehaviour. Join calls are delegated here.")]
+        [SerializeField] private NetworkEventBridge _bridge;
+
+        [Header("Prefab")]
+        [Tooltip("RoomEntryUI prefab instantiated for each room in the list.")]
+        [SerializeField] private RoomEntryUI _entryPrefab;
+
+        [Header("Layout")]
+        [Tooltip("Parent Transform (Content of the ScrollRect) that row prefabs are added to.")]
+        [SerializeField] private Transform _scrollContent;
+
+        [Tooltip("Label shown when the room list is empty.")]
+        [SerializeField] private Text _emptyStateLabel;
+
+        [Header("Optional")]
+        [Tooltip("Optional Refresh button that manually calls OnRoomsUpdated.")]
+        [SerializeField] private Button _refreshButton;
+
+        // ── Runtime state ─────────────────────────────────────────────────────
+
+        // Pool of active row instances; cleared and rebuilt on each Rebuild call.
+        private readonly List<RoomEntryUI> _rows = new List<RoomEntryUI>();
+
+        // ── Lifecycle ─────────────────────────────────────────────────────────
+
+        private void Awake()
+        {
+            if (_refreshButton != null)
+                _refreshButton.onClick.AddListener(OnRoomsUpdated);
+        }
+
+        private void OnEnable()
+        {
+            // Rebuild immediately when the panel opens so stale rows are never shown.
+            Rebuild();
+        }
+
+        private void OnDestroy()
+        {
+            if (_refreshButton != null)
+                _refreshButton.onClick.RemoveListener(OnRoomsUpdated);
+        }
+
+        // ── Public API (wired via VoidGameEventListener in Inspector) ─────────
+
+        /// <summary>
+        /// Called by a sibling <see cref="VoidGameEventListener"/> when
+        /// <see cref="RoomListSO._onRoomsUpdated"/> fires.
+        /// Tears down existing rows and instantiates fresh ones.
+        /// </summary>
+        public void OnRoomsUpdated()
+        {
+            Rebuild();
+        }
+
+        // ── Internal ──────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Destroys all existing row instances and recreates them from the
+        /// current <see cref="RoomListSO.Rooms"/> snapshot.
+        /// </summary>
+        private void Rebuild()
+        {
+            // Destroy previous rows.
+            foreach (RoomEntryUI row in _rows)
+            {
+                if (row != null)
+                    Destroy(row.gameObject);
+            }
+            _rows.Clear();
+
+            bool hasData = _roomList != null && _roomList.Count > 0;
+
+            // Empty-state label toggle.
+            if (_emptyStateLabel != null)
+                _emptyStateLabel.gameObject.SetActive(!hasData);
+
+            if (!hasData || _entryPrefab == null || _scrollContent == null)
+                return;
+
+            IReadOnlyList<RoomEntry> rooms = _roomList.Rooms;
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                RoomEntry entry = rooms[i];
+
+                RoomEntryUI row = Instantiate(_entryPrefab, _scrollContent);
+                row.Setup(entry, HandleJoinRequested);
+                _rows.Add(row);
+            }
+        }
+
+        /// <summary>
+        /// Callback passed into each <see cref="RoomEntryUI"/> row's Setup call.
+        /// Delegates the join request to <see cref="NetworkEventBridge.BeginJoin"/>.
+        /// </summary>
+        private void HandleJoinRequested(string roomCode)
+        {
+            if (string.IsNullOrEmpty(roomCode))
+            {
+                Debug.LogWarning("[RoomListUI] HandleJoinRequested called with empty room code.", this);
+                return;
+            }
+
+            if (_bridge == null)
+            {
+                Debug.LogWarning("[RoomListUI] No NetworkEventBridge assigned. Cannot join room.", this);
+                return;
+            }
+
+            _bridge.BeginJoin(roomCode);
+        }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            if (_roomList == null)
+                Debug.LogWarning("[RoomListUI] RoomListSO is not assigned.", this);
+            if (_bridge == null)
+                Debug.LogWarning("[RoomListUI] NetworkEventBridge is not assigned.", this);
+            if (_entryPrefab == null)
+                Debug.LogWarning("[RoomListUI] RoomEntryUI prefab is not assigned.", this);
+        }
+#endif
+    }
+}
