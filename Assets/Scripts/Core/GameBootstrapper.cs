@@ -16,6 +16,10 @@ namespace BattleRobots.Core
         [Tooltip("SettingsSO — loaded from save file on startup, applied immediately.")]
         [SerializeField] private SettingsSO _settings;
 
+        [Header("Robot Loadout")]
+        [Tooltip("RobotLoadoutSO — restored from save file on startup; snapshotted on match save.")]
+        [SerializeField] private RobotLoadoutSO _robotLoadout;
+
         [Header("Events")]
         [SerializeField] private VoidGameEvent _onGameBootstrapped;
 
@@ -40,6 +44,9 @@ namespace BattleRobots.Core
 
             if (_settings != null)
                 _settings.LoadFromData(save.settings);
+
+            if (_robotLoadout != null)
+                _robotLoadout.LoadFromData(save.robotLoadout);
         }
 
         /// <summary>
@@ -53,6 +60,10 @@ namespace BattleRobots.Core
             save.walletBalance = _playerWallet != null ? _playerWallet.Balance : 0;
             record.walletSnapshot = save.walletBalance;
             save.matchHistory.Add(record);
+
+            if (_robotLoadout != null)
+                save.robotLoadout = _robotLoadout.BuildData();
+
             SaveSystem.Save(save);
         }
     }

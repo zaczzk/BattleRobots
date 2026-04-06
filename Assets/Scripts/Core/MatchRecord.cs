@@ -39,6 +39,35 @@ namespace BattleRobots.Core
         public List<string> equippedPartIds = new List<string>();
     }
 
+    // ── Loadout persistence ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Single slot→part mapping entry; serialized inside <see cref="RobotLoadoutData"/>.
+    /// </summary>
+    [Serializable]
+    public sealed class LoadoutEntry
+    {
+        /// <summary>Slot identifier on the robot chassis (e.g. "slot_weapon_0").</summary>
+        public string slotId;
+
+        /// <summary>Part identifier of the equipped part (e.g. "weapon_sawblade").</summary>
+        public string partId;
+    }
+
+    /// <summary>
+    /// Persisted robot loadout — maps slot IDs to the currently equipped part IDs.
+    /// Serialized inside <see cref="SaveData.robotLoadout"/> as a flat list because
+    /// <c>JsonUtility</c> does not support <c>Dictionary</c>.
+    /// </summary>
+    [Serializable]
+    public sealed class RobotLoadoutData
+    {
+        /// <summary>All slot→part assignments for the current robot configuration.</summary>
+        public List<LoadoutEntry> entries = new List<LoadoutEntry>();
+    }
+
+    // ── Settings ─────────────────────────────────────────────────────────────
+
     /// <summary>
     /// Persisted player settings — serialized inside SaveData so a single
     /// XOR-encrypted file holds both economy state and preferences.
@@ -71,5 +100,12 @@ namespace BattleRobots.Core
 
         /// <summary>Persisted player settings (volume, input preferences).</summary>
         public SettingsData settings = new SettingsData();
+
+        /// <summary>
+        /// Currently equipped parts, keyed by slot ID.
+        /// Populated by <see cref="RobotLoadoutSO.BuildData"/> and consumed by
+        /// <see cref="RobotLoadoutSO.LoadFromData"/>.
+        /// </summary>
+        public RobotLoadoutData robotLoadout = new RobotLoadoutData();
     }
 }

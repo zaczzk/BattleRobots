@@ -61,6 +61,10 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T023 | ArenaSelector UI — choose ArenaConfig before match | 65 | **Done** | UI lists SOs; selection stored; wired to MatchManager |
 | T024 | Part stat bonuses at spawn — RobotSpawner | 75 | **Done** 2026-04-06 | Spawner accumulates HP+torque bonuses; applies via HealthSO.InitializeWithBonus + HingeJointAB.ApplyTorqueBonus |
 | T025 | Pause menu (ESC toggles, Resume/Quit buttons) | 70 | **Done** 2026-04-06 | PauseManager (timeScale, SO events, no alloc in Update); PauseMenuUI (panel show/hide via VoidGameEventListener) |
+| T026 | PlayMode tests for ArenaSelector (selection → MatchManager) | 75 | Pending | Hermetic coroutine tests; covers Select, HasSelection, MatchManager.ActiveArena |
+| T027 | Robot loadout persistence — save/load equipped parts per slot | 85 | **In Progress** | RobotLoadoutSO + RobotLoadoutData; round-trips via SaveSystem; GameBootstrapper restores on startup |
+| T028 | Leaderboard / stats screen (wins, avg damage, total earnings) | 55 | Pending | Reads SaveData.matchHistory; zero-alloc; no new Update |
+| T029 | Robot preview renderer (RenderTexture orbit camera in ShopUI) | 30 | Pending | RenderTexture assigned to RawImage; orbit MonoBehaviour; no Rigidbody |
 
 ---
 
@@ -68,7 +72,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All T001–T025 complete; awaiting next backlog items |
+| T027 — Robot loadout persistence | PM Agent | 2026-04-06 | RobotLoadoutSO + data types created; GameBootstrapper wired |
 
 ---
 
@@ -101,6 +105,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T024 — RobotSpawner | 2026-04-06 | BattleRobots.Physics; SpawnRobot(teamIndex, prefab, arenaConfig, healthSO, equippedPartIds); ComputeBonuses accumulates HP+torque from PartDefinition catalogue; HealthSO.InitializeWithBonus added (transient EffectiveMaxHp); HingeJointAB.ApplyTorqueBonus added; MatchManager updated to snapshot EffectiveMaxHp. |
 | T025 — Pause system | 2026-04-06 | PauseManager (Core): ESC toggle, Pause/Resume/TogglePause API, Time.timeScale, VoidGameEvent channels, OnDestroy safety restore. PauseMenuUI (UI): ShowPanel/HidePanel wired via VoidGameEventListener; Resume+Quit buttons; SceneTransitionController optional. |
 | T023 — ArenaSelector UI | 2026-04-06 | ArenaSelectionSO (Core, runtime SO, Select/Reset/HasSelection). ArenaEntryUI (UI, row with thumbnail+name+timeLimit, SetSelected). ArenaSelectorUI (UI, builds list, detail panel, Fight! confirm button, triggers scene load via SceneTransitionController). MatchManager updated: ActiveArena property prefers ArenaSelectionSO over fallback _arenaConfig. |
+| T027 — Robot loadout persistence | 2026-04-06 | LoadoutEntry + RobotLoadoutData POCOs added to MatchRecord.cs; SaveData.robotLoadout field. RobotLoadoutSO: EquipPart/UnequipPart/GetEquippedPartId/IsEquipped/Clear/LoadFromData/BuildData; O(1) Dictionary lookup + ordered List; VoidGameEvent on change. GameBootstrapper: loads loadout in Awake; snapshots in RecordMatchAndSave. |
 
 ---
 
@@ -120,23 +125,25 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-05 | PM Agent | Session 10: Sprint 8 complete. T018 SettingsSOTests (12 cases) + MatchRecordIntegrationTests (7 cases). T019 GamepadRumble (InputSystem, proportional damage intensity, OnDisable cancel, Physics.asmdef Unity.InputSystem ref). T020 MatchHistoryUI + MatchHistoryEntryUI (newest-first scroll list, summary bar, win-rate, empty state). T021 RobotController InvertControls (fwd-axis negation, optional SettingsSO ref). |
 | 2026-04-06 | PM Agent | Session 11: Sprint 9. T022 PlayMode tests for MatchManager (10 coroutine cases, reflection injection, PlayMode asmdef). T024 RobotSpawner + HealthSO.InitializeWithBonus + EffectiveMaxHp + HingeJointAB.ApplyTorqueBonus. T025 PauseManager + PauseMenuUI. |
 | 2026-04-06 | PM Agent | Session 12: T023 ArenaSelector UI complete. ArenaSelectionSO (Core, Select/Reset/HasSelection, VoidGameEvent on selection). ArenaEntryUI (UI prefab row component). ArenaSelectorUI (scrollable list, detail panel, Fight! button, scene transition). MatchManager extended with optional ArenaSelectionSO field + ActiveArena computed property. |
+| 2026-04-06 | PM Agent | Session 13: T027 Robot loadout persistence. LoadoutEntry + RobotLoadoutData POCOs in MatchRecord.cs; SaveData.robotLoadout field. New RobotLoadoutSO (BattleRobots.Core): EquipPart/UnequipPart/GetEquippedPartId/IsEquipped/Clear/LoadFromData/BuildData; O(1) dict+ordered list; VoidGameEvent on change. GameBootstrapper extended with _robotLoadout field; loads on Awake, snapshots in RecordMatchAndSave. Extended backlog with T026–T029. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T023 (ArenaSelector UI). All T001–T025 complete.  
-**Milestone status:** M1–M6 Done. All backlog items done.
+**Last completed:** T027 (Robot loadout persistence).  
+**Milestone status:** M1–M6 Done. T001–T025 Done. T027 Done.
 
-**Next backlog suggestions (extend the backlog next session):**
-  - T026: PlayMode tests for ArenaSelector (selection propagates to ArenaSelectionSO; MatchManager picks it up)
-  - T027: Robot loadout persistence — save/load equipped part IDs per robot slot; restore on GameBootstrapper startup
-  - T028: Leaderboard / stats screen — all-time wins, avg damage, total earnings from SaveData.matchHistory
-  - T029: Robot preview renderer — RenderTexture camera orbiting the assembled robot in ShopUI / ArenaSelector
+**Next action:** T026 — PlayMode tests for ArenaSelector. Create `Assets/Tests/PlayMode/ArenaSelectorTests.cs` with a new `BattleRobots.Tests.PlayMode` asmdef (already exists from T022 — reuse it). Cover:
+  1. `ArenaSelectionSO.Select()` sets `HasSelection = true` and `SelectedArena` property.
+  2. `ArenaSelectionSO.Reset()` clears selection.
+  3. `MatchManager.ActiveArena` returns the SO's arena when `HasSelection` is true.
+  4. `MatchManager.ActiveArena` falls back to `_arenaConfig` when `HasSelection` is false.
+  Use reflection for any private field injection (same pattern as T022 MatchManagerTests).
 
 **Architecture notes:**
-  - `ArenaSelectionSO.Select()` fires `VoidGameEvent _onArenaSelected` — wire to confirm-button enablement or any other listener in the Inspector.
-  - `ArenaSelectorUI.OnEnable()` calls `ArenaSelectionSO.Reset()` — clears stale selection between screen visits.
+  - `RobotLoadoutSO` is a runtime-only SO; `LoadFromData` does NOT fire `_onLoadoutChanged` (listeners may not be registered yet during Awake). If a UI needs to sync after startup, wire a `VoidGameEventListener` to the `_onGameBootstrapped` event instead.
+  - `SaveData.robotLoadout` is a new field; existing save files without it deserialize to an empty `RobotLoadoutData()` — backwards-compatible.
   - `MatchManager.ActiveArena` is a computed property (no field); falls back to `_arenaConfig` if SO has no selection.
   - `HealthSO.EffectiveMaxHp` is transient; `MatchManager` snapshots it at StartMatch.
   - `PauseManager.OnDestroy` restores `Time.timeScale = 1` — critical when loading scenes while paused.
