@@ -89,8 +89,9 @@ namespace BattleRobots.Core
             for (int i = 0; i < _robotHealthSOs.Length; i++)
                 _robotHealthSOs[i].Initialize();
 
-            _playerMaxHp   = _robotHealthSOs[0].MaxHp;
-            _opponentMaxHp = _robotHealthSOs[1].MaxHp;
+            // Use EffectiveMaxHp to account for any part-bonus applied by RobotSpawner.
+            _playerMaxHp   = _robotHealthSOs[0].EffectiveMaxHp;
+            _opponentMaxHp = _robotHealthSOs[1].EffectiveMaxHp;
             _elapsedSeconds = 0f;
             _matchActive    = true;
 

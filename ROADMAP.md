@@ -57,6 +57,10 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T019 | Gamepad rumble on hit/death (InputSystem Gamepad.SetMotorSpeeds) | 55 | **Done** 2026-04-05 | Proportional intensity; timer-based stop; OnDisable safety cancel |
 | T020 | Match history UI (MatchHistoryUI + MatchHistoryEntryUI) | 50 | **Done** 2026-04-05 | ScrollList newest-first; summary bar; empty state; OnEnable refresh |
 | T021 | RobotController invert-controls via SettingsSO.InvertControls | 40 | **Done** 2026-04-05 | Polled in FixedUpdate; negates fwd axis; optional SettingsSO ref |
+| T022 | PlayMode tests — MatchManager lifecycle (10 cases) | 80 | **Done** 2026-04-06 | Hermetic; covers start/death/timelimit/win-reward/abort/elapsed |
+| T023 | ArenaSelector UI — choose ArenaConfig before match | 65 | Pending | UI lists SOs; selection stored; wired to MatchManager |
+| T024 | Part stat bonuses at spawn — RobotSpawner | 75 | **Done** 2026-04-06 | Spawner accumulates HP+torque bonuses; applies via HealthSO.InitializeWithBonus + HingeJointAB.ApplyTorqueBonus |
+| T025 | Pause menu (ESC toggles, Resume/Quit buttons) | 70 | **Done** 2026-04-06 | PauseManager (timeScale, SO events, no alloc in Update); PauseMenuUI (panel show/hide via VoidGameEventListener) |
 
 ---
 
@@ -64,7 +68,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All Sprint 8 tasks complete; Sprint 9 planning needed |
+| T023 — ArenaSelector UI | PM Agent | 2026-04-06 | Next session: list of ArenaConfig SOs; selection wired to MatchManager |
 
 ---
 
@@ -93,6 +97,9 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T019 — GamepadRumble | 2026-04-05 | BattleRobots.Physics; InputSystem Gamepad.SetMotorSpeeds; proportional intensity via damage/maxDamage ratio; timer-based stop in Update (no alloc); OnDisable safety cancel; Physics asmdef updated with Unity.InputSystem reference. |
 | T020 — MatchHistoryUI | 2026-04-05 | BattleRobots.UI; MatchHistoryUI (OnEnable rebuild, newest-first, summary bar with win-rate %, empty-state label, close button). MatchHistoryEntryUI (result/date/duration/earnings/damage labels, win/loss background tint). |
 | T021 — RobotController invert-controls | 2026-04-05 | Optional SettingsSO field; FixedUpdate reads InvertControls and negates fwd axis; zero additional allocations. |
+| T022 — PlayMode MatchManager tests | 2026-04-06 | PlayMode asmdef (BattleRobots.Tests.PlayMode). MatchManagerTests (10 [UnityTest] coroutines): StartMatch, double-StartMatch, opponent-death win, player-death loss, win-wallet-credit, loss-no-credit, time-limit expiry, AbortMatch, ElapsedSeconds advance+freeze. Reflection-based field injection. |
+| T024 — RobotSpawner | 2026-04-06 | BattleRobots.Physics; SpawnRobot(teamIndex, prefab, arenaConfig, healthSO, equippedPartIds); ComputeBonuses accumulates HP+torque from PartDefinition catalogue; HealthSO.InitializeWithBonus added (transient EffectiveMaxHp); HingeJointAB.ApplyTorqueBonus added; MatchManager updated to snapshot EffectiveMaxHp. |
+| T025 — Pause system | 2026-04-06 | PauseManager (Core): ESC toggle, Pause/Resume/TogglePause API, Time.timeScale, VoidGameEvent channels, OnDestroy safety restore. PauseMenuUI (UI): ShowPanel/HidePanel wired via VoidGameEventListener; Resume+Quit buttons; SceneTransitionController optional. |
 
 ---
 
@@ -110,23 +117,25 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-05 | PM Agent | Session 8: T015 AudioSO — AudioEvent (GameEvent<AudioClip> SO channel), AudioEventListener (typed listener shim), SFXPlayer (Awake pre-warmed fixed pool, round-robin source selection with steal fallback, SetMasterVolume, zero-alloc Play). T016 RobotController — BattleRobots.Physics; WASD + gamepad via Input.GetAxis; differential steering (fwd+steer delta); Fire1 weapon spin; OnDisable AllStop; HealthSO death guard; zero-alloc FixedUpdate. T017 In Progress. |
 | 2026-04-05 | PM Agent | Session 9: T017 Settings persistence — SettingsData POCO added to MatchRecord.cs; SaveData.settings field added; SettingsSO (BattleRobots.Core) with LoadFromData/BuildData/Apply via FloatGameEvent channels; SettingsUI (BattleRobots.UI) with sliders + toggle, SetValueWithoutNotify on panel open, PersistSettings on every change; GameBootstrapper extended to load settings at startup. All T001–T017 complete. |
 | 2026-04-05 | PM Agent | Session 10: Sprint 8 complete. T018 SettingsSOTests (12 cases) + MatchRecordIntegrationTests (7 cases). T019 GamepadRumble (InputSystem, proportional damage intensity, OnDisable cancel, Physics.asmdef Unity.InputSystem ref). T020 MatchHistoryUI + MatchHistoryEntryUI (newest-first scroll list, summary bar, win-rate, empty state). T021 RobotController InvertControls (fwd-axis negation, optional SettingsSO ref). |
+| 2026-04-06 | PM Agent | Session 11: Sprint 9. T022 PlayMode tests for MatchManager (10 coroutine cases, reflection injection, PlayMode asmdef). T024 RobotSpawner + HealthSO.InitializeWithBonus + EffectiveMaxHp + HingeJointAB.ApplyTorqueBonus. T025 PauseManager + PauseMenuUI. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T018 (integration tests), T019 (GamepadRumble), T020 (MatchHistoryUI), T021 (RobotController invert-controls). All T001–T021 complete.  
-**Milestone status:** M1–M6 Done. Sprint 8 complete.
+**Last completed:** T022 (PlayMode MatchManager tests), T024 (RobotSpawner + stat bonuses), T025 (PauseManager + PauseMenuUI). All T001–T022, T024–T025 complete.  
+**Milestone status:** M1–M6 Done. Sprint 9 in progress.
 
-**Next action (Sprint 9):** Candidates for new backlog items:
-  - T022: PlayMode tests — scene-level smoke tests for MatchManager lifecycle using UnityTest coroutines.
-  - T023: ArenaSelector UI — choose from multiple ArenaConfig SOs before a match; wired to MatchManager.
-  - T024: Part stat bonuses applied at spawn — robot spawner reads PartDefinition HP/speed/torque bonuses, calls HealthSO.Initialize with modified max, sets TorqueMultiplier on HingeJointAB.
-  - T025: Pause menu — ESC toggles pause (Time.timeScale=0); resume/quit buttons; no GC in Update.
+**Next action:** T023 — ArenaSelector UI.
+  - Create `ArenaSelector.cs` in `BattleRobots.UI` — displays a scrollable list of `ArenaConfig` SO assets.
+  - Selection sets an `ArenaSelectionSO` (or passes directly to MatchManager) and loads the Arena scene.
+  - `ArenaSelectionSO` is a runtime-only SO that holds the currently chosen `ArenaConfig`.
+  - MatchManager reads from `ArenaSelectionSO` at StartMatch instead of an Inspector-wired config.
 
 **Architecture notes:**
-  - GamepadRumble added Unity.InputSystem reference to BattleRobots.Physics.asmdef.
-  - MatchHistoryUI in BattleRobots.UI; reads SaveSystem directly (no Physics refs).
-  - RobotController SettingsSO field is optional — defaults gracefully when null.
+  - `HealthSO.EffectiveMaxHp` is a new runtime property (transient, not serialised). `MatchManager` now snapshots `EffectiveMaxHp` (not `MaxHp`) for damage calculations.
+  - `HingeJointAB._effectiveTorque` is a runtime field; `ApplyTorqueBonus` patches `forceLimit` on the live drive struct only.
+  - `PauseManager.OnDestroy` restores `Time.timeScale = 1` — critical for scene transitions while paused.
+  - `PauseMenuUI` uses `VoidGameEventListener` wiring (Inspector) to show/hide the panel — no Update polling.
 
-**Blockers:** None. All Sprint 8 tasks are pure C# — no Unity Editor / scene wiring required.
+**Blockers:** None. All Sprint 9 work so far is pure C# — no Unity Editor / scene wiring required.

@@ -1,0 +1,19 @@
+{
+    "name": "BattleRobots.Tests.PlayMode",
+    "rootNamespace": "BattleRobots.Tests",
+    "references": [
+        "UnityEngine.TestRunner",
+        "BattleRobots.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

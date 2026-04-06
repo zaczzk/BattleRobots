@@ -43,6 +43,10 @@ namespace BattleRobots.Physics
 
         private ArticulationBody _ab;
 
+        // Effective torque cap for this match session (base + any bonus applied at spawn).
+        // Initialised in ConfigureJoint; modified by ApplyTorqueBonus.
+        private float _effectiveTorque;
+
         // ── Unity Lifecycle ───────────────────────────────────────────────────
 
         private void Awake()
@@ -87,6 +91,23 @@ namespace BattleRobots.Physics
             _ab.xDrive = drive;
         }
 
+        /// <summary>
+        /// Adds <paramref name="bonusTorque"/> to the drive's force limit for this match.
+        /// Called once by <c>RobotSpawner</c> after spawn — not in the hot path.
+        /// </summary>
+        /// <param name="bonusTorque">Additive N·m bonus from equipped parts (must be ≥ 0).</param>
+        public void ApplyTorqueBonus(float bonusTorque)
+        {
+            if (bonusTorque <= 0f) return;
+
+            _effectiveTorque += bonusTorque;
+
+            // Patch only the force limit — leaves all other drive settings intact.
+            ArticulationDrive drive = _ab.xDrive;
+            drive.forceLimit  = _effectiveTorque;
+            _ab.xDrive = drive;
+        }
+
         /// <summary>Current hinge angle in degrees (read from ArticulationBody joint position).</summary>
         public float CurrentAngleDegrees =>
             _ab.jointPosition.dofCount > 0
@@ -111,7 +132,8 @@ namespace BattleRobots.Physics
             ArticulationDrive drive = _ab.xDrive;
             drive.lowerLimit  = _lowerLimit;
             drive.upperLimit  = _upperLimit;
-            drive.forceLimit  = _maxTorque > 0f ? _maxTorque : float.MaxValue;
+            _effectiveTorque  = _maxTorque > 0f ? _maxTorque : float.MaxValue;
+            drive.forceLimit  = _effectiveTorque;
             drive.damping     = _damping;
             drive.stiffness   = _stiffness;
             // Drive mode: stiffness=0 → velocity drive (caller sets targetVelocity);

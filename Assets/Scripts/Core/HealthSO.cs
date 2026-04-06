@@ -32,16 +32,41 @@ namespace BattleRobots.Core
         [SerializeField] private VoidGameEvent _onDeath;
 
         // ── Runtime State ─────────────────────────────────────────────────────
-        public float MaxHp      => _maxHp;
-        public float CurrentHp  { get; private set; }
-        public bool  IsAlive    => CurrentHp > 0f;
+
+        /// <summary>Configured asset max HP (serialised, never modified at runtime).</summary>
+        public float MaxHp         => _maxHp;
+
+        /// <summary>
+        /// Effective max HP for the current match session.
+        /// Equals <see cref="MaxHp"/> after a plain <see cref="Initialize"/>,
+        /// or <c>MaxHp + bonusHp</c> after <see cref="InitializeWithBonus"/>.
+        /// Resets on each Initialize call.
+        /// </summary>
+        public float EffectiveMaxHp { get; private set; }
+
+        public float CurrentHp     { get; private set; }
+        public bool  IsAlive       => CurrentHp > 0f;
 
         // ── API ───────────────────────────────────────────────────────────────
 
         /// <summary>Resets HP to max and broadcasts the initial value. Call at match start.</summary>
         public void Initialize()
         {
-            CurrentHp = _maxHp;
+            EffectiveMaxHp = _maxHp;
+            CurrentHp      = _maxHp;
+            _onHealthChanged?.Raise(CurrentHp);
+        }
+
+        /// <summary>
+        /// Resets HP to <c>_maxHp + bonusHp</c> for this match only.
+        /// The bonus is transient — it does not modify the serialised asset value.
+        /// Used by <c>RobotSpawner</c> to apply PartDefinition HP bonuses at spawn.
+        /// </summary>
+        /// <param name="bonusHp">Extra HP from equipped parts. Must be ≥ 0.</param>
+        public void InitializeWithBonus(float bonusHp)
+        {
+            EffectiveMaxHp = _maxHp + Mathf.Max(0f, bonusHp);
+            CurrentHp      = EffectiveMaxHp;
             _onHealthChanged?.Raise(CurrentHp);
         }
 
@@ -72,7 +97,7 @@ namespace BattleRobots.Core
         {
             if (!IsAlive || amount <= 0f) return;
 
-            CurrentHp = Mathf.Min(_maxHp, CurrentHp + amount);
+            CurrentHp = Mathf.Min(EffectiveMaxHp, CurrentHp + amount);
             _onHealthChanged?.Raise(CurrentHp);
         }
     }
