@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace BattleRobots.Core
@@ -36,9 +37,23 @@ namespace BattleRobots.Core
                  "Assign the same asset referenced by NetworkLobbyUI.")]
         [SerializeField] private NetworkSessionSO _session;
 
+        [Header("Match-State Channel")]
+        [Tooltip("SO event channel raised when a match-state payload is received from a remote peer. " +
+                 "Wire a ByteArrayGameEventListener to forward payloads to NetworkMatchSync or MatchStateSO.")]
+        [SerializeField] private ByteArrayGameEvent _onMatchStateReceivedChannel;
+
         // ── Runtime adapter ───────────────────────────────────────────────────
 
         private INetworkAdapter _adapter;
+
+        // ── Code-subscription surface (for NetworkMatchSync) ──────────────────
+
+        /// <summary>
+        /// Raised on the main thread whenever a match-state payload arrives from a
+        /// remote peer. <see cref="NetworkMatchSync"/> subscribes here in OnEnable to
+        /// receive payloads without requiring a sibling MonoBehaviour listener.
+        /// </summary>
+        public event Action<byte[]> OnMatchStateReceived;
 
         // ── Unity lifecycle ───────────────────────────────────────────────────
 
@@ -126,6 +141,18 @@ namespace BattleRobots.Core
         }
 
         /// <summary>
+        /// Broadcast a serialised match-state payload to all peers in the current room.
+        /// Delegates directly to the adapter; does nothing if no adapter is set or if
+        /// the payload is null.
+        /// Call from <see cref="NetworkMatchSync"/> — the caller pre-allocates the buffer.
+        /// </summary>
+        public void SendMatchState(byte[] payload)
+        {
+            if (payload == null) return;
+            _adapter?.SendMatchState(payload);
+        }
+
+        /// <summary>
         /// Disconnect from the backend and reset session state.
         /// Wire to a "Disconnect" or "Cancel" button's UnityEvent.
         /// </summary>
@@ -190,9 +217,10 @@ namespace BattleRobots.Core
 
             adapter.OnMatchStateReceived = (payload) =>
             {
-                // Relay raw bytes via a future FloatGameEvent / byte-array channel.
-                // For now log receipt — full relay wired in a future sprint.
-                Debug.Log($"[NetworkEventBridge] Match-state received ({payload?.Length ?? 0} bytes).");
+                // Raise the SO event channel (Inspector-wired listeners).
+                _onMatchStateReceivedChannel?.Raise(payload);
+                // Raise the C# event (code-registered subscribers, e.g. NetworkMatchSync).
+                OnMatchStateReceived?.Invoke(payload);
             };
         }
 

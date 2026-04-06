@@ -73,6 +73,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T035 | DifficultySO — Easy/Medium/Hard presets scaling AI, damage, time limit | 70 | **Done** 2026-04-06 | DifficultySO SO (CreateAssetMenu, LoadPreset, CreatePreset factory); RobotFSM scales ranges+drive; DamageDealer scales damage; MatchManager caches effectiveTimeLimit; MatchRecord.difficultyName; 14 EditMode tests |
 | T036 | DifficultySelector UI — Easy/Medium/Hard buttons, wired to MatchManager | 60 | **Done** 2026-04-06 | DifficultySelectionSO (Core, Select/Reset/HasSelection, LoadPreset side-effect on shared DifficultySO); DifficultySelectorUI (UI, 3 buttons, highlight via Image.color, name+description labels, optional confirm button); 14 EditMode tests |
 | T037 | Network multiplayer stub (session SO, adapter interface, lobby UI) | 95 | **Done** 2026-04-06 | NetworkConnectionState+NetworkRole enums; NetworkSessionSO (Connect/SetConnected/JoinRoom/Disconnect mutators, 4 VoidGameEvent channels); INetworkAdapter interface; StubNetworkAdapter (in-memory, ClearRooms, SentPayloads); NetworkEventBridge MB (SetAdapter, BeginConnect/Host/Join/Disconnect, callback wiring); NetworkLobbyUI (UI, Host/Join radio, room-code input, Connect/Disconnect buttons, status label, VoidGameEventListener wiring); 25 EditMode test cases |
+| T038 | Network match-state sync (RPC-style byte channel + MatchStateSO) | 90 | **Done** 2026-04-06 | ByteArrayGameEvent SO channel; ByteArrayGameEventListener MB; MatchStateSO (PlayerHp/OpponentHp/ElapsedTime, 12-byte BitConverter payload, Snapshot/Apply/SetLocalState/Reset, zero-alloc guarantee); NetworkMatchSync MB (pre-alloc buffer in Awake, FixedUpdate tick counter, send on interval, receive via NetworkEventBridge.OnMatchStateReceived C# event, ForceSend API); NetworkEventBridge extended (SendMatchState, OnMatchStateReceived C# event, ByteArrayGameEvent SO channel raised on receive); 12 EditMode test cases |
 
 ---
 
@@ -80,7 +81,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T038 — Network match-state sync (RPC-style byte channel + MatchStateSO) | PM Agent | 2026-04-06 | Extend network layer to relay MatchManager state changes to remote peer; ByteArrayGameEvent SO channel |
+| T039 — Network reconnection flow (disconnect recovery, session timeout SO, reconnect UI) | PM Agent | 2026-04-06 | Add reconnect state to NetworkSessionSO; expose ReconnectAttempts counter; SessionTimeoutSO (configurable timeout, fires VoidGameEvent); ReconnectUI panel (attempt counter label, Cancel/Retry buttons) |
 
 ---
 
@@ -125,6 +126,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T035 — DifficultySO | 2026-04-06 | DifficultySO.cs (BattleRobots.Core): DifficultyLevel enum (Easy/Medium/Hard), LoadPreset mutator, CreatePreset static factory. RobotFSM: optional DifficultySO field scales approach/attack ranges (×(0.5+aggression)) and drive speed. DamageDealer: optional DifficultySO field scales damage per impact. MatchManager: optional DifficultySO field, _effectiveTimeLimitSeconds cached in StartMatch (timeLimitScale applied), difficultyName written to MatchRecord. MatchRecord.difficultyName string field added. DifficultySOTests.cs (14 EditMode cases). |
 | T036 — DifficultySelector UI | 2026-04-06 | DifficultySelectionSO + DifficultySelectorUI (see Active Backlog). |
 | T037 — Network multiplayer stub | 2026-04-06 | INetworkAdapter interface; StubNetworkAdapter (in-memory, shared rooms, SentPayloads); NetworkSessionSO (state machine: Disconnected/Connecting/Connected/InMatch; mutators; 4 VoidGameEvent channels); NetworkEventBridge MB (adapter DI, BeginConnect/Host/Join/Disconnect); NetworkLobbyUI (BattleRobots.UI, Host/Join radio, room-code input, Connect/Disconnect buttons, status label; VoidGameEventListener wiring docs); NetworkSessionSOTests (25 EditMode cases). |
+| T038 — Network match-state sync | 2026-04-06 | ByteArrayGameEvent SO channel + ByteArrayGameEventListener MB. MatchStateSO: PlayerHp/OpponentHp/ElapsedTime; 12-byte BitConverter payload; Snapshot(byte[]) zero-alloc write; Apply(byte[]) validated + fires channel; SetLocalState; Reset. NetworkMatchSync MB: Awake pre-alloc _sendBuffer; FixedUpdate int tick counter; sends every _syncIntervalTicks via NetworkEventBridge.SendMatchState; OnEnable/OnDisable subscribes to NetworkEventBridge.OnMatchStateReceived C# event; ForceSend() API. NetworkEventBridge extended: SendMatchState public method; OnMatchStateReceived C# event + ByteArrayGameEvent SO field both raised on adapter receive. NetworkMatchSyncTests (12 EditMode cases). |
 
 ---
 
@@ -155,32 +157,29 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 21: T035 DifficultySO. New DifficultySO (BattleRobots.Core): DifficultyLevel enum, LoadPreset (Easy/Medium/Hard), CreatePreset factory. Integrated into RobotFSM (range+drive scaling), DamageDealer (damage multiplier), MatchManager (time-limit scale cached in StartMatch, difficultyName recorded). MatchRecord.difficultyName field added. DifficultySOTests.cs (14 EditMode cases). All optional fields — null-safe; no existing behaviour changes when field unassigned. |
 | 2026-04-06 | PM Agent | Session 22: T036 DifficultySelector UI. DifficultySelectionSO (BattleRobots.Core): Select(DifficultyLevel)/Reset(), HasSelection, ActiveDifficulty, LoadPreset side-effect on shared DifficultySO — no MatchManager changes needed. DifficultySelectorUI (BattleRobots.UI): Easy/Medium/Hard buttons, Image.color highlights (_selectedColor/_normalColor), difficultyNameLabel + descriptionLabel, optional confirmButton (interactable after selection), Awake wires listeners once, OnEnable resets, OnDestroy removes — zero Update/FixedUpdate. DifficultySelectionSOTests.cs (14 EditMode cases): default state, Select Easy/Hard/Medium, LoadPreset side-effect, consecutive Select, Reset clears HasSelection + restores Medium, null-safety on both Select and Reset. |
 | 2026-04-06 | PM Agent | Session 23: T037 Network multiplayer stub. INetworkAdapter interface (Connect/Disconnect/Host/Join/SendMatchState + 5 Action callbacks). StubNetworkAdapter pure-C# class (static s_ActiveRooms, ClearRooms, SentPayloads list, ConnectCallCount/DisconnectCallCount for assertion; immediate callback invocation). NetworkSessionSO SO (state machine: Disconnected→Connecting→Connected→InMatch via Connect/SetConnected/JoinRoom/Disconnect; IsConnected/IsInMatch convenience properties; 4 VoidGameEvent channels). NetworkEventBridge MB (SetAdapter DI; Awake defaults to StubNetworkAdapter; RegisterAdapterCallbacks wires transport events to session mutators; BeginConnect/Host/Join/Disconnect public API + BeginConnectAsHost/Client convenience wrappers). NetworkLobbyUI (BattleRobots.UI: Host/Join radio buttons, room-code InputField, Connect/Disconnect buttons, status Text; OnConnected auto-proceeds to host/join; OnEnable reset; GenerateRoomCode 4-char A–Z; no Update/FixedUpdate). NetworkSessionSOTests.cs (25 EditMode cases). |
+| 2026-04-06 | PM Agent | Session 24: T038 Network match-state sync. ByteArrayGameEvent SO channel (GameEvent<byte[]>) + ByteArrayGameEventListener MB. MatchStateSO: PlayerHp/OpponentHp/ElapsedTime float properties; 12-byte payload via BitConverter; Snapshot(byte[]) zero-alloc in-place write; Apply(byte[]) length-validated + fires ByteArrayGameEvent; SetLocalState mutator; Reset. NetworkMatchSync MB: pre-alloc _sendBuffer[12] in Awake; FixedUpdate int _tickCounter (no alloc); sends every _syncIntervalTicks ticks; subscribes to NetworkEventBridge.OnMatchStateReceived C# event in OnEnable/OnDisable; HandleMatchStateReceived → MatchStateSO.Apply; ForceSend() public API. NetworkEventBridge extended: SendMatchState(byte[]) public method; Action<byte[]> OnMatchStateReceived C# event; _onMatchStateReceivedChannel ByteArrayGameEvent SO field — both raised in adapter receive callback. NetworkMatchSyncTests.cs (12 EditMode cases: PayloadSize const, Snapshot length, 4 Apply round-trips, full encode→decode identity, null/wrong-length/zero-payload guards, Snapshot bad-buffer exceptions, FixedUpdate interval gating via reflection). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T037 — Network multiplayer stub (INetworkAdapter, StubNetworkAdapter, NetworkSessionSO, NetworkEventBridge, NetworkLobbyUI, 25 EditMode tests).  
-**Milestone status:** M1–M6 Done. T001–T037 Done.
+**Last completed:** T038 — Network match-state sync (ByteArrayGameEvent, MatchStateSO, NetworkMatchSync, NetworkEventBridge extended, 12 EditMode tests).  
+**Milestone status:** M1–M6 Done. T001–T038 Done.
 
-**Next action:** T038 — Network match-state sync. Deliverables:
-  - `ByteArrayGameEvent.cs` (Core) — `GameEvent<byte[]>` typed SO channel for relaying raw match-state payloads through the SO bus.
-  - `ByteArrayGameEventListener.cs` (Core) — typed listener MonoBehaviour for the above.
-  - `MatchStateSO.cs` (Core) — holds the latest remote match state (health values for both robots, elapsed time); `Apply(byte[])` deserialises the payload; `Snapshot()` serialises local state to bytes. All via `System.BitConverter` — no third-party serialiser.
-  - `NetworkMatchSync.cs` (Core) — MB that wires `NetworkEventBridge.OnMatchStateReceived` to `MatchStateSO.Apply`, and fires `MatchStateSO.Snapshot()` + `NetworkEventBridge.SendMatchState` on every N-tick interval. Uses `FixedUpdate` counter (no `Time.deltaTime` allocation), sync interval configurable via Inspector int field.
-  - `NetworkMatchSyncTests.cs` (Tests.EditMode) — 10+ cases covering Snapshot round-trip, Apply updates SO, Apply ignores wrong-length payloads, sync interval gating.
+**Next action:** T039 — Network reconnection flow. Deliverables:
+  - `SessionTimeoutSO.cs` (Core) — configurable timeout duration (seconds); runtime countdown via `Tick(float deltaTime)`; fires `VoidGameEvent _onTimeout` when countdown expires; `Reset()` restarts timer; `IsRunning` property.
+  - `NetworkSessionSO.cs` extension — add `Reconnecting` state to `NetworkConnectionState` enum; add `BeginReconnect()` mutator (transitions Connected/InMatch → Reconnecting, increments `ReconnectAttempts` int property); `ResetReconnectCount()` helper; fire `VoidGameEvent _onReconnecting` channel.
+  - `ReconnectUI.cs` (UI) — panel shown on `onReconnecting` event; displays attempt counter label (`Attempt N of Max`); Cancel button calls `NetworkEventBridge.BeginDisconnect`; Retry button calls `NetworkEventBridge.BeginConnect`. `MaxAttempts` configurable via Inspector; hides panel on connected/disconnected events.
+  - `NetworkReconnectTests.cs` (Tests.EditMode) — 10+ cases: timeout countdown/expiry, Reset restarts timer, Reconnecting state transition, ReconnectAttempts increments, max-attempts guard, SessionTimeoutSO fires event.
 
 **Blockers:** None.  
 **Architecture notes:**
-  - `ByteArrayGameEvent` follows the existing `GameEvent<T>` generic pattern — add typed listener like `FloatGameEventListener`.
-  - `MatchStateSO` stores: `float PlayerHp`, `float OpponentHp`, `float ElapsedTime` (3 floats × 4 bytes = 12-byte payload).
-  - `NetworkMatchSync` must NOT allocate in `FixedUpdate` — pre-allocate the 12-byte `byte[]` buffer in `Awake`.
-  - All cross-component comms via SO event channels; `NetworkMatchSync` → Core namespace.
-  - `NetworkLobbyUI` Inspector wiring checklist (defer to Editor session):
-      □ _session → NetworkSessionSO asset
-      □ _bridge → NetworkEventBridge MB in scene
-      □ VoidGameEventListener (onConnecting) → NetworkLobbyUI.OnConnecting()
-      □ VoidGameEventListener (onConnected) → NetworkLobbyUI.OnConnected()
-      □ VoidGameEventListener (onMatchJoined) → NetworkLobbyUI.OnMatchJoined()
-      □ VoidGameEventListener (onDisconnected) → NetworkLobbyUI.OnDisconnected()
-  - SettingsUI rebind panel and SpawnPoint scene wiring remain deferred to an Editor session.
+  - `SessionTimeoutSO` is a pure-data SO — no MonoBehaviour; caller (e.g. MatchManager or a coroutine driver) calls `Tick(Time.deltaTime)` each update.
+  - `NetworkConnectionState` enum is in `NetworkSessionSO.cs` — extend in place; no new file needed.
+  - `ReconnectUI` → BattleRobots.UI namespace; must not reference BattleRobots.Physics.
+  - Inspector wiring checklist (defer to Editor session):
+      □ NetworkEventBridge._onMatchStateReceivedChannel → ByteArrayGameEvent asset
+      □ NetworkMatchSync._matchStateSO, _bridge, _playerHealth, _opponentHealth, _matchManager
+      □ NetworkLobbyUI (onConnecting/Connected/MatchJoined/Disconnected VoidGameEventListeners)
+      □ SettingsUI rebind panel wiring
+      □ SpawnPoint scene positions
