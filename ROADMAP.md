@@ -63,7 +63,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T025 | Pause menu (ESC toggles, Resume/Quit buttons) | 70 | **Done** 2026-04-06 | PauseManager (timeScale, SO events, no alloc in Update); PauseMenuUI (panel show/hide via VoidGameEventListener) |
 | T026 | PlayMode tests for ArenaSelector (selection → MatchManager) | 75 | **Done** 2026-04-06 | 9 test cases: Select/Reset/null/replace (plain [Test]) + 4 [UnityTest] routing via win-bonus delta |
 | T027 | Robot loadout persistence — save/load equipped parts per slot | 85 | **Done** 2026-04-06 | RobotLoadoutSO + RobotLoadoutData; round-trips via SaveSystem; GameBootstrapper restores on startup |
-| T028 | Leaderboard / stats screen (wins, avg damage, total earnings) | 55 | Pending | Reads SaveData.matchHistory; zero-alloc; no new Update |
+| T028 | Leaderboard / stats screen (wins, avg damage, total earnings) | 55 | **Done** 2026-04-06 | LeaderboardStats (readonly struct, single-pass Compute); LeaderboardUI (OnEnable, no Update); 12 EditMode tests |
 | T029 | Robot preview renderer (RenderTexture orbit camera in ShopUI) | 30 | Pending | RenderTexture assigned to RawImage; orbit MonoBehaviour; no Rigidbody |
 
 ---
@@ -72,7 +72,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T028 — Leaderboard / stats screen | PM Agent | 2026-04-06 | Next session |
+| T029 — Robot preview renderer | PM Agent | 2026-04-06 | Next session |
 
 ---
 
@@ -107,6 +107,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T023 — ArenaSelector UI | 2026-04-06 | ArenaSelectionSO (Core, runtime SO, Select/Reset/HasSelection). ArenaEntryUI (UI, row with thumbnail+name+timeLimit, SetSelected). ArenaSelectorUI (UI, builds list, detail panel, Fight! confirm button, triggers scene load via SceneTransitionController). MatchManager updated: ActiveArena property prefers ArenaSelectionSO over fallback _arenaConfig. |
 | T027 — Robot loadout persistence | 2026-04-06 | LoadoutEntry + RobotLoadoutData POCOs added to MatchRecord.cs; SaveData.robotLoadout field. RobotLoadoutSO: EquipPart/UnequipPart/GetEquippedPartId/IsEquipped/Clear/LoadFromData/BuildData; O(1) Dictionary lookup + ordered List; VoidGameEvent on change. GameBootstrapper: loads loadout in Awake; snapshots in RecordMatchAndSave. |
 | T026 — PlayMode tests for ArenaSelector | 2026-04-06 | ArenaSelectorTests.cs (9 cases). Plain [Test]: Default_HasNoSelection, Select_ValidArena, Select_NullIgnored, Reset_ClearsSelection, Reset_WhenEmpty, Select_ReplacesFirst. [UnityTest]: ActiveArena_WithSelection (win-bonus delta), ActiveArena_WithoutSelection (fallback), ActiveArena_NullSO (null guard), ActiveArena_ChangedMidMatch. Reuses BattleRobots.Tests.PlayMode asmdef. |
+| T028 — Leaderboard / stats screen | 2026-04-06 | LeaderboardStats readonly struct (Compute single-pass over List<MatchRecord>: MatchCount, Wins, Losses, WinRatePercent, AvgDamageDealt, AvgDamageTaken, TotalEarnings, AvgDurationSeconds). LeaderboardUI (BattleRobots.UI, OnEnable + Refresh, stats/empty panel toggle, 8 label fields, close button). LeaderboardStatsTests (12 EditMode cases: null/empty, single win/loss, mixed history, win-rate boundaries, avg damage, total earnings, avg duration). |
 
 ---
 
@@ -127,26 +128,26 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 11: Sprint 9. T022 PlayMode tests for MatchManager (10 coroutine cases, reflection injection, PlayMode asmdef). T024 RobotSpawner + HealthSO.InitializeWithBonus + EffectiveMaxHp + HingeJointAB.ApplyTorqueBonus. T025 PauseManager + PauseMenuUI. |
 | 2026-04-06 | PM Agent | Session 12: T023 ArenaSelector UI complete. ArenaSelectionSO (Core, Select/Reset/HasSelection, VoidGameEvent on selection). ArenaEntryUI (UI prefab row component). ArenaSelectorUI (scrollable list, detail panel, Fight! button, scene transition). MatchManager extended with optional ArenaSelectionSO field + ActiveArena computed property. |
 | 2026-04-06 | PM Agent | Session 13: T027 Robot loadout persistence. LoadoutEntry + RobotLoadoutData POCOs in MatchRecord.cs; SaveData.robotLoadout field. New RobotLoadoutSO (BattleRobots.Core): EquipPart/UnequipPart/GetEquippedPartId/IsEquipped/Clear/LoadFromData/BuildData; O(1) dict+ordered list; VoidGameEvent on change. GameBootstrapper extended with _robotLoadout field; loads on Awake, snapshots in RecordMatchAndSave. Extended backlog with T026–T029. |
+| 2026-04-06 | PM Agent | Session 15: T028 Leaderboard stats screen. LeaderboardStats readonly struct (single-pass Compute, 8 fields). LeaderboardUI (BattleRobots.UI, OnEnable/Refresh, stats+empty panels, 8 labels, close button). LeaderboardStatsTests (12 EditMode cases). |
 | 2026-04-06 | PM Agent | Session 14: T026 PlayMode tests for ArenaSelector. ArenaSelectorTests.cs — 6 plain [Test] cases for ArenaSelectionSO isolation + 4 [UnityTest] cases verifying MatchManager.ActiveArena routing via win-bonus wallet delta. Covers Select/Reset/null-guard/replace and fallback/_arenaSelection-null/mid-match-switch scenarios. T028 identified as next. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T026 (ArenaSelector PlayMode tests), T027 (Robot loadout persistence).  
-**Milestone status:** M1–M6 Done. T001–T027 Done. T026 Done.
+**Last completed:** T028 (Leaderboard / stats screen — LeaderboardStats struct + LeaderboardUI + 12 tests).
+**Milestone status:** M1–M6 Done. T001–T028 Done.
 
-**Next action:** T028 — Leaderboard / stats screen. Create:
-  - `Assets/Scripts/Core/LeaderboardStats.cs` — pure-data helper that computes wins, losses, win-rate, avg damage dealt/taken, total earnings from `SaveData.matchHistory` (no allocations after initial List pass).
-  - `Assets/Scripts/UI/LeaderboardUI.cs` — `BattleRobots.UI` namespace; `OnEnable` reads `SaveSystem.Load()` and populates labels; no `Update`; no Physics references.
-  Suggested label fields: Wins, Losses, WinRate (%), AvgDamageDealt, AvgDamageTaken, TotalEarnings, MatchCount.
+**Next action:** T029 — Robot preview renderer. Create:
+  - `Assets/Scripts/UI/RobotPreviewCamera.cs` — `BattleRobots.UI` namespace; controls a Camera that renders to a `RenderTexture`; orbit input (horizontal mouse/gamepad delta) rotates the robot preview; `RenderTexture` assigned to a `RawImage` in the Shop UI. No Rigidbody; no ArticulationBody; no Physics namespace import.
+  - Suggested fields: `_camera` (Camera), `_renderTexture` (RenderTexture), `_rawImage` (RawImage), `_orbitSpeed` (float), `_targetTransform` (Transform — root of preview robot GO). Orbit rotates `_targetTransform` around its Y axis using `Input.GetAxis("Mouse X")` scaled by `_orbitSpeed * Time.deltaTime`. No allocations in Update.
 
 **Architecture notes:**
-  - `LeaderboardStats` should be a static helper or a plain-data struct — no MonoBehaviour, no SO. It operates on `SaveData` which is already loaded; no additional I/O.
-  - `LeaderboardUI` must import only `BattleRobots.Core` (never `BattleRobots.Physics`).
-  - `SaveSystem.Load()` allocates (File.ReadAllBytes); calling it in `OnEnable` is acceptable (UI open is not a hot path).
-  - Avg damage fields: divide by matchHistory.Count, guard for zero matches.
-  - Win-rate: wins / matchHistory.Count * 100f, displayed as "72.3%".
+  - `RobotPreviewCamera` lives in `BattleRobots.UI`. It must NOT reference `BattleRobots.Physics`.
+  - The Camera's `targetTexture` should be set to `_renderTexture` in `Awake`; unset in `OnDestroy` to release the RT.
+  - The preview robot GameObject should be on its own Layer (e.g. "RobotPreview") so the preview Camera culls only that layer.
+  - `RenderTexture` should be created as an asset (256×256 or 512×512) and assigned in the Inspector — do not create it at runtime unless necessary.
+  - LeaderboardUI (`Assets/Scripts/UI/LeaderboardUI.cs`) and LeaderboardStats (`Assets/Scripts/Core/LeaderboardStats.cs`) are complete. Wire `LeaderboardUI` to the stats screen panel in the MainMenu scene.
   - T029 (RobotPreviewRenderer) is lower RICE — do T028 first.
 
 **Blockers:** None. Pure C# + Unity UI work.
