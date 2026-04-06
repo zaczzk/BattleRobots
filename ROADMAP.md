@@ -58,7 +58,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T020 | Match history UI (MatchHistoryUI + MatchHistoryEntryUI) | 50 | **Done** 2026-04-05 | ScrollList newest-first; summary bar; empty state; OnEnable refresh |
 | T021 | RobotController invert-controls via SettingsSO.InvertControls | 40 | **Done** 2026-04-05 | Polled in FixedUpdate; negates fwd axis; optional SettingsSO ref |
 | T022 | PlayMode tests — MatchManager lifecycle (10 cases) | 80 | **Done** 2026-04-06 | Hermetic; covers start/death/timelimit/win-reward/abort/elapsed |
-| T023 | ArenaSelector UI — choose ArenaConfig before match | 65 | Pending | UI lists SOs; selection stored; wired to MatchManager |
+| T023 | ArenaSelector UI — choose ArenaConfig before match | 65 | **Done** | UI lists SOs; selection stored; wired to MatchManager |
 | T024 | Part stat bonuses at spawn — RobotSpawner | 75 | **Done** 2026-04-06 | Spawner accumulates HP+torque bonuses; applies via HealthSO.InitializeWithBonus + HingeJointAB.ApplyTorqueBonus |
 | T025 | Pause menu (ESC toggles, Resume/Quit buttons) | 70 | **Done** 2026-04-06 | PauseManager (timeScale, SO events, no alloc in Update); PauseMenuUI (panel show/hide via VoidGameEventListener) |
 
@@ -68,7 +68,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T023 — ArenaSelector UI | PM Agent | 2026-04-06 | Next session: list of ArenaConfig SOs; selection wired to MatchManager |
+| — | — | — | All T001–T025 complete; awaiting next backlog items |
 
 ---
 
@@ -100,6 +100,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T022 — PlayMode MatchManager tests | 2026-04-06 | PlayMode asmdef (BattleRobots.Tests.PlayMode). MatchManagerTests (10 [UnityTest] coroutines): StartMatch, double-StartMatch, opponent-death win, player-death loss, win-wallet-credit, loss-no-credit, time-limit expiry, AbortMatch, ElapsedSeconds advance+freeze. Reflection-based field injection. |
 | T024 — RobotSpawner | 2026-04-06 | BattleRobots.Physics; SpawnRobot(teamIndex, prefab, arenaConfig, healthSO, equippedPartIds); ComputeBonuses accumulates HP+torque from PartDefinition catalogue; HealthSO.InitializeWithBonus added (transient EffectiveMaxHp); HingeJointAB.ApplyTorqueBonus added; MatchManager updated to snapshot EffectiveMaxHp. |
 | T025 — Pause system | 2026-04-06 | PauseManager (Core): ESC toggle, Pause/Resume/TogglePause API, Time.timeScale, VoidGameEvent channels, OnDestroy safety restore. PauseMenuUI (UI): ShowPanel/HidePanel wired via VoidGameEventListener; Resume+Quit buttons; SceneTransitionController optional. |
+| T023 — ArenaSelector UI | 2026-04-06 | ArenaSelectionSO (Core, runtime SO, Select/Reset/HasSelection). ArenaEntryUI (UI, row with thumbnail+name+timeLimit, SetSelected). ArenaSelectorUI (UI, builds list, detail panel, Fight! confirm button, triggers scene load via SceneTransitionController). MatchManager updated: ActiveArena property prefers ArenaSelectionSO over fallback _arenaConfig. |
 
 ---
 
@@ -118,24 +119,26 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-05 | PM Agent | Session 9: T017 Settings persistence — SettingsData POCO added to MatchRecord.cs; SaveData.settings field added; SettingsSO (BattleRobots.Core) with LoadFromData/BuildData/Apply via FloatGameEvent channels; SettingsUI (BattleRobots.UI) with sliders + toggle, SetValueWithoutNotify on panel open, PersistSettings on every change; GameBootstrapper extended to load settings at startup. All T001–T017 complete. |
 | 2026-04-05 | PM Agent | Session 10: Sprint 8 complete. T018 SettingsSOTests (12 cases) + MatchRecordIntegrationTests (7 cases). T019 GamepadRumble (InputSystem, proportional damage intensity, OnDisable cancel, Physics.asmdef Unity.InputSystem ref). T020 MatchHistoryUI + MatchHistoryEntryUI (newest-first scroll list, summary bar, win-rate, empty state). T021 RobotController InvertControls (fwd-axis negation, optional SettingsSO ref). |
 | 2026-04-06 | PM Agent | Session 11: Sprint 9. T022 PlayMode tests for MatchManager (10 coroutine cases, reflection injection, PlayMode asmdef). T024 RobotSpawner + HealthSO.InitializeWithBonus + EffectiveMaxHp + HingeJointAB.ApplyTorqueBonus. T025 PauseManager + PauseMenuUI. |
+| 2026-04-06 | PM Agent | Session 12: T023 ArenaSelector UI complete. ArenaSelectionSO (Core, Select/Reset/HasSelection, VoidGameEvent on selection). ArenaEntryUI (UI prefab row component). ArenaSelectorUI (scrollable list, detail panel, Fight! button, scene transition). MatchManager extended with optional ArenaSelectionSO field + ActiveArena computed property. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T022 (PlayMode MatchManager tests), T024 (RobotSpawner + stat bonuses), T025 (PauseManager + PauseMenuUI). All T001–T022, T024–T025 complete.  
-**Milestone status:** M1–M6 Done. Sprint 9 in progress.
+**Last completed:** T023 (ArenaSelector UI). All T001–T025 complete.  
+**Milestone status:** M1–M6 Done. All backlog items done.
 
-**Next action:** T023 — ArenaSelector UI.
-  - Create `ArenaSelector.cs` in `BattleRobots.UI` — displays a scrollable list of `ArenaConfig` SO assets.
-  - Selection sets an `ArenaSelectionSO` (or passes directly to MatchManager) and loads the Arena scene.
-  - `ArenaSelectionSO` is a runtime-only SO that holds the currently chosen `ArenaConfig`.
-  - MatchManager reads from `ArenaSelectionSO` at StartMatch instead of an Inspector-wired config.
+**Next backlog suggestions (extend the backlog next session):**
+  - T026: PlayMode tests for ArenaSelector (selection propagates to ArenaSelectionSO; MatchManager picks it up)
+  - T027: Robot loadout persistence — save/load equipped part IDs per robot slot; restore on GameBootstrapper startup
+  - T028: Leaderboard / stats screen — all-time wins, avg damage, total earnings from SaveData.matchHistory
+  - T029: Robot preview renderer — RenderTexture camera orbiting the assembled robot in ShopUI / ArenaSelector
 
 **Architecture notes:**
-  - `HealthSO.EffectiveMaxHp` is a new runtime property (transient, not serialised). `MatchManager` now snapshots `EffectiveMaxHp` (not `MaxHp`) for damage calculations.
-  - `HingeJointAB._effectiveTorque` is a runtime field; `ApplyTorqueBonus` patches `forceLimit` on the live drive struct only.
-  - `PauseManager.OnDestroy` restores `Time.timeScale = 1` — critical for scene transitions while paused.
-  - `PauseMenuUI` uses `VoidGameEventListener` wiring (Inspector) to show/hide the panel — no Update polling.
+  - `ArenaSelectionSO.Select()` fires `VoidGameEvent _onArenaSelected` — wire to confirm-button enablement or any other listener in the Inspector.
+  - `ArenaSelectorUI.OnEnable()` calls `ArenaSelectionSO.Reset()` — clears stale selection between screen visits.
+  - `MatchManager.ActiveArena` is a computed property (no field); falls back to `_arenaConfig` if SO has no selection.
+  - `HealthSO.EffectiveMaxHp` is transient; `MatchManager` snapshots it at StartMatch.
+  - `PauseManager.OnDestroy` restores `Time.timeScale = 1` — critical when loading scenes while paused.
 
-**Blockers:** None. All Sprint 9 work so far is pure C# — no Unity Editor / scene wiring required.
+**Blockers:** None. All work is pure C# — Unity Editor scene wiring can be done in a local session.

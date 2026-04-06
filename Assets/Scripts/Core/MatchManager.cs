@@ -25,8 +25,13 @@ namespace BattleRobots.Core
         // ── Inspector ─────────────────────────────────────────────────────────
 
         [Header("Arena")]
-        [Tooltip("Describes the arena: time limit, win bonus, spawn layout.")]
+        [Tooltip("Describes the arena: time limit, win bonus, spawn layout. " +
+                 "If ArenaSelectionSO is also assigned, its SelectedArena takes priority.")]
         [SerializeField] private ArenaConfig _arenaConfig;
+
+        [Tooltip("Optional runtime SO set by the ArenaSelector screen. " +
+                 "When assigned and HasSelection is true, overrides _arenaConfig.")]
+        [SerializeField] private ArenaSelectionSO _arenaSelection;
 
         [Header("Combatants  (index 0 = player · index 1 = opponent)")]
         [Tooltip("One HealthSO per robot in match order. Must have at least 2 entries.")]
@@ -53,6 +58,16 @@ namespace BattleRobots.Core
         [SerializeField] private VoidGameEvent _onPlayerLost;
 
         // ── Runtime State ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// The arena to use for this match.
+        /// Prefers <see cref="_arenaSelection"/>.SelectedArena when available;
+        /// falls back to the Inspector-wired <see cref="_arenaConfig"/>.
+        /// </summary>
+        private ArenaConfig ActiveArena =>
+            (_arenaSelection != null && _arenaSelection.HasSelection)
+                ? _arenaSelection.SelectedArena
+                : _arenaConfig;
 
         /// <summary>True while a match is in progress.</summary>
         public bool IsMatchActive => _matchActive;
@@ -95,8 +110,8 @@ namespace BattleRobots.Core
             _elapsedSeconds = 0f;
             _matchActive    = true;
 
-            Debug.Log($"[MatchManager] Match started. Arena: '{_arenaConfig.ArenaName}' · " +
-                      $"Time limit: {_arenaConfig.TimeLimitSeconds}s.");
+            Debug.Log($"[MatchManager] Match started. Arena: '{ActiveArena.ArenaName}' · " +
+                      $"Time limit: {ActiveArena.TimeLimitSeconds}s.");
         }
 
         /// <summary>
@@ -136,8 +151,8 @@ namespace BattleRobots.Core
             }
 
             // Time-limit expiry (0 means no limit).
-            if (_arenaConfig.TimeLimitSeconds > 0f &&
-                _elapsedSeconds >= _arenaConfig.TimeLimitSeconds)
+            if (ActiveArena.TimeLimitSeconds > 0f &&
+                _elapsedSeconds >= ActiveArena.TimeLimitSeconds)
             {
                 EndMatch(playerWon: false); // draw → treated as loss for economy
             }
@@ -162,7 +177,7 @@ namespace BattleRobots.Core
             int currencyEarned = 0;
             if (playerWon)
             {
-                currencyEarned = _baseWinReward + _arenaConfig.WinBonusCurrency;
+                currencyEarned = _baseWinReward + ActiveArena.WinBonusCurrency;
                 _wallet?.AddFunds(currencyEarned);
                 _onPlayerWon?.Raise(currencyEarned);
             }
@@ -175,7 +190,7 @@ namespace BattleRobots.Core
             var record = new MatchRecord
             {
                 timestamp       = DateTime.UtcNow.ToString("o"),
-                arenaIndex      = _arenaConfig.ArenaIndex,
+                arenaIndex      = ActiveArena.ArenaIndex,
                 playerWon       = playerWon,
                 durationSeconds = _elapsedSeconds,
                 damageDone      = damageDone,
@@ -217,9 +232,10 @@ namespace BattleRobots.Core
 
         private bool ValidateDependencies()
         {
-            if (_arenaConfig == null)
+            if (ActiveArena == null)
             {
-                Debug.LogError("[MatchManager] ArenaConfig is not assigned.", this);
+                Debug.LogError("[MatchManager] No ArenaConfig available. Assign _arenaConfig or " +
+                               "ensure _arenaSelection has a valid selection before StartMatch.", this);
                 return false;
             }
 
