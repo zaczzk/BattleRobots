@@ -141,6 +141,17 @@ namespace BattleRobots.Core
             SentPayloads.Add(payload);
         }
 
+        // ── Diagnostics ───────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Configurable simulated ping value returned by <see cref="GetPingMs"/>.
+        /// Set in tests to exercise ping-display thresholds.  Defaults to 0.
+        /// </summary>
+        public int FakePingMs { get; set; } = 0;
+
+        /// <inheritdoc/>
+        public int GetPingMs() => FakePingMs;
+
         // ── Helpers ───────────────────────────────────────────────────────────
 
         private static string Normalise(string code) =>

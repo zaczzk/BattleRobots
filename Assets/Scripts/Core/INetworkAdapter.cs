@@ -83,5 +83,14 @@ namespace BattleRobots.Core
         /// received from a remote peer.  Passes back the raw byte array.
         /// </summary>
         Action<byte[]> OnMatchStateReceived { get; set; }
+
+        // ── Diagnostics ───────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns the current round-trip latency to the backend server in milliseconds.
+        /// Returns 0 when not connected or when the transport does not support ping.
+        /// Must be allocation-free (read a cached value; never allocate on each call).
+        /// </summary>
+        int GetPingMs();
     }
 }

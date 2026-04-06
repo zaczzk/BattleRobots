@@ -162,6 +162,15 @@ namespace BattleRobots.Core
             // Session state is updated via the OnDisconnected callback registered in Awake.
         }
 
+        // ── Diagnostics ──────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns the current round-trip latency from the active adapter in milliseconds.
+        /// Returns 0 when no adapter is set or when the adapter is not connected.
+        /// Allocation-free — delegates directly to <see cref="INetworkAdapter.GetPingMs"/>.
+        /// </summary>
+        public int GetAdapterPingMs() => _adapter != null ? _adapter.GetPingMs() : 0;
+
         // ── Adapter injection (tests / DI) ────────────────────────────────────
 
         /// <summary>

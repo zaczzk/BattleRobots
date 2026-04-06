@@ -75,6 +75,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T037 | Network multiplayer stub (session SO, adapter interface, lobby UI) | 95 | **Done** 2026-04-06 | NetworkConnectionState+NetworkRole enums; NetworkSessionSO (Connect/SetConnected/JoinRoom/Disconnect mutators, 4 VoidGameEvent channels); INetworkAdapter interface; StubNetworkAdapter (in-memory, ClearRooms, SentPayloads); NetworkEventBridge MB (SetAdapter, BeginConnect/Host/Join/Disconnect, callback wiring); NetworkLobbyUI (UI, Host/Join radio, room-code input, Connect/Disconnect buttons, status label, VoidGameEventListener wiring); 25 EditMode test cases |
 | T038 | Network match-state sync (RPC-style byte channel + MatchStateSO) | 90 | **Done** 2026-04-06 | ByteArrayGameEvent SO channel; ByteArrayGameEventListener MB; MatchStateSO (PlayerHp/OpponentHp/ElapsedTime, 12-byte BitConverter payload, Snapshot/Apply/SetLocalState/Reset, zero-alloc guarantee); NetworkMatchSync MB (pre-alloc buffer in Awake, FixedUpdate tick counter, send on interval, receive via NetworkEventBridge.OnMatchStateReceived C# event, ForceSend API); NetworkEventBridge extended (SendMatchState, OnMatchStateReceived C# event, ByteArrayGameEvent SO channel raised on receive); 12 EditMode test cases |
 | T039 | Network reconnection flow (SessionTimeoutSO, Reconnecting state, ReconnectUI) | 85 | **Done** 2026-04-06 | SessionTimeoutSO; NetworkSessionSO.Reconnecting+BeginReconnect+ReconnectAttempts; ReconnectUI overlay; 20 EditMode test cases |
+| T040 | Network latency / ping display (PingSO, PingMonitor, PingDisplayUI) | 75 | **Done** 2026-04-06 | PingSO SO; PingMonitor polls adapter on interval; PingDisplayUI colour-coded label; INetworkAdapter.GetPingMs(); 16 EditMode tests |
 
 ---
 
@@ -82,7 +83,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T040 — (next task TBD) | PM Agent | 2026-04-06 | See Session Handoff for suggested next work |
+| T041 — (next task TBD) | PM Agent | 2026-04-06 | See Session Handoff |
 
 ---
 
@@ -129,6 +130,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T037 — Network multiplayer stub | 2026-04-06 | INetworkAdapter interface; StubNetworkAdapter (in-memory, shared rooms, SentPayloads); NetworkSessionSO (state machine: Disconnected/Connecting/Connected/InMatch; mutators; 4 VoidGameEvent channels); NetworkEventBridge MB (adapter DI, BeginConnect/Host/Join/Disconnect); NetworkLobbyUI (BattleRobots.UI, Host/Join radio, room-code input, Connect/Disconnect buttons, status label; VoidGameEventListener wiring docs); NetworkSessionSOTests (25 EditMode cases). |
 | T038 — Network match-state sync | 2026-04-06 | ByteArrayGameEvent SO channel + ByteArrayGameEventListener MB. MatchStateSO: PlayerHp/OpponentHp/ElapsedTime; 12-byte BitConverter payload; Snapshot(byte[]) zero-alloc write; Apply(byte[]) validated + fires channel; SetLocalState; Reset. NetworkMatchSync MB: Awake pre-alloc _sendBuffer; FixedUpdate int tick counter; sends every _syncIntervalTicks via NetworkEventBridge.SendMatchState; OnEnable/OnDisable subscribes to NetworkEventBridge.OnMatchStateReceived C# event; ForceSend() API. NetworkEventBridge extended: SendMatchState public method; OnMatchStateReceived C# event + ByteArrayGameEvent SO field both raised on adapter receive. NetworkMatchSyncTests (12 EditMode cases). |
 | T039 — Network reconnection flow | 2026-04-06 | SessionTimeoutSO (Core): configurable duration, Tick(float) countdown, VoidGameEvent _onTimeout, Reset()/Stop(), IsRunning/RemainingTime. NetworkSessionSO extended: Reconnecting enum value; _onReconnecting VoidGameEvent; _maxReconnectAttempts field; ReconnectAttempts/MaxReconnectAttempts; BeginReconnect() (Connected/InMatch/Connecting→Reconnecting, increments counter, guards max); ResetReconnectCount(); Disconnect() zeroes counter; IsConnected includes Reconnecting. ReconnectUI (BattleRobots.UI): overlay panel; OnReconnecting/OnConnectionRestored via VoidGameEventListener; attempt label ("Attempt N of Max"); Cancel→BeginDisconnect; Retry→BeginConnect(last role); Retry disabled at max; no Update/FixedUpdate. NetworkReconnectTests.cs (20 EditMode cases). |
+| T040 — Network latency / ping display | 2026-04-06 | INetworkAdapter.GetPingMs() added (interface extension). StubNetworkAdapter: FakePingMs configurable field, GetPingMs() returns it. PingSO (Core): CurrentPingMs int; SetPing(int) clamps ≥0 + fires IntGameEvent; Reset() zeros + fires. PingMonitor (Core MB): polls bridge.GetAdapterPingMs() every _pollIntervalSeconds via float timer in Update (no alloc); OnDisable calls pingSO.Reset(). NetworkEventBridge: GetAdapterPingMs() delegation method added. PingDisplayUI (BattleRobots.UI): Text label + colour (green/yellow/red/grey) via OnPingChanged(int) wired from IntGameEventListener; offline state hides label and shows optional offline label; no Update. PingTests.cs: 16 EditMode cases covering PingSO default/SetPing/Reset, StubAdapter FakePingMs, INetworkAdapter contract, NetworkEventBridge delegation, SetAdapter swap. |
 
 ---
 
@@ -161,29 +163,31 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 23: T037 Network multiplayer stub. INetworkAdapter interface (Connect/Disconnect/Host/Join/SendMatchState + 5 Action callbacks). StubNetworkAdapter pure-C# class (static s_ActiveRooms, ClearRooms, SentPayloads list, ConnectCallCount/DisconnectCallCount for assertion; immediate callback invocation). NetworkSessionSO SO (state machine: Disconnected→Connecting→Connected→InMatch via Connect/SetConnected/JoinRoom/Disconnect; IsConnected/IsInMatch convenience properties; 4 VoidGameEvent channels). NetworkEventBridge MB (SetAdapter DI; Awake defaults to StubNetworkAdapter; RegisterAdapterCallbacks wires transport events to session mutators; BeginConnect/Host/Join/Disconnect public API + BeginConnectAsHost/Client convenience wrappers). NetworkLobbyUI (BattleRobots.UI: Host/Join radio buttons, room-code InputField, Connect/Disconnect buttons, status Text; OnConnected auto-proceeds to host/join; OnEnable reset; GenerateRoomCode 4-char A–Z; no Update/FixedUpdate). NetworkSessionSOTests.cs (25 EditMode cases). |
 | 2026-04-06 | PM Agent | Session 24: T038 Network match-state sync. ByteArrayGameEvent SO channel (GameEvent<byte[]>) + ByteArrayGameEventListener MB. MatchStateSO: PlayerHp/OpponentHp/ElapsedTime float properties; 12-byte payload via BitConverter; Snapshot(byte[]) zero-alloc in-place write; Apply(byte[]) length-validated + fires ByteArrayGameEvent; SetLocalState mutator; Reset. NetworkMatchSync MB: pre-alloc _sendBuffer[12] in Awake; FixedUpdate int _tickCounter (no alloc); sends every _syncIntervalTicks ticks; subscribes to NetworkEventBridge.OnMatchStateReceived C# event in OnEnable/OnDisable; HandleMatchStateReceived → MatchStateSO.Apply; ForceSend() public API. NetworkEventBridge extended: SendMatchState(byte[]) public method; Action<byte[]> OnMatchStateReceived C# event; _onMatchStateReceivedChannel ByteArrayGameEvent SO field — both raised in adapter receive callback. NetworkMatchSyncTests.cs (12 EditMode cases: PayloadSize const, Snapshot length, 4 Apply round-trips, full encode→decode identity, null/wrong-length/zero-payload guards, Snapshot bad-buffer exceptions, FixedUpdate interval gating via reflection). |
 | 2026-04-06 | PM Agent | Session 25: T039 Network reconnection flow. SessionTimeoutSO (Core): _timeoutDuration/Reset()/Tick(deltaTime)/Stop()/IsRunning/RemainingTime; fires VoidGameEvent _onTimeout on expiry; no MonoBehaviour. NetworkSessionSO extended: Reconnecting enum value; _onReconnecting VoidGameEvent + _maxReconnectAttempts (default 3) inspector fields; ReconnectAttempts/MaxReconnectAttempts properties; BeginReconnect() guards (Disconnected/already-Reconnecting/max-reached), increments counter, fires channel; ResetReconnectCount(); Disconnect() now zeroes counter; IsConnected updated to include Reconnecting. ReconnectUI (BattleRobots.UI): overlay panel toggled by OnReconnecting/OnConnectionRestored via VoidGameEventListener; attempt counter label; Cancel→BeginDisconnect; Retry→BeginConnect using last role; Retry.interactable=false at max attempts; no Update/FixedUpdate. NetworkReconnectTests.cs: 20 EditMode cases covering all of the above. |
+| 2026-04-06 | PM Agent | Session 26: T040 Network latency / ping display. INetworkAdapter.GetPingMs() new method added. StubNetworkAdapter: FakePingMs int field + GetPingMs() implementation. PingSO (Core SO): CurrentPingMs; SetPing(int) clamps negatives to 0, fires IntGameEvent; Reset() zeroes + fires. PingMonitor (Core MB): float timer in Update (only per-frame work); polls bridge.GetAdapterPingMs() every _pollIntervalSeconds; OnEnable forces first poll; OnDisable calls pingSO.Reset(). NetworkEventBridge: GetAdapterPingMs() delegation method. PingDisplayUI (BattleRobots.UI): Text label + colour (green ≤80/yellow ≤150/red 151+/grey=offline); optional offline label; no Update; updated via OnPingChanged(int) from IntGameEventListener. PingTests.cs: 16 EditMode cases (PingSO default/SetPing/Reset, Stub FakePingMs, INetworkAdapter contract, Bridge delegation + SetAdapter swap). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T039 — Network reconnection flow (SessionTimeoutSO, NetworkSessionSO.Reconnecting, ReconnectUI, 20 EditMode tests).  
-**Milestone status:** M1–M6 Done. T001–T039 Done.
+**Last completed:** T040 — Network latency / ping display (PingSO, INetworkAdapter.GetPingMs, PingMonitor, PingDisplayUI, 16 EditMode tests).  
+**Milestone status:** M1–M6 Done. T001–T040 Done.
 
-**Next action:** T040 — Network latency / ping display. Suggested deliverables:
-  - `PingSO.cs` (Core) — runtime SO storing current ping in milliseconds (`int CurrentPingMs`); `SetPing(int ms)` mutator that fires `IntGameEvent _onPingChanged`; `Reset()` zeroes value.
-  - `INetworkAdapter` extension — add `int GetPingMs()` method (StubNetworkAdapter returns configurable `FakePingMs` int field, default 0).
-  - `PingMonitor.cs` (Core MonoBehaviour) — polls `INetworkAdapter.GetPingMs()` every `_pollIntervalSeconds`; uses a float timer incremented in `Update` (no alloc); calls `PingSO.SetPing()`; references `NetworkEventBridge` to access adapter.
-  - `PingDisplayUI.cs` (BattleRobots.UI) — Text label updated by `IntGameEventListener` wired to `PingSO._onPingChanged`; colours text green/yellow/red based on thresholds (0–80/80–150/150+); no Update.
+**Next action:** T041 — Player connection status badge. Suggested deliverables:
+  - `ConnectionBadgeUI.cs` (BattleRobots.UI) — small HUD badge (icon + label) showing current `NetworkConnectionState`; updated by wiring `VoidGameEventListener`s to `NetworkSessionSO` event channels (onConnecting/onConnected/onDisconnected/onReconnecting); no Update; colour-coded (grey=disconnected, yellow=connecting, green=connected, orange=reconnecting).
+  - `ConnectionStateLabel.cs` (BattleRobots.UI) — Text label that maps `NetworkConnectionState` to a localised string (e.g. "Offline", "Connecting…", "Online"); updated via the same event channels as ConnectionBadgeUI.
+  - `ConnectionBadgeTests.cs` (EditMode) — 10 test cases driving NetworkSessionSO state machine transitions and verifying that ConnectionBadgeUI reflects correct colour+text states.
 
-**Blockers:** None.  
+**Blockers:** None. Scene .unity wiring deferred to Editor session.  
 **Architecture notes:**
-  - `PingSO` is mutable at runtime via `SetPing()` — this is the designated mutator pattern.
-  - `PingMonitor` is Core (not UI); `PingDisplayUI` is UI. No cross-namespace dependency.
-  - `INetworkAdapter.GetPingMs()` is a new method — update `StubNetworkAdapter` to implement it.
-  - Inspector wiring checklist (defer to Editor session):
+  - Both new UI types in `BattleRobots.UI` namespace — no Physics refs.
+  - PingMonitor Inspector wiring (defer to Editor session):
+      □ _pingSO → PingSO asset
+      □ _networkBridge → NetworkEventBridge GO
+  - PingDisplayUI Inspector wiring:
+      □ _pingLabel → Text component
+      □ IntGameEventListener sibling: _event=PingSO._onPingChanged, Response=PingDisplayUI.OnPingChanged
+  - Other deferred wiring (carry-forward from T039):
       □ ReconnectUI._session, _bridge, _reconnectPanel, _attemptLabel, _cancelButton, _retryButton
-      □ VoidGameEventListeners wired: onReconnecting→OnReconnecting, onConnected→OnConnectionRestored, onDisconnected→OnConnectionRestored
+      □ VoidGameEventListeners: onReconnecting→OnReconnecting, onConnected→OnConnectionRestored
       □ NetworkEventBridge._onMatchStateReceivedChannel → ByteArrayGameEvent asset
-      □ NetworkMatchSync._matchStateSO, _bridge, _playerHealth, _opponentHealth, _matchManager
-      □ NetworkLobbyUI VoidGameEventListeners (onConnecting/Connected/MatchJoined/Disconnected)
-      □ SessionTimeoutSO._onTimeout → VoidGameEvent asset (wired to ReconnectUI or MatchManager)
+      □ SessionTimeoutSO._onTimeout → VoidGameEvent asset
