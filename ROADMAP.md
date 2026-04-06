@@ -40,9 +40,9 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T002 | PlayerWallet ScriptableObject | 85 | Pending | SO mutates via AddFunds/Deduct; fires event |
 | T003 | MatchRecord data class + JSON shape | 85 | Pending | Serializable; round-trips clean |
 | T004 | XOR SaveSystem (save/load MatchRecord) | 80 | Pending | Encrypts file on disk; loads back intact |
-| T005 | RobotDefinition SO (part slots, base stats) | 75 | Pending | Compiles; slots validated in Editor |
-| T006 | ArticulationBody joint wrapper (HingeJointAB) | 75 | Pending | Drive applies torque; no Rigidbody |
-| T007 | DamageSystem — HealthSO + DamageEvent channel | 70 | Pending | Damage reduces health SO; death event fires |
+| T005 | RobotDefinition SO (part slots, base stats) | 75 | **Done** | Compiles; slots validated in Editor |
+| T006 | ArticulationBody joint wrapper (HingeJointAB) | 75 | **Done** | Drive applies torque; no Rigidbody |
+| T007 | DamageSystem — HealthSO + DamageEvent channel | 70 | **Done** | Damage reduces health SO; death event fires |
 | T008 | Arena scene scaffold (ground, walls, spawn points) | 60 | Pending | Scene loads; robots spawn at markers |
 | T009 | ShopUI — part browser, buy button, wallet display | 55 | Pending | UI reads wallet SO; buy fires deduct |
 | T010 | MatchManager — round timer, win condition | 55 | Pending | Correct winner determined; MatchRecord written |
@@ -55,7 +55,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T001 — SO Event Channel system | PM Agent | 2026-04-05 | First session; bootstrapping repo |
+| T008 — Arena scene scaffold | PM Agent | 2026-04-06 | Next: ground plane, walls, spawn point markers as ScriptableObject-driven prefab setup |
 
 ---
 
@@ -63,7 +63,13 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Completed | Notes |
 |------|-----------|-------|
-| — | — | First session |
+| T001 — SO Event Channel system | 2026-04-05 | GameEvent<T>, VoidGameEvent, typed listeners (Float, Int, Void) |
+| T002 — PlayerWallet SO | 2026-04-05 | AddFunds/Deduct; fires IntGameEvent on balance change |
+| T003 — MatchRecord + SaveData | 2026-04-05 | Serializable POCO; round-trips through JsonUtility |
+| T004 — XOR SaveSystem | 2026-04-05 | Atomic write via temp file; XOR key 0xAB |
+| T005 — RobotDefinition SO | 2026-04-06 | PartSlot list, base stats; Editor drawer with slot validation |
+| T006 — HingeJointAB | 2026-04-06 | RevoluteJoint ArticulationBody wrapper; SetTargetVelocity / ApplyTorque |
+| T007 — DamageSystem | 2026-04-06 | HealthSO + DamageInfo struct + DamageGameEvent channel + DamageReceiver |
 
 ---
 
@@ -72,12 +78,18 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | Date | Agent | Summary |
 |------|-------|---------|
 | 2026-04-05 | PM Agent | Session 1: Repo bootstrap. Created ROADMAP.md, .gitignore, folder structure, Core SO event channel system (GameEvent, VoidGameEvent, GameEventListenerT), PlayerWallet SO, MatchRecord, XOR SaveSystem. |
+| 2026-04-06 | PM Agent | Session 2: T005 RobotDefinition SO (PartSlot, PartCategory, ValidateSlots, Editor drawer). T006 HingeJointAB (RevoluteJoint, SetTargetVelocity, ApplyTorque, no Rigidbody). T007 DamageSystem (DamageInfo struct, DamageGameEvent channel, DamageGameEventListener, HealthSO with FloatGameEvent/VoidGameEvent channels, DamageReceiver bridging events to HealthSO). M1 fully complete; M2 core Physics in place. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T001 (SO Event Channel), T002 (PlayerWallet), T003 (MatchRecord), T004 (SaveSystem)  
-**Next action:** T005 — RobotDefinition SO. Create `Assets/Scripts/Core/RobotDefinition.cs` with part slot list and base stats (HP, speed, torque multiplier). Validate slot count in a custom Editor drawer.  
-**Blockers:** None. Unity Editor not available in remote env; all files are pure C# — no scene wiring needed for M1 tasks.  
-**Architecture notes:** All M1 scripts use `BattleRobots.Core` namespace. SaveSystem uses `Application.persistentDataPath`. XOR key is a const byte in SaveSystem (rotate in M5 for security pass).
+**Last completed:** T005 (RobotDefinition SO), T006 (HingeJointAB), T007 (DamageSystem)  
+**Next action:** T008 — Arena scene scaffold. Since Unity Editor is unavailable in remote env, deliverable is C# scaffolding: `ArenaConfig.cs` SO (ground size, wall height, spawn point transforms as SO data), `SpawnPointMarker.cs` MonoBehaviour (marks spawn positions in scene), and `ArenaManager.cs` (reads ArenaConfig SO, positions robots at spawn points on MatchStart event). No scene files — scene wiring deferred to a session with Unity Editor access.  
+**Blockers:** None for C# work. Scene asset creation (.unity) deferred until Editor session.  
+**Architecture notes:**
+- `ArenaConfig` → `BattleRobots.Core` namespace (data SO)  
+- `SpawnPointMarker` → `BattleRobots.Core` namespace (pure marker MB)  
+- `ArenaManager` → `BattleRobots.Core` namespace; listens to `VoidGameEvent` MatchStarted channel  
+- All cross-component communication via SO event channels — no direct references to Physics or UI  
+- `DamageReceiver` in Physics namespace: to wire SO damage channel in Inspector, add a `DamageGameEventListener` MB to the robot GO and point its UnityEvent at `DamageReceiver.TakeDamage(DamageInfo)`
