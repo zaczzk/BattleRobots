@@ -43,7 +43,10 @@ namespace BattleRobots.Core
                     : _playerWallet.Balance); // keeps starting balance on first launch
 
             if (_settings != null)
+            {
                 _settings.LoadFromData(save.settings);
+                _settings.LoadKeyBindings(save.keyBindings);
+            }
 
             if (_robotLoadout != null)
                 _robotLoadout.LoadFromData(save.robotLoadout);

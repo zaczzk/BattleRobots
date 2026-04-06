@@ -85,6 +85,35 @@ namespace BattleRobots.Core
         public bool invertControls = false;
     }
 
+    // ── Key bindings ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Single action → key mapping entry.
+    /// <c>keyCode</c> is stored as <c>int</c> (the underlying value of <see cref="UnityEngine.KeyCode"/>)
+    /// because <c>JsonUtility</c> does not serialise enums by name — only by value.
+    /// Cast back to <c>KeyCode</c> at runtime.
+    /// </summary>
+    [Serializable]
+    public sealed class KeyBindingEntry
+    {
+        /// <summary>Logical action name, e.g. "Forward", "Back", "Left", "Right", "Fire".</summary>
+        public string actionName;
+
+        /// <summary>The assigned key stored as int. Cast to <c>KeyCode</c> when reading.</summary>
+        public int keyCode;
+    }
+
+    /// <summary>
+    /// Flat list of <see cref="KeyBindingEntry"/> objects that persists all custom
+    /// key bindings in a <c>JsonUtility</c>-compatible format.
+    /// </summary>
+    [Serializable]
+    public sealed class KeyBindingsData
+    {
+        /// <summary>All action→key pairs. Order is not significant.</summary>
+        public List<KeyBindingEntry> entries = new List<KeyBindingEntry>();
+    }
+
     /// <summary>
     /// Top-level save file container. Holds the running wallet balance,
     /// full match history, and player settings.
@@ -107,5 +136,12 @@ namespace BattleRobots.Core
         /// <see cref="RobotLoadoutSO.LoadFromData"/>.
         /// </summary>
         public RobotLoadoutData robotLoadout = new RobotLoadoutData();
+
+        /// <summary>
+        /// Persisted custom key bindings.
+        /// Populated by <see cref="SettingsSO.BuildKeyBindings"/> and consumed by
+        /// <see cref="SettingsSO.LoadKeyBindings"/>.
+        /// </summary>
+        public KeyBindingsData keyBindings = new KeyBindingsData();
     }
 }

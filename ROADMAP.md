@@ -68,6 +68,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T030 | Apply PartDefinition.SpeedBonus in RobotSpawner + RobotController | 75 | **Done** 2026-04-06 | ComputeBonuses now outputs speedBonus; ApplySpeedBonus added to RobotController |
 | T031 | EditMode tests for RobotLoadoutSO | 80 | **Done** 2026-04-06 | 16 test cases: default state, EquipPart, UnequipPart, Clear, LoadFromData, BuildData round-trip, null/empty guards |
 | T032 | PlayMode tests — RobotSpawner bonus pipeline | 80 | **Done** 2026-04-06 | 11 cases: null guards, HP/speed bonus application, accumulation, unknown part skip, position, missing descriptor, torque path |
+| T033 | Input rebinding — SettingsSO bindings + SettingsUI rebind panel | 75 | **Done** 2026-04-06 | KeyBindingEntry/KeyBindingsData POCOs; SettingsSO GetBinding/SetBinding/LoadKeyBindings/BuildKeyBindings; RebindRowUI; SettingsUI rebind panel + key capture coroutine; RobotController ReadAxis/UpdateWeapon use bindings; 16 EditMode tests |
 
 ---
 
@@ -75,7 +76,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T033 — Input rebinding | PM Agent | 2026-04-06 | Next: extend SettingsSO + SaveData with action→key map; SettingsUI rebind button flow |
+| T034 — PlayMode tests for input rebinding | PM Agent | 2026-04-06 | Next: PlayMode tests verifying RobotController reads custom bindings; KeyBindings round-trip in live session |
 
 ---
 
@@ -115,6 +116,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T030 — SpeedBonus applied in RobotSpawner | 2026-04-06 | PartDefinition.SpeedBonus was computed but never used. ComputeBonuses now outputs speedBonus (3rd out param). RobotController.ApplySpeedBonus(float) added — increments _driveSpeedRadPerSec at spawn. RobotSpawner.SpawnRobot applies it via GetComponent<RobotController>. |
 | T031 — RobotLoadoutSO EditMode tests | 2026-04-06 | RobotLoadoutSOTests.cs: 16 cases covering default state, EquipPart (single/replace/multi/null-slotId/empty-partId), UnequipPart (existing/missing/empty-id), Clear (populated/empty), LoadFromData (valid/null/skip-bad-entries/overwrite), BuildData (round-trip/empty). |
 | T032 — PlayMode tests for RobotSpawner | 2026-04-06 | RobotSpawnerTests.cs (11 plain [Test] cases): null prefab/config, no-parts init, HP bonus single+accumulated, speed bonus via reflection, unknown part ID skip, empty catalogue, null HealthSO, spawn position, missing descriptor origin fallback, torque-bonus no-joints path. PlayMode asmdef extended with BattleRobots.Physics. |
+| T033 — Input rebinding | 2026-04-06 | KeyBindingEntry + KeyBindingsData POCOs; SaveData.keyBindings. SettingsSO: s_DefaultBindings (W/S/A/D/Space), _bindings Dictionary, LoadKeyBindings/BuildKeyBindings/GetBinding(O1)/SetBinding + _onBindingsChanged event. RebindRowUI (BattleRobots.UI). SettingsUI: s_AllKeyCodes static cache, CaptureKeyCoroutine (anyKeyDown fast-path), rebind overlay, PersistSettings saves keyBindings. RobotController.ReadAxis/UpdateWeapon prefer SO bindings. GameBootstrapper loads key bindings at startup. KeyBindingsTests (16 EditMode cases). |
 
 ---
 
@@ -140,23 +142,23 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 16: T029 Robot preview renderer. RobotPreviewCamera MonoBehaviour (BattleRobots.UI): Camera.targetTexture set in Awake/cleared in OnDestroy; RawImage.texture wired; Activate/Deactivate/SetTarget/ResetRotation API; orbit via Input.GetAxis("Mouse X"); zero-alloc Update. All T001–T029 complete. All milestones M1–M6 Done. Backlog exhausted. |
 | 2026-04-06 | PM Agent | Session 17: T030 SpeedBonus gap closed — PartDefinition.SpeedBonus was never applied; extended RobotSpawner.ComputeBonuses to output speedBonus (3rd out param), applied via new RobotController.ApplySpeedBonus(float). T031 RobotLoadoutSOTests (16 EditMode cases) — full coverage of EquipPart/UnequipPart/Clear/LoadFromData/BuildData including null guards, replacement, round-trip. |
 | 2026-04-06 | PM Agent | Session 18: T032 PlayMode tests for RobotSpawner (11 plain [Test] cases). RobotSpawnerTests.cs covers: null prefab/config guards, no-parts Initialize, HP bonus (single + accumulated), speed bonus via reflection on RobotController._driveSpeedRadPerSec, unknown part ID skip, empty catalogue no-op, null HealthSO robustness, spawn position from SpawnDescriptor, missing descriptor fallback to origin, torque-bonus path with no joints. PlayMode asmdef extended with BattleRobots.Physics reference. |
+| 2026-04-06 | PM Agent | Session 19: T033 Input rebinding. KeyBindingEntry + KeyBindingsData POCOs in MatchRecord.cs; SaveData.keyBindings field. SettingsSO extended with s_DefaultBindings, _bindings Dictionary, LoadKeyBindings/BuildKeyBindings (POCO bridge), GetBinding (O(1) + static fallback), SetBinding (mutates + _onBindingsChanged), GetAllActionNames. RebindRowUI new MonoBehaviour (Setup/UpdateKeyDisplay/SetInteractable). SettingsUI extended with s_AllKeyCodes static cache (keyboard range 8–322), CaptureKeyCoroutine (yield loop, anyKeyDown fast-path, 1-frame skip), rebind overlay, PersistSettings now saves keyBindings too, closes panel aborts capture. RobotController: ReadAxis + UpdateWeapon prefer SettingsSO bindings (null-safe), fall back to Input.GetAxis/GetButton. GameBootstrapper calls LoadKeyBindings at startup. KeyBindingsTests.cs (16 EditMode cases). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T032 — PlayMode tests for RobotSpawner (11 cases; HP/speed/torque bonus pipeline verified end-to-end).  
-**Milestone status:** M1–M6 Done. T001–T032 Done.
+**Last completed:** T033 — Input rebinding (all files written; 16 EditMode tests).  
+**Milestone status:** M1–M6 Done. T001–T033 Done.
 
-**Next action:** T033 — Input rebinding.
-  - Extend `SettingsData` (in MatchRecord.cs) with `List<KeyBindingEntry>` (actionName + KeyCode); add `SaveData.keyBindings` field.
-  - Extend `SettingsSO` with `GetBinding(string action)` / `SetBinding(string action, KeyCode key)` / `LoadKeyBindings` / `BuildKeyBindings`; fire `VoidGameEvent` on change.
-  - Extend `SettingsUI` (BattleRobots.UI) with a rebind panel: per-action row showing current key, "Press key" await state on button click, applies immediately + calls `PersistSettings`.
-  - `GameBootstrapper.Awake` loads key bindings alongside existing settings.
+**Next action:** T034 — PlayMode tests for input rebinding.
+  - Test `RobotController` reads custom bindings from `SettingsSO` via `ReadAxis` (forward/back/left/right/fire).
+  - Test `SettingsSO.SetBinding` + `BuildKeyBindings` + `LoadKeyBindings` round-trip in a running Player context (complement to existing EditMode tests).
+  - Scene: create a minimal robot GO (RobotController + HingeJointAB stubs) and SettingsSO instance; call `SetBinding("Forward", KeyCode.UpArrow)`; simulate a `KeyDown` event and verify wheel velocity changes.
+  - Use PlayMode asmdef `BattleRobots.Tests.PlayMode`.
 
-**Blockers:** None. All code is pure C#. Unity Editor not running in remote env.
+**Blockers:** None.
 **Architecture notes:**
-  - `KeyBindingEntry` → plain serialisable struct in MatchRecord.cs (or separate file), `BattleRobots.Core`
-  - `SettingsSO.GetBinding` returns `KeyCode.None` for unregistered actions (safe default)
-  - `SettingsUI` must not import `BattleRobots.Physics`; reads binding via `SettingsSO` only
-  - `RobotController` can optionally read bindings from `SettingsSO` if the action name matches `"Forward"`, `"Back"`, `"Left"`, `"Right"`, `"Fire"`
+  - Use `Input.simulateMouseWithTouches = false` pattern is not relevant here — legacy Input is read-only in tests; prefer reflection or mock approach to verify `ReadAxis` logic, or just drive the public `SetBinding` API + verify `GetBinding` as an integration signal.
+  - Alternatively: test RobotController.ReadAxis indirectly via `ApplyDifferentialSteering` reflection on `_leftWheel._targetVelocity` after injecting a SettingsSO with known bindings and calling `Invoke("FixedUpdate", 0f)`.
+  - SettingsUI scene wiring (rebind rows + overlay) is deferred to an Editor session.

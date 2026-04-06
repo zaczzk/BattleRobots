@@ -72,9 +72,10 @@ namespace BattleRobots.Physics
                 return;
             }
 
-            // Read axes — float returns; zero GC.
-            float fwd  = Input.GetAxis("Vertical");      //  1 = forward, -1 = reverse
-            float turn = Input.GetAxis("Horizontal");    //  1 = right,   -1 = left
+            // Read movement axes — prefer custom key bindings from SettingsSO when
+            // the action has a bound key; fall back to Unity's legacy Input axes.
+            float fwd  = ReadAxis("Forward", "Back",  "Vertical");
+            float turn = ReadAxis("Right",   "Left",  "Horizontal");
 
             // Invert vertical axis when the player has opted in via SettingsSO.
             if (_settings != null && _settings.InvertControls)
@@ -105,17 +106,55 @@ namespace BattleRobots.Physics
         }
 
         /// <summary>
-        /// Spins the weapon at full speed while Fire1 is held; brakes when released.
-        /// No allocations — Input.GetButton returns bool.
+        /// Spins the weapon at full speed while the fire key / Fire1 is held; brakes when released.
+        /// Prefers the custom "Fire" binding from SettingsSO; falls back to Input.GetButton("Fire1").
+        /// No allocations — bool/KeyCode value types only.
         /// </summary>
         private void UpdateWeapon()
         {
             if (_weaponJoint == null) return;
 
-            if (Input.GetButton("Fire1"))
-                _weaponJoint.SetTargetVelocity(_weaponSpeedRadPerSec);
+            bool fireHeld;
+            if (_settings != null)
+            {
+                KeyCode fireKey = _settings.GetBinding("Fire");
+                fireHeld = fireKey != KeyCode.None
+                    ? Input.GetKey(fireKey)
+                    : Input.GetButton("Fire1");
+            }
             else
-                _weaponJoint.SetTargetVelocity(0f);
+            {
+                fireHeld = Input.GetButton("Fire1");
+            }
+
+            _weaponJoint.SetTargetVelocity(fireHeld ? _weaponSpeedRadPerSec : 0f);
+        }
+
+        /// <summary>
+        /// Reads a normalised [-1, 1] axis value from either custom key bindings
+        /// (when SettingsSO has a non-None binding) or Unity's legacy Input axes.
+        /// Pure value-type arithmetic — O(1) dictionary lookup, zero allocations.
+        /// </summary>
+        /// <param name="positiveAction">Action name for the +1 direction (e.g. "Forward").</param>
+        /// <param name="negativeAction">Action name for the -1 direction (e.g. "Back").</param>
+        /// <param name="fallbackAxis">Legacy axis name used when no custom binding exists.</param>
+        private float ReadAxis(string positiveAction, string negativeAction, string fallbackAxis)
+        {
+            if (_settings != null)
+            {
+                KeyCode pos = _settings.GetBinding(positiveAction);
+                KeyCode neg = _settings.GetBinding(negativeAction);
+
+                // Use key bindings only when both directions are bound.
+                if (pos != KeyCode.None && neg != KeyCode.None)
+                {
+                    float v = 0f;
+                    if (Input.GetKey(pos)) v += 1f;
+                    if (Input.GetKey(neg)) v -= 1f;
+                    return v;
+                }
+            }
+            return Input.GetAxis(fallbackAxis);
         }
 
         /// <summary>Zeroes all joint velocities — called when dead or disabled.</summary>
