@@ -20,14 +20,27 @@ namespace BattleRobots.Core
         [Tooltip("Number of players currently in the room.")]
         public int playerCount;
 
+        [Tooltip("Maximum number of players allowed in this room.")]
+        public int maxPlayers;
+
         /// <summary>
         /// Convenience constructor for use in tests and the stub adapter.
         /// </summary>
-        public RoomEntry(string roomCode, int playerCount)
+        /// <param name="roomCode">Four-character room identifier.</param>
+        /// <param name="playerCount">Current number of players in the room.</param>
+        /// <param name="maxPlayers">Capacity cap. Defaults to 2 (standard 1v1 match).</param>
+        public RoomEntry(string roomCode, int playerCount, int maxPlayers = 2)
         {
             this.roomCode    = roomCode    ?? string.Empty;
             this.playerCount = playerCount;
+            this.maxPlayers  = maxPlayers > 0 ? maxPlayers : 2;
         }
+
+        /// <summary>
+        /// Returns true when the room cannot accept any more players
+        /// (<see cref="playerCount"/> &gt;= <see cref="maxPlayers"/>).
+        /// </summary>
+        public bool IsFull => maxPlayers > 0 && playerCount >= maxPlayers;
     }
 
     // ── RoomListSO ────────────────────────────────────────────────────────────

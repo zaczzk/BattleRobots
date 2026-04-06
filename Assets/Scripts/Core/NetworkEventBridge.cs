@@ -112,11 +112,22 @@ namespace BattleRobots.Core
         public void BeginConnectAsClient() => BeginConnect(NetworkRole.Client);
 
         /// <summary>
-        /// Tell the adapter to create a room with <paramref name="roomCode"/>.
+        /// Tell the adapter to create a room with <paramref name="roomCode"/>
+        /// and the default capacity (2 players).
         /// The session must be in Connected state; call <see cref="BeginConnect"/>
         /// first and wait for the <c>onConnected</c> event before hosting.
         /// </summary>
         public void BeginHost(string roomCode)
+        {
+            BeginHost(roomCode, maxPlayers: 2);
+        }
+
+        /// <summary>
+        /// Tell the adapter to create a room with an explicit player
+        /// <paramref name="maxPlayers"/> capacity. The session must be in Connected state.
+        /// Values less than 1 are clamped to 2 by the adapter.
+        /// </summary>
+        public void BeginHost(string roomCode, int maxPlayers)
         {
             if (_session == null) return;
 
@@ -126,7 +137,7 @@ namespace BattleRobots.Core
                 return;
             }
 
-            _adapter?.Host(roomCode);
+            _adapter?.Host(roomCode, maxPlayers);
         }
 
         /// <summary>

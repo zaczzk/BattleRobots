@@ -79,6 +79,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T041 | Player connection status badge (ConnectionBadgeUI, ConnectionStateLabel) | 65 | **Done** 2026-04-06 | Coloured HUD badge + text label; event-driven via VoidGameEventListener channels; 10 EditMode tests |
 | T042 | Network room-list browser (RoomListSO, RoomEntryUI, RoomListUI) | 80 | **Done** 2026-04-06 | RoomListSO SO + RoomEntryUI row + RoomListUI scrollable browser; 12 EditMode tests |
 | T043 | Room-list refresh polling (adapter RequestRoomList, bridge wiring, RoomListRefreshButton) | 75 | **Done** 2026-04-06 | INetworkAdapter.RequestRoomList + OnRoomListReceived; StubNetworkAdapter; NetworkEventBridge._roomList + RequestRoomList(); RoomListRefreshButton UI MB; 10 EditMode tests |
+| T044 | Network room capacity (maxPlayers, full-room filter, capacity label) | 70 | **Done** 2026-04-06 | RoomEntry.maxPlayers + IsFull; INetworkAdapter.Host(string,int); StubNetworkAdapter Dictionary + capacity-aware Join; NetworkEventBridge.BeginHost(string,int); RoomEntryUI "N/MAX" label + FULL badge + disabled join; RoomListUI _filterFullRooms toggle; 10 EditMode tests |
 
 ---
 
@@ -86,7 +87,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T044 — (next task TBD) | PM Agent | 2026-04-06 | See Session Handoff |
+| T045 — (next task TBD) | PM Agent | 2026-04-06 | See Session Handoff |
 
 ---
 
@@ -136,6 +137,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T040 — Network latency / ping display | 2026-04-06 | INetworkAdapter.GetPingMs() added (interface extension). StubNetworkAdapter: FakePingMs configurable field, GetPingMs() returns it. PingSO (Core): CurrentPingMs int; SetPing(int) clamps ≥0 + fires IntGameEvent; Reset() zeros + fires. PingMonitor (Core MB): polls bridge.GetAdapterPingMs() every _pollIntervalSeconds via float timer in Update (no alloc); OnDisable calls pingSO.Reset(). NetworkEventBridge: GetAdapterPingMs() delegation method added. PingDisplayUI (BattleRobots.UI): Text label + colour (green/yellow/red/grey) via OnPingChanged(int) wired from IntGameEventListener; offline state hides label and shows optional offline label; no Update. PingTests.cs: 16 EditMode cases covering PingSO default/SetPing/Reset, StubAdapter FakePingMs, INetworkAdapter contract, NetworkEventBridge delegation, SetAdapter swap. |
 | T041 — Player connection status badge | 2026-04-06 | ConnectionBadgeUI (BattleRobots.UI): Image badge + Text label; CurrentState property; OnDisconnected/OnConnecting/OnConnected/OnMatchJoined/OnReconnecting callbacks; colour mapping (grey/yellow/green/darker-green/orange); no Update. ConnectionStateLabel (BattleRobots.UI): Text label; CurrentState + CurrentText properties; same 5 callbacks; configurable state strings. ConnectionBadgeTests.cs: 10 EditMode cases covering default state, state transitions (Connecting/Connected/InMatch/Reconnecting/Disconnected), and label text contracts. EditMode asmdef extended with BattleRobots.UI reference. |
 | T042 — Network room-list browser | 2026-04-06 | RoomEntry [Serializable] struct (roomCode, playerCount, constructor). RoomListSO (Core SO): List<RoomEntry> with SetRooms/Clear mutators; IReadOnlyList<RoomEntry> Rooms; Count; VoidGameEvent _onRoomsUpdated fires on every mutation; null-safe. RoomEntryUI (UI MB): row prefab component; Setup(RoomEntry, Action<string>) pushes data in; Join Button fires callback with roomCode; interactable=false on empty code; Awake AddListener, OnDestroy cleanup. RoomListUI (UI MB): rebuilds on OnRoomsUpdated() (wired via sibling VoidGameEventListener); instantiates RoomEntryUI prefab per room; HandleJoinRequested delegates to NetworkEventBridge.BeginJoin; empty-state label toggled; optional Refresh button; OnEnable rebuilds. RoomListTests.cs: 12 EditMode cases (DefaultState×2, SetRooms×5, Clear×2, RoomEntry struct×2). Scene .unity wiring deferred to Editor session. |
+| T044 — Network room capacity | 2026-04-06 | RoomEntry.maxPlayers field + IsFull property + 3-arg constructor (default maxPlayers=2). INetworkAdapter.Host(string,int) overload. StubNetworkAdapter: s_ActiveRooms changed from HashSet to Dictionary<string,RoomEntry>; Host(string,int) stores capacity (playerCount=1); Join checks IsFull → fires OnRoomJoinFailed when full; RequestRoomList returns full RoomEntry from dict. NetworkEventBridge.BeginHost(string,int) overload; BeginHost(string) delegates to it with maxPlayers=2. RoomEntryUI: _playerCountLabel shows "N/MAX"; optional _fullBadge GO toggled on IsFull; _joinButton disabled when full. RoomListUI: _filterFullRooms bool toggle; Rebuild skips IsFull entries when enabled. RoomCapacityTests.cs: 10 EditMode cases. |
 
 ---
 
@@ -172,29 +174,33 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 27: T041 Player connection status badge. ConnectionBadgeUI (BattleRobots.UI): Image badge + Text label; CurrentState property tracks NetworkConnectionState; OnDisconnected/OnConnecting/OnConnected/OnMatchJoined/OnReconnecting public callbacks wired via VoidGameEventListener; colour map (grey/yellow/green/dark-green/orange); Awake initialises to Disconnected; no Update. ConnectionStateLabel (BattleRobots.UI): Text label; same 5 callbacks; CurrentText property; configurable state strings per Inspector field. ConnectionBadgeTests.cs: 10 EditMode cases covering default state, all 5 state transitions for badge and label, text contract assertions. BattleRobots.Tests.EditMode.asmdef extended with BattleRobots.UI reference. |
 | 2026-04-06 | PM Agent | Session 28: T042 Network room-list browser. RoomEntry [Serializable] struct (roomCode string, playerCount int, convenience constructor) in RoomListSO.cs. RoomListSO (BattleRobots.Core SO): List<RoomEntry> backing store, IReadOnlyList<RoomEntry> Rooms + Count, SetRooms(List<RoomEntry>) null-safe + Clear() mutators, VoidGameEvent _onRoomsUpdated fires on both. RoomEntryUI (BattleRobots.UI MB): Setup(RoomEntry, Action<string>) pushes data in; Join Button wired in Awake, cleaned in OnDestroy; interactable=false on empty code; no Update. RoomListUI (BattleRobots.UI MB): Rebuild() destroys old rows and instantiates RoomEntryUI prefab per room; OnRoomsUpdated() public entry point (wired via VoidGameEventListener sibling); OnEnable rebuilds; HandleJoinRequested delegates to NetworkEventBridge.BeginJoin; empty-state label toggled; optional Refresh button. RoomListTests.cs: 12 EditMode cases (DefaultState×2, SetRooms×5, Clear×2, RoomEntry struct×2). Scene .unity wiring deferred to Editor session. |
 | 2026-04-06 | PM Agent | Session 29: T043 Room-list refresh polling. INetworkAdapter: void RequestRoomList() + Action<List<RoomEntry>> OnRoomListReceived (using System.Collections.Generic added). StubNetworkAdapter: OnRoomListReceived property, RequestRoomListCallCount, RequestRoomList() converts s_ActiveRooms HashSet→List<RoomEntry> (playerCount=1 per stub convention) and invokes callback. NetworkEventBridge: RoomListSO _roomList field; RequestRoomList() delegates to adapter; RegisterAdapterCallbacks wires OnRoomListReceived → _roomList?.SetRooms(). RoomListRefreshButton (BattleRobots.UI): [RequireComponent(typeof(Button))], Awake/OnDestroy listener lifecycle, OnRefreshClicked→_bridge.RequestRoomList(), null guards. RoomListRefreshTests.cs: 10 EditMode cases (stub empty/1-room/multi-room/call-count/null-callback/code-match; bridge SO update; null SO guard; SetAdapter re-wire; interface property round-trip). |
+| 2026-04-06 | PM Agent | Session 30: T044 Network room capacity. RoomEntry struct extended: maxPlayers field + IsFull computed property + 3-arg constructor (default maxPlayers=2, clamps ≤0 to 2). INetworkAdapter: Host(string,int) overload added. StubNetworkAdapter: s_ActiveRooms converted from HashSet<string> to Dictionary<string,RoomEntry>; Host(string) delegates to Host(string,2); Host(string,int) stores RoomEntry(code,1,cap); Join checks IsFull → OnRoomJoinFailed("...full...") when room at capacity, else increments playerCount in dict + fires OnRoomJoined; RequestRoomList returns kvp.Value list preserving full RoomEntry. NetworkEventBridge: BeginHost(string) delegates to BeginHost(string,2); BeginHost(string,int) added, calls adapter.Host(roomCode,maxPlayers). RoomEntryUI: _playerCountLabel shows "N/MAX"; optional _fullBadge GameObject toggled on IsFull; _joinButton disabled when full or empty code. RoomListUI: _filterFullRooms bool SerializeField; Rebuild skips entry when _filterFullRooms && entry.IsFull. RoomCapacityTests.cs: 10 EditMode cases (constructor/default/IsFull×2; capacity in list; full-join rejected; non-full-join succeeds; playerCount increment; BeginHost capacity contract; SetRooms IsFull in SO). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T043 — Room-list refresh polling (INetworkAdapter extended, StubNetworkAdapter, NetworkEventBridge, RoomListRefreshButton, 10 EditMode tests).  
-**Milestone status:** M1–M6 Done. T001–T043 Done.
+**Last completed:** T044 — Network room capacity (RoomEntry.maxPlayers + IsFull; StubNetworkAdapter Dictionary + capacity-aware Join; INetworkAdapter.Host(string,int); NetworkEventBridge.BeginHost(string,int); RoomEntryUI "N/MAX" label + FULL badge + disabled-join; RoomListUI _filterFullRooms toggle; 10 EditMode tests).  
+**Milestone status:** M1–M6 Done. T001–T044 Done.
 
-**Next action:** T044 — Suggest: Network room capacity (max players per room). Suggested deliverables:
-  - `RoomEntry.maxPlayers` field (add to struct, default 2).
-  - `StubNetworkAdapter.Host(string, int maxPlayers)` overload that stores capacity in a `Dictionary<string, RoomEntry>` replacing `HashSet<string>`.
-  - `NetworkEventBridge.BeginHost(string, int)` overload.
-  - `RoomEntryUI`: show capacity label ("1/2 players").
-  - `RoomListUI`: filter full rooms or show "FULL" badge.
+**Next action:** T045 — Suggest: Room password / private rooms. Suggested deliverables:
+  - `RoomEntry.isPrivate` bool field.
+  - `StubNetworkAdapter.Host(string, int, bool isPrivate)` overload; private rooms appear in list but Join requires password string; adapt `INetworkAdapter` interface.
+  - `NetworkEventBridge.BeginHost(string, int, bool)` overload.
+  - `RoomEntryUI`: show lock icon or "PRIVATE" badge.
+  - `RoomListUI`: optional `_hidePrivateRooms` toggle.
   - 8+ EditMode tests.
+
+Alternatively: T045 — EditMode tests for T044 capacity additions (extend RoomListTests + RoomListRefreshTests with maxPlayers assertion cases) if more coverage is desired before moving to new features.
 
 **Blockers:** None.  
 **Architecture notes:**
-  - `RoomEntry` struct is `[Serializable]` in `RoomListSO.cs` — adding `maxPlayers` field is additive and backwards-compatible.
-  - StubNetworkAdapter: replacing `s_ActiveRooms HashSet<string>` with `Dictionary<string, RoomEntry>` keeps all existing functionality while enabling capacity queries.
+  - All T044 changes are additive and backwards-compatible — existing 2-arg `RoomEntry(code, count)` constructor still works (maxPlayers defaults to 2).
+  - Existing tests (RoomListTests, RoomListRefreshTests) should continue passing unchanged; RoomCapacityTests adds 10 new cases.
   - Deferred Inspector wiring (carry-forward):
       □ NetworkEventBridge._roomList → RoomListSO asset
       □ RoomListUI._roomList + _bridge + _entryPrefab + _scrollContent
+      □ RoomEntryUI._fullBadge → optional FULL badge GameObject
       □ ConnectionBadgeUI: 5 VoidGameEventListeners → OnDisconnected/OnConnecting/OnConnected/OnMatchJoined/OnReconnecting
       □ ConnectionStateLabel: same 5 channels
       □ PingMonitor._pingSO + _networkBridge

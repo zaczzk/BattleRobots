@@ -18,9 +18,10 @@ namespace BattleRobots.UI
     ///   • Allocation only in Awake (AddListener) and Setup (closure captured action).
     ///
     /// Inspector wiring:
-    ///   □ _roomCodeLabel   → Text displaying the 4-char room code
-    ///   □ _playerCountLabel → Text displaying "N / MAX players" or similar
-    ///   □ _joinButton       → Button that triggers the join action
+    ///   □ _roomCodeLabel    → Text displaying the 4-char room code
+    ///   □ _playerCountLabel → Text displaying "N/MAX" player capacity
+    ///   □ _fullBadge        → (optional) GameObject shown only when the room is full
+    ///   □ _joinButton       → Button that triggers the join action (disabled when full)
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RoomEntryUI : MonoBehaviour
@@ -31,11 +32,15 @@ namespace BattleRobots.UI
         [Tooltip("Text component that shows the room code.")]
         [SerializeField] private Text _roomCodeLabel;
 
-        [Tooltip("Text component that shows the player count.")]
+        [Tooltip("Text component that shows the player count as 'N/MAX'.")]
         [SerializeField] private Text _playerCountLabel;
 
+        [Tooltip("(Optional) GameObject shown when the room has reached capacity. " +
+                 "Use a Text child labelled 'FULL' or a coloured overlay.")]
+        [SerializeField] private GameObject _fullBadge;
+
         [Header("Action")]
-        [Tooltip("Button the user presses to join this room.")]
+        [Tooltip("Button the user presses to join this room. Disabled when the room is full.")]
         [SerializeField] private Button _joinButton;
 
         // ── Runtime state ─────────────────────────────────────────────────────
@@ -73,10 +78,20 @@ namespace BattleRobots.UI
                 _roomCodeLabel.text = _roomCode;
 
             if (_playerCountLabel != null)
-                _playerCountLabel.text = $"{entry.playerCount} player{(entry.playerCount == 1 ? "" : "s")}";
+            {
+                // Format: "1/2" when capacity is known; fall back to plain count.
+                _playerCountLabel.text = entry.maxPlayers > 0
+                    ? $"{entry.playerCount}/{entry.maxPlayers}"
+                    : entry.playerCount.ToString();
+            }
+
+            bool isFull = entry.IsFull;
+
+            if (_fullBadge != null)
+                _fullBadge.SetActive(isFull);
 
             if (_joinButton != null)
-                _joinButton.interactable = !string.IsNullOrEmpty(_roomCode);
+                _joinButton.interactable = !string.IsNullOrEmpty(_roomCode) && !isFull;
         }
 
         // ── Private ───────────────────────────────────────────────────────────

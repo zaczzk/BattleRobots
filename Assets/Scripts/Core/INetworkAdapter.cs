@@ -44,6 +44,14 @@ namespace BattleRobots.Core
         void Host(string roomCode);
 
         /// <summary>
+        /// Create and host a room with an explicit player capacity.
+        /// <paramref name="maxPlayers"/> specifies the maximum number of players
+        /// (including the host) allowed in the room. Values &lt; 1 are clamped to 2.
+        /// Calls <see cref="OnRoomJoined"/> with the confirmed room code on success.
+        /// </summary>
+        void Host(string roomCode, int maxPlayers);
+
+        /// <summary>
         /// Join an existing match room identified by <paramref name="roomCode"/>.
         /// Calls <see cref="OnRoomJoined"/> with the confirmed code on success,
         /// or <see cref="OnRoomJoinFailed"/> if the room does not exist.

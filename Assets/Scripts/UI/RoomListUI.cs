@@ -60,6 +60,9 @@ namespace BattleRobots.UI
         [Tooltip("Optional Refresh button that manually calls OnRoomsUpdated.")]
         [SerializeField] private Button _refreshButton;
 
+        [Tooltip("When enabled, rooms that have reached capacity (IsFull) are hidden from the list.")]
+        [SerializeField] private bool _filterFullRooms = false;
+
         // ── Runtime state ─────────────────────────────────────────────────────
 
         // Pool of active row instances; cleared and rebuilt on each Rebuild call.
@@ -126,6 +129,10 @@ namespace BattleRobots.UI
             for (int i = 0; i < rooms.Count; i++)
             {
                 RoomEntry entry = rooms[i];
+
+                // Skip rooms at capacity when the filter toggle is on.
+                if (_filterFullRooms && entry.IsFull)
+                    continue;
 
                 RoomEntryUI row = Instantiate(_entryPrefab, _scrollContent);
                 row.Setup(entry, HandleJoinRequested);

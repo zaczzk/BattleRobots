@@ -38,12 +38,15 @@ namespace BattleRobots.Core
         // ── Shared state (simulates a lobby server for two-player local tests) ─
 
         /// <summary>
-        /// Room codes that exist in the "server". Tests or host adapters register
-        /// a room via <see cref="Host"/> and a client adapter may join it.
+        /// Rooms that exist in the "server", keyed by normalised room code.
+        /// Value holds the full <see cref="RoomEntry"/> so capacity and player
+        /// count can be queried by tests and by <see cref="RequestRoomList"/>.
+        ///
+        /// Tests or host adapters register rooms via <see cref="Host"/> overloads.
         /// Cleared between test runs by calling <see cref="ClearRooms"/>.
         /// </summary>
-        private static readonly HashSet<string> s_ActiveRooms =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, RoomEntry> s_ActiveRooms =
+            new Dictionary<string, RoomEntry>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>Remove all simulated rooms (call in TearDown).</summary>
         public static void ClearRooms() => s_ActiveRooms.Clear();
@@ -106,29 +109,53 @@ namespace BattleRobots.Core
         }
 
         /// <summary>
-        /// Register <paramref name="roomCode"/> in the shared room set and invoke
-        /// <see cref="OnRoomJoined"/> with the normalised code.
+        /// Register <paramref name="roomCode"/> in the shared room dictionary with the
+        /// default capacity (2 players) and invoke <see cref="OnRoomJoined"/>.
         /// </summary>
         public void Host(string roomCode)
         {
+            Host(roomCode, maxPlayers: 2);
+        }
+
+        /// <summary>
+        /// Register <paramref name="roomCode"/> with an explicit <paramref name="maxPlayers"/>
+        /// capacity and invoke <see cref="OnRoomJoined"/> with the normalised code.
+        /// The host counts as the first player (playerCount = 1).
+        /// </summary>
+        public void Host(string roomCode, int maxPlayers)
+        {
             string code = Normalise(roomCode);
-            LastRoomCode = code;
-            s_ActiveRooms.Add(code);
+            int    cap  = maxPlayers > 0 ? maxPlayers : 2;
+
+            LastRoomCode       = code;
+            s_ActiveRooms[code] = new RoomEntry(code, playerCount: 1, maxPlayers: cap);
             OnRoomJoined?.Invoke(code);
         }
 
         /// <summary>
-        /// Join the room if it exists in <see cref="s_ActiveRooms"/>; otherwise invoke
-        /// <see cref="OnRoomJoinFailed"/> with a descriptive reason.
+        /// Join the room if it exists in <see cref="s_ActiveRooms"/> and is not full;
+        /// otherwise invoke <see cref="OnRoomJoinFailed"/> with a descriptive reason.
+        /// On a successful join the room's <c>playerCount</c> is incremented.
         /// </summary>
         public void Join(string roomCode)
         {
             string code = Normalise(roomCode);
             LastRoomCode = code;
 
-            if (s_ActiveRooms.Contains(code))
+            if (s_ActiveRooms.TryGetValue(code, out RoomEntry room))
             {
-                OnRoomJoined?.Invoke(code);
+                if (room.IsFull)
+                {
+                    string reason = $"Room '{code}' is full ({room.playerCount}/{room.maxPlayers}).";
+                    Debug.Log($"[StubNetworkAdapter] Join failed: {reason}");
+                    OnRoomJoinFailed?.Invoke(reason);
+                }
+                else
+                {
+                    // Increment player count and write back (struct copy).
+                    s_ActiveRooms[code] = new RoomEntry(code, room.playerCount + 1, room.maxPlayers);
+                    OnRoomJoined?.Invoke(code);
+                }
             }
             else
             {
@@ -148,17 +175,17 @@ namespace BattleRobots.Core
         }
 
         /// <summary>
-        /// Simulate a room-list response. Converts the current <see cref="s_ActiveRooms"/>
-        /// set to a <see cref="List{RoomEntry}"/> (playerCount = 1 per room as a stub default)
-        /// and immediately invokes <see cref="OnRoomListReceived"/>.
+        /// Simulate a room-list response. Returns all rooms currently in
+        /// <see cref="s_ActiveRooms"/> — including their <c>playerCount</c> and
+        /// <c>maxPlayers</c> capacity — via <see cref="OnRoomListReceived"/>.
         /// </summary>
         public void RequestRoomList()
         {
             RequestRoomListCallCount++;
 
             var rooms = new List<RoomEntry>(s_ActiveRooms.Count);
-            foreach (string code in s_ActiveRooms)
-                rooms.Add(new RoomEntry(code, 1));
+            foreach (var kvp in s_ActiveRooms)
+                rooms.Add(kvp.Value);
 
             OnRoomListReceived?.Invoke(rooms);
         }
