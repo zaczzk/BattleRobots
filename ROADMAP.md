@@ -71,6 +71,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T033 | Input rebinding — SettingsSO bindings + SettingsUI rebind panel | 75 | **Done** 2026-04-06 | KeyBindingEntry/KeyBindingsData POCOs; SettingsSO GetBinding/SetBinding/LoadKeyBindings/BuildKeyBindings; RebindRowUI; SettingsUI rebind panel + key capture coroutine; RobotController ReadAxis/UpdateWeapon use bindings; 16 EditMode tests |
 | T034 | PlayMode tests for input rebinding | 80 | **Done** 2026-04-06 | InputRebindingTests.cs (11 cases): SettingsSO API in player context, SaveSystem round-trip, RobotController FixedUpdate/ReadAxis/OnDisable smoke tests, live reference binding update |
 | T035 | DifficultySO — Easy/Medium/Hard presets scaling AI, damage, time limit | 70 | **Done** 2026-04-06 | DifficultySO SO (CreateAssetMenu, LoadPreset, CreatePreset factory); RobotFSM scales ranges+drive; DamageDealer scales damage; MatchManager caches effectiveTimeLimit; MatchRecord.difficultyName; 14 EditMode tests |
+| T036 | DifficultySelector UI — Easy/Medium/Hard buttons, wired to MatchManager | 60 | **Done** 2026-04-06 | DifficultySelectionSO (Core, Select/Reset/HasSelection, LoadPreset side-effect on shared DifficultySO); DifficultySelectorUI (UI, 3 buttons, highlight via Image.color, name+description labels, optional confirm button); 14 EditMode tests |
 
 ---
 
@@ -78,7 +79,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | PM Agent | 2026-04-06 | All T001–T035 complete; awaiting new backlog items |
+| T037 — Network multiplayer stub | PM Agent | 2026-04-06 | High RICE (95); Photon/Mirror connection SO event bridge |
 
 ---
 
@@ -149,25 +150,27 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 20: T034 PlayMode tests for input rebinding. InputRebindingTests.cs (11 [Test] cases): Group A — SettingsSO in player context (LoadKeyBindings defaults, GetAllActionNames, sequential SetBinding, BuildAndLoad round-trip, SaveSystem round-trip). Group B — RobotController integration (FixedUpdate with/without SO, ReadAxis with custom bindings returns 0 when no key held, None binding falls back to legacy, live reference check after binding update, OnDisable no-throw, multi-frame FixedUpdate with changing bindings, ApplySpeedBonus then FixedUpdate). |
 | 2026-04-06 | PM Agent | Session 19: T033 Input rebinding. KeyBindingEntry + KeyBindingsData POCOs in MatchRecord.cs; SaveData.keyBindings field. SettingsSO extended with s_DefaultBindings, _bindings Dictionary, LoadKeyBindings/BuildKeyBindings (POCO bridge), GetBinding (O(1) + static fallback), SetBinding (mutates + _onBindingsChanged), GetAllActionNames. RebindRowUI new MonoBehaviour (Setup/UpdateKeyDisplay/SetInteractable). SettingsUI extended with s_AllKeyCodes static cache (keyboard range 8–322), CaptureKeyCoroutine (yield loop, anyKeyDown fast-path, 1-frame skip), rebind overlay, PersistSettings now saves keyBindings too, closes panel aborts capture. RobotController: ReadAxis + UpdateWeapon prefer SettingsSO bindings (null-safe), fall back to Input.GetAxis/GetButton. GameBootstrapper calls LoadKeyBindings at startup. KeyBindingsTests.cs (16 EditMode cases). |
 | 2026-04-06 | PM Agent | Session 21: T035 DifficultySO. New DifficultySO (BattleRobots.Core): DifficultyLevel enum, LoadPreset (Easy/Medium/Hard), CreatePreset factory. Integrated into RobotFSM (range+drive scaling), DamageDealer (damage multiplier), MatchManager (time-limit scale cached in StartMatch, difficultyName recorded). MatchRecord.difficultyName field added. DifficultySOTests.cs (14 EditMode cases). All optional fields — null-safe; no existing behaviour changes when field unassigned. |
+| 2026-04-06 | PM Agent | Session 22: T036 DifficultySelector UI. DifficultySelectionSO (BattleRobots.Core): Select(DifficultyLevel)/Reset(), HasSelection, ActiveDifficulty, LoadPreset side-effect on shared DifficultySO — no MatchManager changes needed. DifficultySelectorUI (BattleRobots.UI): Easy/Medium/Hard buttons, Image.color highlights (_selectedColor/_normalColor), difficultyNameLabel + descriptionLabel, optional confirmButton (interactable after selection), Awake wires listeners once, OnEnable resets, OnDestroy removes — zero Update/FixedUpdate. DifficultySelectionSOTests.cs (14 EditMode cases): default state, Select Easy/Hard/Medium, LoadPreset side-effect, consecutive Select, Reset clears HasSelection + restores Medium, null-safety on both Select and Reset. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T035 — DifficultySO (Easy/Medium/Hard presets; wired into RobotFSM, DamageDealer, MatchManager).  
-**Milestone status:** M1–M6 Done. T001–T035 Done.
+**Last completed:** T036 — DifficultySelector UI (DifficultySelectionSO + DifficultySelectorUI + 14 EditMode tests).  
+**Milestone status:** M1–M6 Done. T001–T036 Done.
 
-**Next action:** Identify T036+ tasks. Suggested high-RICE candidates:
-  - **T036** — DifficultySelector UI (SettingsUI panel showing Easy/Medium/Hard buttons, stores selection in a DifficultySelectionSO, wires to MatchManager; ~RICE 60)
-  - **T037** — Network multiplayer stub (Photon/Mirror connection manager via SO event channel; ~RICE 95 if added)
-  - **T038** — Accessibility options (colorblind-safe gizmo palette SO, font-scale SO; ~RICE 45)
-  - Or: in-Editor scene wiring sprint (deferred items: SpawnPoint placement, SettingsUI rebind rows, ArenaManager wiring)
+**Next action:** T037 — Network multiplayer stub (RICE 95). Deliverables (no Editor required):
+  - `NetworkSessionSO.cs` (Core) — runtime SO tracking connection state (Disconnected/Connecting/Connected/InMatch), host/client role enum, room code string; mutation via Connect/Disconnect/JoinRoom methods; fires `VoidGameEvent` channels for state changes.
+  - `NetworkEventBridge.cs` (Core) — MonoBehaviour shim; listens to SO event channels, routes to a stub `INetworkAdapter` interface so real Photon/Mirror can be swapped in without changing game code.
+  - `INetworkAdapter.cs` (Core) — interface: `Connect()`, `Disconnect()`, `Host(roomCode)`, `Join(roomCode)`, `SendMatchState(byte[])`, `OnMatchStateReceived(Action<byte[]>)`.
+  - `StubNetworkAdapter.cs` (Core) — in-memory `INetworkAdapter` implementation for tests (no real networking).
+  - `NetworkLobbyUI.cs` (UI) — Host/Join radio, room-code input field, Connect button, status label; reads NetworkSessionSO; no Physics refs.
+  - `NetworkSessionSOTests.cs` (Tests.EditMode) — 12+ cases.
 
-**Blockers:** None.
+**Blockers:** None. All networking is stubbed; no Photon/Mirror SDK required.  
 **Architecture notes:**
-  - DifficultySO is in BattleRobots.Core; all consumers (RobotFSM in Physics, DamageDealer in Physics, MatchManager in Core) follow existing namespace rules.
-  - All three consumers treat DifficultySO as optional — null-safe, existing behaviour unchanged when field not assigned.
-  - RobotFSM range formula: effectiveRange = base × (0.5 + aggressionScale). At Medium (aggressionScale=0.5) multiplier = 1.0 (identity).
-  - MatchManager caches _effectiveTimeLimitSeconds at StartMatch; no per-frame property indirection.
-  - PlayMode asmdef already references BattleRobots.Core + BattleRobots.Physics.
-  - SettingsUI rebind panel scene wiring (RebindRowUI prefab placement) deferred to Editor session.
+  - `DifficultySelectionSO.Select()` mutates the shared `DifficultySO` asset via `LoadPreset` — this is the designated mutator; no SO-immutability violation.
+  - `DifficultySelectorUI` has no `Update`/`FixedUpdate`; button callbacks run AddListener once in Awake.
+  - To wire in scene: one `DifficultySelectionSO` asset shared between `DifficultySelectorUI._difficultySelection` and MatchManager's `_difficulty` field (via the same `DifficultySO`).
+  - T037 `NetworkSessionSO` → BattleRobots.Core; `INetworkAdapter`/`StubNetworkAdapter` → BattleRobots.Core; `NetworkLobbyUI` → BattleRobots.UI.
+  - SettingsUI rebind panel and SpawnPoint scene wiring remain deferred to an Editor session.
