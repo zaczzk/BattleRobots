@@ -130,5 +130,18 @@ namespace BattleRobots.Physics
         {
             AllStop();
         }
+
+        // ── Spawn-time bonuses ────────────────────────────────────────────────
+
+        /// <summary>
+        /// Increases <c>_driveSpeedRadPerSec</c> by <paramref name="bonus"/> rad/s.
+        /// Called once by <see cref="RobotSpawner"/> after the robot is instantiated,
+        /// before the match begins. Never call from the per-frame hot path.
+        /// </summary>
+        public void ApplySpeedBonus(float bonus)
+        {
+            if (bonus <= 0f) return;
+            _driveSpeedRadPerSec += bonus;
+        }
     }
 }

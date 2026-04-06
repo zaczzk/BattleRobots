@@ -82,7 +82,7 @@ namespace BattleRobots.Physics
             // ── Accumulate part bonuses ───────────────────────────────────────
 
             ComputeBonuses(equippedPartIds,
-                out float hpBonus, out float torqueBonus);
+                out float hpBonus, out float torqueBonus, out float speedBonus);
 
             // ── Apply HP bonus via HealthSO ───────────────────────────────────
 
@@ -115,9 +115,21 @@ namespace BattleRobots.Physics
                 }
             }
 
+            // ── Apply speed bonus to RobotController ──────────────────────────
+
+            if (speedBonus > 0f)
+            {
+                RobotController controller = robotGo.GetComponent<RobotController>();
+                if (controller != null)
+                    controller.ApplySpeedBonus(speedBonus);
+                else
+                    Debug.LogWarning(
+                        "[RobotSpawner] Speed bonus > 0 but no RobotController found on robot.", this);
+            }
+
             Debug.Log(
                 $"[RobotSpawner] Team {teamIndex} robot spawned at {spawnPos}. " +
-                $"HP bonus: +{hpBonus:F1}  Torque bonus: +{torqueBonus:F2}", this);
+                $"HP bonus: +{hpBonus:F1}  Torque bonus: +{torqueBonus:F2}  Speed bonus: +{speedBonus:F2}", this);
 
             return robotGo;
         }
@@ -125,16 +137,18 @@ namespace BattleRobots.Physics
         // ── Helpers ───────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Sums HP and torque bonuses from the provided part IDs.
-        /// Allocates a temporary HashSet (called once at spawn, not in hot path).
+        /// Sums HP, torque, and speed bonuses from the provided part IDs.
+        /// Allocates a temporary Dictionary (called once at spawn, not in hot path).
         /// </summary>
         private void ComputeBonuses(
             IList<string> equippedPartIds,
             out float hpBonus,
-            out float torqueBonus)
+            out float torqueBonus,
+            out float speedBonus)
         {
             hpBonus     = 0f;
             torqueBonus = 0f;
+            speedBonus  = 0f;
 
             if (equippedPartIds == null || equippedPartIds.Count == 0) return;
             if (_partCatalogue  == null || _partCatalogue.Count  == 0) return;
@@ -159,6 +173,7 @@ namespace BattleRobots.Physics
                 {
                     hpBonus     += def.HpBonus;
                     torqueBonus += def.TorqueBonus;
+                    speedBonus  += def.SpeedBonus;
                 }
                 else
                 {

@@ -65,6 +65,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T027 | Robot loadout persistence — save/load equipped parts per slot | 85 | **Done** 2026-04-06 | RobotLoadoutSO + RobotLoadoutData; round-trips via SaveSystem; GameBootstrapper restores on startup |
 | T028 | Leaderboard / stats screen (wins, avg damage, total earnings) | 55 | **Done** 2026-04-06 | LeaderboardStats (readonly struct, single-pass Compute); LeaderboardUI (OnEnable, no Update); 12 EditMode tests |
 | T029 | Robot preview renderer (RenderTexture orbit camera in ShopUI) | 30 | **Done** 2026-04-06 | RenderTexture assigned to RawImage; orbit MonoBehaviour; no Rigidbody |
+| T030 | Apply PartDefinition.SpeedBonus in RobotSpawner + RobotController | 75 | **Done** 2026-04-06 | ComputeBonuses now outputs speedBonus; ApplySpeedBonus added to RobotController |
+| T031 | EditMode tests for RobotLoadoutSO | 80 | **Done** 2026-04-06 | 16 test cases: default state, EquipPart, UnequipPart, Clear, LoadFromData, BuildData round-trip, null/empty guards |
 
 ---
 
@@ -72,7 +74,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | All T001–T029 complete. |
+| — | — | All T001–T031 complete. |
 
 ---
 
@@ -109,6 +111,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T026 — PlayMode tests for ArenaSelector | 2026-04-06 | ArenaSelectorTests.cs (9 cases). Plain [Test]: Default_HasNoSelection, Select_ValidArena, Select_NullIgnored, Reset_ClearsSelection, Reset_WhenEmpty, Select_ReplacesFirst. [UnityTest]: ActiveArena_WithSelection (win-bonus delta), ActiveArena_WithoutSelection (fallback), ActiveArena_NullSO (null guard), ActiveArena_ChangedMidMatch. Reuses BattleRobots.Tests.PlayMode asmdef. |
 | T028 — Leaderboard / stats screen | 2026-04-06 | LeaderboardStats readonly struct (Compute single-pass over List<MatchRecord>: MatchCount, Wins, Losses, WinRatePercent, AvgDamageDealt, AvgDamageTaken, TotalEarnings, AvgDurationSeconds). LeaderboardUI (BattleRobots.UI, OnEnable + Refresh, stats/empty panel toggle, 8 label fields, close button). LeaderboardStatsTests (12 EditMode cases: null/empty, single win/loss, mixed history, win-rate boundaries, avg damage, total earnings, avg duration). |
 | T029 — Robot preview renderer | 2026-04-06 | RobotPreviewCamera (BattleRobots.UI): Camera targetTexture=RenderTexture in Awake, unset in OnDestroy; RawImage.texture wired in Awake; Activate(Transform)/Deactivate/SetTarget/ResetRotation API; orbit via Input.GetAxis("Mouse X")*orbitSpeed*deltaTime rotates _targetTransform around Y; IsActive guard; zero-alloc Update; no Physics namespace. |
+| T030 — SpeedBonus applied in RobotSpawner | 2026-04-06 | PartDefinition.SpeedBonus was computed but never used. ComputeBonuses now outputs speedBonus (3rd out param). RobotController.ApplySpeedBonus(float) added — increments _driveSpeedRadPerSec at spawn. RobotSpawner.SpawnRobot applies it via GetComponent<RobotController>. |
+| T031 — RobotLoadoutSO EditMode tests | 2026-04-06 | RobotLoadoutSOTests.cs: 16 cases covering default state, EquipPart (single/replace/multi/null-slotId/empty-partId), UnequipPart (existing/missing/empty-id), Clear (populated/empty), LoadFromData (valid/null/skip-bad-entries/overwrite), BuildData (round-trip/empty). |
 
 ---
 
@@ -132,19 +136,19 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 15: T028 Leaderboard stats screen. LeaderboardStats readonly struct (single-pass Compute, 8 fields). LeaderboardUI (BattleRobots.UI, OnEnable/Refresh, stats+empty panels, 8 labels, close button). LeaderboardStatsTests (12 EditMode cases). |
 | 2026-04-06 | PM Agent | Session 14: T026 PlayMode tests for ArenaSelector. ArenaSelectorTests.cs — 6 plain [Test] cases for ArenaSelectionSO isolation + 4 [UnityTest] cases verifying MatchManager.ActiveArena routing via win-bonus wallet delta. Covers Select/Reset/null-guard/replace and fallback/_arenaSelection-null/mid-match-switch scenarios. T028 identified as next. |
 | 2026-04-06 | PM Agent | Session 16: T029 Robot preview renderer. RobotPreviewCamera MonoBehaviour (BattleRobots.UI): Camera.targetTexture set in Awake/cleared in OnDestroy; RawImage.texture wired; Activate/Deactivate/SetTarget/ResetRotation API; orbit via Input.GetAxis("Mouse X"); zero-alloc Update. All T001–T029 complete. All milestones M1–M6 Done. Backlog exhausted. |
+| 2026-04-06 | PM Agent | Session 17: T030 SpeedBonus gap closed — PartDefinition.SpeedBonus was never applied; extended RobotSpawner.ComputeBonuses to output speedBonus (3rd out param), applied via new RobotController.ApplySpeedBonus(float). T031 RobotLoadoutSOTests (16 EditMode cases) — full coverage of EquipPart/UnequipPart/Clear/LoadFromData/BuildData including null guards, replacement, round-trip. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T029 (RobotPreviewCamera — orbit preview with RenderTexture + RawImage).  
-**Milestone status:** M1–M6 Done. T001–T029 Done. **Backlog exhausted.**
+**Last completed:** T030 (SpeedBonus applied in RobotSpawner/RobotController), T031 (RobotLoadoutSO — 16 EditMode tests).  
+**Milestone status:** M1–M6 Done. T001–T031 Done.
 
-**Next action:** Backlog is empty. Recommended next steps for future sessions:
-  1. Scene wiring — hook RobotPreviewCamera into the ShopUI scene prefab (assign _previewCamera, _renderTexture, _rawImage, _targetTransform in Inspector).
-  2. Play-test pass — verify MatchManager end-to-end (spawn → fight → record → save → leaderboard).
-  3. Build & profile — ArticulationBody physics step budget, GC alloc sweep in Unity Profiler.
-  4. Content pass — author 3+ ArenaConfig SOs, 4+ PartDefinition SOs, 2 RobotDefinition SOs.
-  5. If new features needed, add T030+ entries to the Active Backlog.
+**Next action:** Suggested T032+ candidates:
+  - T032: PlayMode tests for RobotSpawner — verify HP/torque/speed bonuses applied end-to-end in a running scene
+  - T033: Input rebinding — extend SettingsSO with action→key bindings, persist via SaveSystem
+  - T034: Difficulty tiers — ArenaConfig extension with aiDifficultyMultiplier; RobotFSM reads it to scale reaction radius
+  - Scene wiring / content pass (requires Unity Editor): ArenaConfig SOs, PartDefinition SOs, RobotDefinition SOs
 
-**Blockers:** None. Unity Editor not running in remote env; all scripts are pure C#.
+**Blockers:** None. Unity Editor not running in remote env; all code is pure C#.
