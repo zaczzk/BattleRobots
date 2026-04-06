@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace BattleRobots.Core
 {
@@ -49,6 +50,17 @@ namespace BattleRobots.Core
         /// </summary>
         void Join(string roomCode);
 
+        // ── Room discovery ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Ask the backend for the current list of available rooms.
+        /// The adapter invokes <see cref="OnRoomListReceived"/> asynchronously (or
+        /// synchronously for in-process stubs) with the fetched list.
+        /// Implementors must never allocate on the call site; the result list is
+        /// passed through <see cref="OnRoomListReceived"/> and owned by the callee.
+        /// </summary>
+        void RequestRoomList();
+
         // ── Match-state messaging ─────────────────────────────────────────────
 
         /// <summary>
@@ -83,6 +95,14 @@ namespace BattleRobots.Core
         /// received from a remote peer.  Passes back the raw byte array.
         /// </summary>
         Action<byte[]> OnMatchStateReceived { get; set; }
+
+        /// <summary>
+        /// Invoked by the adapter in response to <see cref="RequestRoomList"/>.
+        /// Passes the current list of available <see cref="RoomEntry"/> values.
+        /// The adapter owns the list allocation; the callee must not hold a long-lived
+        /// reference to it.
+        /// </summary>
+        Action<List<RoomEntry>> OnRoomListReceived { get; set; }
 
         // ── Diagnostics ───────────────────────────────────────────────────────
 

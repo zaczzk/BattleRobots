@@ -65,6 +65,9 @@ namespace BattleRobots.Core
         /// <inheritdoc/>
         public Action<byte[]> OnMatchStateReceived { get; set; }
 
+        /// <inheritdoc/>
+        public Action<List<RoomEntry>> OnRoomListReceived { get; set; }
+
         // ── Test-inspection surface ───────────────────────────────────────────
 
         /// <summary>All payloads passed to <see cref="SendMatchState"/>, in order.</summary>
@@ -75,6 +78,9 @@ namespace BattleRobots.Core
 
         /// <summary>Number of times <see cref="Disconnect"/> has been called.</summary>
         public int DisconnectCallCount { get; private set; }
+
+        /// <summary>Number of times <see cref="RequestRoomList"/> has been called.</summary>
+        public int RequestRoomListCallCount { get; private set; }
 
         /// <summary>Last room code passed to <see cref="Host"/> or <see cref="Join"/>.</summary>
         public string LastRoomCode { get; private set; } = string.Empty;
@@ -139,6 +145,22 @@ namespace BattleRobots.Core
         {
             if (payload == null) return;
             SentPayloads.Add(payload);
+        }
+
+        /// <summary>
+        /// Simulate a room-list response. Converts the current <see cref="s_ActiveRooms"/>
+        /// set to a <see cref="List{RoomEntry}"/> (playerCount = 1 per room as a stub default)
+        /// and immediately invokes <see cref="OnRoomListReceived"/>.
+        /// </summary>
+        public void RequestRoomList()
+        {
+            RequestRoomListCallCount++;
+
+            var rooms = new List<RoomEntry>(s_ActiveRooms.Count);
+            foreach (string code in s_ActiveRooms)
+                rooms.Add(new RoomEntry(code, 1));
+
+            OnRoomListReceived?.Invoke(rooms);
         }
 
         // ── Diagnostics ───────────────────────────────────────────────────────

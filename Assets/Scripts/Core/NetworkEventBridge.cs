@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace BattleRobots.Core
@@ -41,6 +42,11 @@ namespace BattleRobots.Core
         [Tooltip("SO event channel raised when a match-state payload is received from a remote peer. " +
                  "Wire a ByteArrayGameEventListener to forward payloads to NetworkMatchSync or MatchStateSO.")]
         [SerializeField] private ByteArrayGameEvent _onMatchStateReceivedChannel;
+
+        [Header("Room List")]
+        [Tooltip("Runtime SO that stores the current network room list. " +
+                 "RequestRoomList() will push adapter results into this SO so RoomListUI updates automatically.")]
+        [SerializeField] private RoomListSO _roomList;
 
         // ── Runtime adapter ───────────────────────────────────────────────────
 
@@ -162,6 +168,23 @@ namespace BattleRobots.Core
             // Session state is updated via the OnDisconnected callback registered in Awake.
         }
 
+        // ── Room discovery ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Ask the adapter for the current room list. The adapter invokes its
+        /// <see cref="INetworkAdapter.OnRoomListReceived"/> callback (wired in
+        /// <see cref="RegisterAdapterCallbacks"/>) which calls
+        /// <see cref="RoomListSO.SetRooms"/> — triggering the SO event channel so
+        /// that <see cref="RoomListUI"/> rebuilds automatically.
+        ///
+        /// Safe to call when no adapter is set (no-op) or when <c>_roomList</c> is
+        /// unassigned (adapter result will be silently discarded).
+        /// </summary>
+        public void RequestRoomList()
+        {
+            _adapter?.RequestRoomList();
+        }
+
         // ── Diagnostics ──────────────────────────────────────────────────────
 
         /// <summary>
@@ -231,6 +254,12 @@ namespace BattleRobots.Core
                 // Raise the C# event (code-registered subscribers, e.g. NetworkMatchSync).
                 OnMatchStateReceived?.Invoke(payload);
             };
+
+            adapter.OnRoomListReceived = (rooms) =>
+            {
+                // Push the result into the SO; this fires _onRoomsUpdated so RoomListUI rebuilds.
+                _roomList?.SetRooms(rooms);
+            };
         }
 
 #if UNITY_EDITOR
@@ -238,6 +267,9 @@ namespace BattleRobots.Core
         {
             if (_session == null)
                 Debug.LogWarning("[NetworkEventBridge] NetworkSessionSO is not assigned.", this);
+            if (_roomList == null)
+                Debug.LogWarning("[NetworkEventBridge] RoomListSO is not assigned — " +
+                                 "RequestRoomList() results will be discarded.", this);
         }
 #endif
     }
