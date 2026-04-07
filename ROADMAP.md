@@ -92,6 +92,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T054 | RoomEntryUI ping/latency badge | 55 | **Done** 2026-04-07 | RoomEntry.pingMs field (clamped ≥0, optional 5th ctor arg); StubNetworkAdapter.SetRoomPing + s_RoomPings dict + ClearRooms clears pings; RoomEntryUI._pingBadge (Image colour-coded) + _pingLabel (Text "N ms", empty when 0); GetPingColor public static (grey≤0 / green≤80 / yellow≤150 / red≥151); ApplyPingBadge private; 12 EditMode tests |
 | T055 | RoomEntryUI host-name label | 50 | **Done** 2026-04-07 | RoomEntry.hostName string field (optional 6th ctor arg, null→empty); StubNetworkAdapter.HostPlayerName property (default "Host", stored per room in Host()); Join preserves hostName; RoomEntryUI._hostNameLabel optional Text wired in Setup; 10 EditMode tests (RoomHostNameTests.cs) |
 | T056 | RoomEntryUI room-age / created-time display | 45 | **Done** 2026-04-07 | RoomEntry.createdAt long (7th ctor arg, neg→0); StubNetworkAdapter.SetRoomCreatedAt + s_RoomCreatedAt dict; ClearRooms and RequestRoomList extended; RoomEntryUI._ageLabel optional Text + GetAgeString(long,long) public static ("Just now"/<60s, "Xm ago"/<60m, "Xh ago"/<24h, "Xd ago"); 12 EditMode tests (RoomAgeTests.cs) |
+| T057 | RoomListUI ping-tier section headers (Excellent/Good/High/Unknown) | 40 | **Done** 2026-04-07 | PingTier enum (Core, Excellent=0/Good=1/High=2/Unknown=3); RoomEntryUI.GetPingTier + GetTierLabel public static; RoomListUI: _groupByPingTier bool + _sectionHeaderPrefab Text; SortByTier stable sort; EmitSectionHeader; RebuildGrouped/RebuildFlat split; 14 EditMode tests (RoomPingTierTests.cs) |
 
 ---
 
@@ -99,7 +100,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T057 — (next pending task TBD) | PM Agent | — | See Session Handoff for next action |
+| T058 — (next task TBD) | PM Agent | — | See Session Handoff for next action |
 
 ---
 
@@ -202,18 +203,20 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-07 | PM Agent | Session 40: T054 Room ping/latency badge. RoomEntry.pingMs int field (Tooltip; Mathf.Max(0,…) clamp in 5-arg constructor; backward-compatible — 4-arg ctor unchanged). StubNetworkAdapter: s_RoomPings static dict; SetRoomPing(string,int) public static; ClearRooms() clears pings; RequestRoomList populates entry.pingMs from dict. RoomEntryUI: _pingBadge (Image, optional) + _pingLabel (Text, optional) Inspector fields; ApplyPingBadge(int) private; GetPingColor(int) public static (grey≤0/green≤80/yellow≤150/red≥151); ApplyPingBadge called at end of Setup overload. RoomPingBadgeTests.cs: 12 EditMode cases (RoomEntry default/ctor/clamp; GetPingColor ×5; Setup badge color; null badge no-throw; StubSetRoomPing→RequestRoomList; ClearRooms clears pings). |
 | 2026-04-07 | PM Agent | Session 41: T055 RoomEntryUI host-name label. RoomEntry.hostName string field (optional 6th ctor arg, null→empty guard). StubNetworkAdapter.HostPlayerName string property (default "Host"): stored in RoomEntry on Host(); Join preserves hostName on playerCount increment. RoomEntryUI._hostNameLabel optional Text SerializeField wired in Setup (empty when hostName absent). RoomHostNameTests.cs: 10 EditMode cases (default/ctor/null-coercion; HostPlayerName default; Host stores name; RequestRoomList returns name; two rooms with different names; ClearRooms resets; UI Setup; null label no-throw). |
 | 2026-04-07 | PM Agent | Session 42: T056 RoomEntryUI room-age display. RoomEntry.createdAt long (optional 7th ctor arg, neg→0 clamp, Serializable Tooltip). StubNetworkAdapter: s_RoomCreatedAt static dict; SetRoomCreatedAt(string,long) public static (≤0 removes entry); ClearRooms clears it; RequestRoomList populates entry.createdAt from dict. RoomEntryUI: _ageLabel optional Text SerializeField; GetAgeString(long,long) public static ("" when 0/negative/future; "Just now" <60s; "Xm ago" <60m; "Xh ago" <24h; "Xd ago" ≥24h); called in Setup with DateTime.UtcNow.Ticks as nowTicks. RoomAgeTests.cs: 12 EditMode cases (RoomEntry default/ctor/neg-clamp; GetAgeString zero/sub-60s/minutes/hours/days; SetRoomCreatedAt pipeline; ClearRooms clears; UI Setup known/zero age). |
+| 2026-04-07 | PM Agent | Session 43: T057 RoomListUI ping-tier section headers. PingTier enum (Core, in RoomListSO.cs: Excellent=0/Good=1/High=2/Unknown=3 — ordering drives display priority). RoomEntryUI: GetPingTier(int) public static (0/neg→Unknown/≤80→Excellent/≤150→Good/151+→High); GetTierLabel(PingTier) public static (localised header strings). RoomListUI: _groupByPingTier bool + _sectionHeaderPrefab Text Inspector fields; _headers List<GameObject> runtime pool; Rebuild splits into RebuildFlat (old path) / RebuildGrouped (tier path); SortByTier internal static (stable — index tiebreak via (entry,idx) pairs); EmitSectionHeader instantiates _sectionHeaderPrefab (no-op when null). RoomPingTierTests.cs: 14 EditMode cases (GetPingTier×6, GetTierLabel×4, enum sort order×3, SortByTier stable sort×1). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T056 — RoomEntryUI room-age display.  
-**Milestone status:** M1–M6 Done. T001–T056 Done.
+**Last completed:** T057 — RoomListUI ping-tier section headers.  
+**Milestone status:** M1–M6 Done. T001–T057 Done.
 
-**Next action:** T057 — Suggested: `RoomListUI` section headers grouping rooms by ping tier (Excellent ≤80 ms / Good ≤150 ms / High >150 ms / Unknown 0 ms). Or: `RoomEntry` player name list (host + joined players), or any deferred Inspector-wiring item below.
+**Next action:** T058 — Suggested: `RoomEntry` player name list (host + joined player names), or `RoomListUI` section collapse/expand toggle per tier, or next RICE item from the team.
 
 **Blockers:** None.  
 **Architecture notes:**
+  - T057: `PingTier` enum int values define display order (Excellent=0 sorts first). `GetPingTier` + `GetTierLabel` are public static on `RoomEntryUI` — testable without MonoBehaviour instantiation. `SortByTier` is `internal static` on `RoomListUI` — tested directly from the same assembly. `_sectionHeaderPrefab` null = headers suppressed but tier-sorting still active (useful for non-visual grouping scenarios).
   - T056: `RoomEntry.createdAt` is optional 7th ctor arg (default 0); negative values clamped to 0. `GetAgeString` is public static on `RoomEntryUI` — testable without MonoBehaviour instantiation. `StubNetworkAdapter.SetRoomCreatedAt` follows same static-helper pattern as `SetRoomPing`.
   - T055: `RoomEntry.hostName` is optional 6th ctor arg (default `""`); existing tests using 3–5 arg constructors compile unchanged. `StubNetworkAdapter.HostPlayerName` is an instance property (default `"Host"`), not static — each stub instance can simulate a different host. `Join(string,string)` now preserves `hostName` when incrementing `playerCount`.
   - T054: `GetPingColor` is public static (no MB instantiation required in tests). `ApplyPingBadge` is private — tested indirectly via `Setup` + badge Image.color assertion.

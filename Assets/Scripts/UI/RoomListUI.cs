@@ -75,10 +75,23 @@ namespace BattleRobots.UI
                  "Leave null to hide favourite buttons on all rows.")]
         [SerializeField] private FavouriteRoomsSO _favouriteRoomsSO;
 
+        [Header("Ping-Tier Grouping (optional)")]
+        [Tooltip("When enabled, rooms are sorted by ping quality and a section header is " +
+                 "inserted before each tier group: Excellent → Good → High → Unknown.")]
+        [SerializeField] private bool _groupByPingTier = false;
+
+        [Tooltip("(Optional) Text prefab used as a section header between ping-tier groups. " +
+                 "Required only when _groupByPingTier is enabled. Leave null to suppress headers " +
+                 "while still sorting by tier.")]
+        [SerializeField] private Text _sectionHeaderPrefab;
+
         // ── Runtime state ─────────────────────────────────────────────────────
 
         // Pool of active row instances; cleared and rebuilt on each Rebuild call.
         private readonly List<RoomEntryUI> _rows = new List<RoomEntryUI>();
+
+        // Pool of active section header instances; cleared on each Rebuild call.
+        private readonly List<GameObject> _headers = new List<GameObject>();
 
         // Active search prefix. Empty string = show all rooms.
         private string _searchPrefix = string.Empty;
@@ -163,6 +176,14 @@ namespace BattleRobots.UI
             }
             _rows.Clear();
 
+            // Destroy previous section headers.
+            foreach (GameObject header in _headers)
+            {
+                if (header != null)
+                    Destroy(header);
+            }
+            _headers.Clear();
+
             // Apply search prefix filter + sort. Empty prefix returns the full list.
             IReadOnlyList<RoomEntry> rooms = _roomList != null
                 ? _roomList.GetSortedFilteredRooms(_searchPrefix, _sortMode)
@@ -177,22 +198,110 @@ namespace BattleRobots.UI
             if (!hasData || _entryPrefab == null || _scrollContent == null)
                 return;
 
+            if (_groupByPingTier)
+                RebuildGrouped(rooms);
+            else
+                RebuildFlat(rooms);
+        }
+
+        /// <summary>
+        /// Flat rebuild: instantiate one row per room in the supplied order.
+        /// Used when <c>_groupByPingTier</c> is false.
+        /// </summary>
+        private void RebuildFlat(IReadOnlyList<RoomEntry> rooms)
+        {
             for (int i = 0; i < rooms.Count; i++)
             {
                 RoomEntry entry = rooms[i];
 
-                // Skip rooms at capacity when the filter toggle is on.
-                if (_filterFullRooms && entry.IsFull)
-                    continue;
-
-                // Skip private rooms when the filter toggle is on.
-                if (_hidePrivateRooms && entry.isPrivate)
-                    continue;
+                if (_filterFullRooms && entry.IsFull)        continue;
+                if (_hidePrivateRooms && entry.isPrivate)    continue;
 
                 RoomEntryUI row = Instantiate(_entryPrefab, _scrollContent);
                 row.Setup(entry, HandleJoinRequested, _favouriteRoomsSO);
                 _rows.Add(row);
             }
+        }
+
+        /// <summary>
+        /// Grouped rebuild: sorts rooms by ping tier, inserts a section header
+        /// Text at each tier boundary, then instantiates one row per room.
+        /// Used when <c>_groupByPingTier</c> is true.
+        /// </summary>
+        private void RebuildGrouped(IReadOnlyList<RoomEntry> rooms)
+        {
+            // Sort by tier (Excellent first, Unknown last) while preserving the
+            // existing relative order within each tier (stable via index tiebreak).
+            List<RoomEntry> sorted = SortByTier(rooms);
+
+            PingTier lastTier = (PingTier)(-1); // sentinel — no header emitted yet
+
+            for (int i = 0; i < sorted.Count; i++)
+            {
+                RoomEntry entry = sorted[i];
+
+                if (_filterFullRooms && entry.IsFull)        continue;
+                if (_hidePrivateRooms && entry.isPrivate)    continue;
+
+                PingTier tier = RoomEntryUI.GetPingTier(entry.pingMs);
+                if (tier != lastTier)
+                {
+                    EmitSectionHeader(RoomEntryUI.GetTierLabel(tier));
+                    lastTier = tier;
+                }
+
+                RoomEntryUI row = Instantiate(_entryPrefab, _scrollContent);
+                row.Setup(entry, HandleJoinRequested, _favouriteRoomsSO);
+                _rows.Add(row);
+            }
+        }
+
+        /// <summary>
+        /// Instantiates a section header Text from the prefab (if wired) and
+        /// parents it to <see cref="_scrollContent"/>.
+        /// When <see cref="_sectionHeaderPrefab"/> is null the call is a no-op —
+        /// rooms are still sorted by tier; headers are simply not rendered.
+        /// </summary>
+        private void EmitSectionHeader(string label)
+        {
+            if (_sectionHeaderPrefab == null || _scrollContent == null)
+                return;
+
+            Text header = Instantiate(_sectionHeaderPrefab, _scrollContent);
+            header.text = label;
+            _headers.Add(header.gameObject);
+        }
+
+        /// <summary>
+        /// Returns a new list containing the same entries as <paramref name="rooms"/>
+        /// sorted by ascending <see cref="PingTier"/> (Excellent=0 first, Unknown=3 last).
+        /// Relative order within a tier is preserved (stable sort via original index).
+        /// Allocates; called only during Rebuild (not in Update / FixedUpdate).
+        /// </summary>
+        internal static List<RoomEntry> SortByTier(IReadOnlyList<RoomEntry> rooms)
+        {
+            var sorted = new List<RoomEntry>(rooms.Count);
+            for (int i = 0; i < rooms.Count; i++)
+                sorted.Add(rooms[i]);
+
+            // Stable sort: use original index stored alongside each entry.
+            var indexed = new List<(RoomEntry entry, int idx)>(rooms.Count);
+            for (int i = 0; i < rooms.Count; i++)
+                indexed.Add((rooms[i], i));
+
+            indexed.Sort((a, b) =>
+            {
+                int ta = (int)RoomEntryUI.GetPingTier(a.entry.pingMs);
+                int tb = (int)RoomEntryUI.GetPingTier(b.entry.pingMs);
+                int cmp = ta.CompareTo(tb);
+                return cmp != 0 ? cmp : a.idx.CompareTo(b.idx); // stable
+            });
+
+            sorted.Clear();
+            for (int i = 0; i < indexed.Count; i++)
+                sorted.Add(indexed[i].entry);
+
+            return sorted;
         }
 
         /// <summary>

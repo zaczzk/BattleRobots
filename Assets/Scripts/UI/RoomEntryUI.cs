@@ -234,6 +234,39 @@ namespace BattleRobots.UI
         }
 
         /// <summary>
+        /// Classifies a latency value into a <see cref="PingTier"/>.
+        /// Exposed as public static so tests and <see cref="RoomListUI"/> can use it
+        /// without instantiating this MonoBehaviour.
+        ///   0 or negative  → <see cref="PingTier.Unknown"/>
+        ///   ≤ 80 ms        → <see cref="PingTier.Excellent"/>
+        ///   ≤ 150 ms       → <see cref="PingTier.Good"/>
+        ///   &gt; 150 ms    → <see cref="PingTier.High"/>
+        /// </summary>
+        public static PingTier GetPingTier(int pingMs)
+        {
+            if (pingMs <= 0)   return PingTier.Unknown;
+            if (pingMs <= 80)  return PingTier.Excellent;
+            if (pingMs <= 150) return PingTier.Good;
+            return PingTier.High;
+        }
+
+        /// <summary>
+        /// Returns the human-readable section header label for a given
+        /// <see cref="PingTier"/>. Used by <see cref="RoomListUI"/> when
+        /// <c>_groupByPingTier</c> is enabled.
+        /// </summary>
+        public static string GetTierLabel(PingTier tier)
+        {
+            switch (tier)
+            {
+                case PingTier.Excellent: return "Excellent  \u2264 80 ms";
+                case PingTier.Good:      return "Good  \u2264 150 ms";
+                case PingTier.High:      return "High  > 150 ms";
+                default:                 return "Unknown";
+            }
+        }
+
+        /// <summary>
         /// Converts a room creation timestamp into a human-readable relative age string.
         ///
         /// Exposed as public static so unit tests can verify the mapping without

@@ -4,6 +4,30 @@ using UnityEngine;
 
 namespace BattleRobots.Core
 {
+    // ── PingTier ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Latency classification used for section-header grouping in
+    /// <see cref="RoomListUI"/> and colour-coding in <see cref="RoomEntryUI"/>.
+    ///
+    /// Enum int values define the display order (lowest = shown first):
+    ///   Excellent → Good → High → Unknown
+    /// </summary>
+    public enum PingTier
+    {
+        /// <summary>Round-trip latency ≤ 80 ms — best connection quality.</summary>
+        Excellent = 0,
+
+        /// <summary>Round-trip latency 81–150 ms — acceptable connection.</summary>
+        Good = 1,
+
+        /// <summary>Round-trip latency > 150 ms — degraded connection.</summary>
+        High = 2,
+
+        /// <summary>Ping was not measured (pingMs = 0). Shown last in the list.</summary>
+        Unknown = 3,
+    }
+
     // ── RoomSortMode ──────────────────────────────────────────────────────────
 
     /// <summary>
