@@ -65,6 +65,21 @@ namespace BattleRobots.Core
         /// (<see cref="playerCount"/> &gt;= <see cref="maxPlayers"/>).
         /// </summary>
         public bool IsFull => maxPlayers > 0 && playerCount >= maxPlayers;
+
+        /// <summary>
+        /// Number of open slots in the room.
+        /// Returns 0 when the room is full, when <see cref="maxPlayers"/> is not
+        /// configured (&lt;= 0), or when <see cref="playerCount"/> exceeds capacity.
+        /// Never negative.
+        /// </summary>
+        public int SlotsRemaining
+        {
+            get
+            {
+                if (maxPlayers <= 0 || IsFull) return 0;
+                return Mathf.Max(0, maxPlayers - playerCount);
+            }
+        }
     }
 
     // ── RoomListSO ────────────────────────────────────────────────────────────

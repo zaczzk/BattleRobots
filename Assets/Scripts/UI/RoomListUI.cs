@@ -70,6 +70,11 @@ namespace BattleRobots.UI
                  "a private room. When assigned the text value is forwarded to BeginJoin.")]
         [SerializeField] private InputField _passwordInputField;
 
+        [Tooltip("(Optional) FavouriteRoomsSO asset. When assigned, each RoomEntryUI row " +
+                 "receives it so the star/favourite button is visible and correctly wired. " +
+                 "Leave null to hide favourite buttons on all rows.")]
+        [SerializeField] private FavouriteRoomsSO _favouriteRoomsSO;
+
         // ── Runtime state ─────────────────────────────────────────────────────
 
         // Pool of active row instances; cleared and rebuilt on each Rebuild call.
@@ -185,7 +190,7 @@ namespace BattleRobots.UI
                     continue;
 
                 RoomEntryUI row = Instantiate(_entryPrefab, _scrollContent);
-                row.Setup(entry, HandleJoinRequested);
+                row.Setup(entry, HandleJoinRequested, _favouriteRoomsSO);
                 _rows.Add(row);
             }
         }

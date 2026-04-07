@@ -37,6 +37,10 @@ namespace BattleRobots.UI
         [Tooltip("Text component that shows the player count as 'N/MAX'.")]
         [SerializeField] private Text _playerCountLabel;
 
+        [Tooltip("(Optional) Text component showing how many slots are still open, e.g. '1 left'. " +
+                 "Hidden (empty string) when the room is full or maxPlayers is not configured.")]
+        [SerializeField] private Text _slotsRemainingLabel;
+
         [Tooltip("(Optional) GameObject shown when the room has reached capacity. " +
                  "Use a Text child labelled 'FULL' or a coloured overlay.")]
         [SerializeField] private GameObject _fullBadge;
@@ -108,6 +112,15 @@ namespace BattleRobots.UI
 
             bool isFull    = entry.IsFull;
             bool isPrivate = entry.isPrivate;
+
+            // Slots-remaining label: show "N left" only when room is not full and
+            // maxPlayers is configured. Empty string hides the label gracefully.
+            if (_slotsRemainingLabel != null)
+            {
+                _slotsRemainingLabel.text = entry.SlotsRemaining > 0
+                    ? $"{entry.SlotsRemaining} left"
+                    : string.Empty;
+            }
 
             if (_fullBadge != null)
                 _fullBadge.SetActive(isFull);
