@@ -94,6 +94,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T056 | RoomEntryUI room-age / created-time display | 45 | **Done** 2026-04-07 | RoomEntry.createdAt long (7th ctor arg, neg→0); StubNetworkAdapter.SetRoomCreatedAt + s_RoomCreatedAt dict; ClearRooms and RequestRoomList extended; RoomEntryUI._ageLabel optional Text + GetAgeString(long,long) public static ("Just now"/<60s, "Xm ago"/<60m, "Xh ago"/<24h, "Xd ago"); 12 EditMode tests (RoomAgeTests.cs) |
 | T057 | RoomListUI ping-tier section headers (Excellent/Good/High/Unknown) | 40 | **Done** 2026-04-07 | PingTier enum (Core, Excellent=0/Good=1/High=2/Unknown=3); RoomEntryUI.GetPingTier + GetTierLabel public static; RoomListUI: _groupByPingTier bool + _sectionHeaderPrefab Text; SortByTier stable sort; EmitSectionHeader; RebuildGrouped/RebuildFlat split; 14 EditMode tests (RoomPingTierTests.cs) |
 | T058 | RoomListUI section collapse/expand toggle per ping tier | 35 | **Done** 2026-04-07 | SectionHeaderUI MB (Button + label + indicator ▼/▶, Setup/HandleClicked/IsCollapsed/Tier); RoomListUI: _sectionHeaderUIPrefab + _collapsedTiers HashSet<PingTier> + ToggleTierCollapse + IsTierCollapsed + updated EmitSectionHeader + RebuildGrouped skips collapsed rows; 12 EditMode tests (SectionCollapseTests.cs) |
+| T059 | RoomEntry joined-player name list | 70 | **Done** 2026-04-07 | RoomEntry.playerNames List<string> (8th ctor arg, null default, host at index 0); INetworkAdapter.OnRoomUpdated Action<RoomEntry>; StubNetworkAdapter: JoinPlayerName property (default "Player"), s_RoomPlayerNames dict, Host() seeds names, Join() appends+fires OnRoomUpdated; RoomListSO.UpdateRoom(RoomEntry) replaces entry by roomCode + fires _onRoomsUpdated; NetworkEventBridge wires OnRoomUpdated→UpdateRoom; RoomEntryUI._playerNamesLabel optional Text (comma-joined); 11 EditMode tests (RoomPlayerNamesTests.cs) |
 
 ---
 
@@ -101,7 +102,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T059 — (next task TBD) | PM Agent | — | See Session Handoff for next action |
+| T060 — (next task TBD) | PM Agent | — | See Session Handoff for next action |
 
 ---
 
@@ -206,22 +207,21 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-07 | PM Agent | Session 42: T056 RoomEntryUI room-age display. RoomEntry.createdAt long (optional 7th ctor arg, neg→0 clamp, Serializable Tooltip). StubNetworkAdapter: s_RoomCreatedAt static dict; SetRoomCreatedAt(string,long) public static (≤0 removes entry); ClearRooms clears it; RequestRoomList populates entry.createdAt from dict. RoomEntryUI: _ageLabel optional Text SerializeField; GetAgeString(long,long) public static ("" when 0/negative/future; "Just now" <60s; "Xm ago" <60m; "Xh ago" <24h; "Xd ago" ≥24h); called in Setup with DateTime.UtcNow.Ticks as nowTicks. RoomAgeTests.cs: 12 EditMode cases (RoomEntry default/ctor/neg-clamp; GetAgeString zero/sub-60s/minutes/hours/days; SetRoomCreatedAt pipeline; ClearRooms clears; UI Setup known/zero age). |
 | 2026-04-07 | PM Agent | Session 44: T058 Section collapse/expand per ping tier. SectionHeaderUI MB (BattleRobots.UI, [RequireComponent(Button)], Setup(label,tier,isCollapsed,onToggle), HandleClicked toggles IsCollapsed + fires callback, RefreshIndicator ▼/▶, null-safe Awake/OnDestroy). RoomListUI: _sectionHeaderUIPrefab SectionHeaderUI field; _collapsedTiers HashSet<PingTier>; ToggleTierCollapse(tier) adds/removes from set + Rebuild; IsTierCollapsed(tier) public query; EmitSectionHeader updated to prefer SectionHeaderUI over Text fallback, passes ToggleTierCollapse as callback; RebuildGrouped skips rows whose tier is in _collapsedTiers (header still shown). SectionCollapseTests.cs: 12 EditMode cases (SectionHeaderUI default/Setup tier+collapsed/HandleClicked toggle/callback/null-callback/double-Setup; RoomListUI IsTierCollapsed defaults/ToggleCollapse/ToggleTwiceExpands/independent/all-four-collapse-expand). |
 | 2026-04-07 | PM Agent | Session 43: T057 RoomListUI ping-tier section headers. PingTier enum (Core, in RoomListSO.cs: Excellent=0/Good=1/High=2/Unknown=3 — ordering drives display priority). RoomEntryUI: GetPingTier(int) public static (0/neg→Unknown/≤80→Excellent/≤150→Good/151+→High); GetTierLabel(PingTier) public static (localised header strings). RoomListUI: _groupByPingTier bool + _sectionHeaderPrefab Text Inspector fields; _headers List<GameObject> runtime pool; Rebuild splits into RebuildFlat (old path) / RebuildGrouped (tier path); SortByTier internal static (stable — index tiebreak via (entry,idx) pairs); EmitSectionHeader instantiates _sectionHeaderPrefab (no-op when null). RoomPingTierTests.cs: 14 EditMode cases (GetPingTier×6, GetTierLabel×4, enum sort order×3, SortByTier stable sort×1). |
+| 2026-04-07 | PM Agent | Session 45: T059 RoomEntry joined-player name list. RoomEntry.playerNames List<string> (8th ctor arg, null default, host at index 0). INetworkAdapter.OnRoomUpdated Action<RoomEntry>. StubNetworkAdapter: JoinPlayerName property (default "Player"); s_RoomPlayerNames static dict; Host() seeds names with [HostPlayerName]; Join() appends JoinPlayerName + fires OnRoomUpdated with updated entry; RequestRoomList populates playerNames from dict; ClearRooms clears dict. RoomListSO.UpdateRoom(RoomEntry): replaces entry by case-insensitive roomCode match + fires _onRoomsUpdated (no-op with warning when not found). NetworkEventBridge.RegisterAdapterCallbacks: wires adapter.OnRoomUpdated → _roomList?.UpdateRoom(entry). RoomEntryUI._playerNamesLabel optional Text SerializeField; Setup comma-joins entry.playerNames (string.Join(", ", …), empty when null/empty). RoomPlayerNamesTests.cs: 11 EditMode cases. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T058 — Section collapse/expand toggle per ping tier.  
-**Milestone status:** M1–M6 Done. T001–T058 Done.
+**Last completed:** T059 — RoomEntry joined-player name list.  
+**Milestone status:** M1–M6 Done. T001–T059 Done.
 
-**Next action:** T059 — `RoomEntry` joined-player name list (show all player display-names in a room, not just the host). Suggested deliverables:
-  - `RoomEntry.playerNames List<string>` field (serializable; null-safe; host name always index 0 when populated)
-  - `INetworkAdapter.OnRoomUpdated Action<RoomEntry>` event — adapter fires when a player joins/leaves
-  - `StubNetworkAdapter` — populate `playerNames` from internal room state on `Host()`/`Join()`
-  - `NetworkEventBridge` — wire `OnRoomUpdated` → `RoomListSO.UpdateRoom(RoomEntry)` new mutator
-  - `RoomListSO.UpdateRoom(RoomEntry)` — finds existing entry by roomCode + replaces it, fires `_onRoomsUpdated`
-  - `RoomEntryUI._playerNamesLabel` optional Text — shows comma-joined names (e.g. "Alice, Bob")
-  - EditMode tests ×10
+**Next action:** T060 — Room spectator count (viewers who are watching but not playing). Suggested deliverables:
+  - `RoomEntry.spectatorCount int` field (optional 9th ctor arg; defaults to 0; clamped ≥ 0)
+  - `INetworkAdapter.OnSpectatorCountChanged Action<string, int>` callback — adapter fires when spectator count changes for a given roomCode
+  - `StubNetworkAdapter.SetSpectatorCount(string roomCode, int count)` static helper + `s_SpectatorCounts` dict; populates `entry.spectatorCount` in `RequestRoomList`
+  - `RoomEntryUI._spectatorCountLabel` optional Text — shows "N watching" or empty when 0
+  - EditMode tests ×8
 
 **Blockers:** None.  
 **Architecture notes:**

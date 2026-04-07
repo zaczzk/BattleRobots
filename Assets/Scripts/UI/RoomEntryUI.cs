@@ -31,6 +31,7 @@ namespace BattleRobots.UI
     ///   □ _pingLabel            → (optional) Text showing "N ms" (empty when pingMs = 0)
     ///   □ _hostNameLabel        → (optional) Text showing the host's display name
     ///   □ _ageLabel             → (optional) Text showing relative room age ("Just now", "3m ago", etc.)
+    ///   □ _playerNamesLabel     → (optional) Text showing comma-joined player names ("Alice, Bob")
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RoomEntryUI : MonoBehaviour
@@ -92,6 +93,11 @@ namespace BattleRobots.UI
                  "e.g. 'Just now', '3m ago', '2h ago'. Hidden (empty string) when " +
                  "createdAt is 0 (unknown).")]
         [SerializeField] private Text _ageLabel;
+
+        [Header("Player Names (optional)")]
+        [Tooltip("(Optional) Text label showing all player display names comma-joined, " +
+                 "e.g. 'Alice, Bob'. Empty when playerNames is null or empty.")]
+        [SerializeField] private Text _playerNamesLabel;
 
         // ── Runtime state ─────────────────────────────────────────────────────
 
@@ -200,6 +206,15 @@ namespace BattleRobots.UI
             // Room age label: compute relative time string from createdAt ticks.
             if (_ageLabel != null)
                 _ageLabel.text = GetAgeString(entry.createdAt, DateTime.UtcNow.Ticks);
+
+            // Player names: comma-join the list, or leave empty when not provided.
+            if (_playerNamesLabel != null)
+            {
+                _playerNamesLabel.text =
+                    entry.playerNames != null && entry.playerNames.Count > 0
+                        ? string.Join(", ", entry.playerNames)
+                        : string.Empty;
+            }
         }
 
         /// <summary>

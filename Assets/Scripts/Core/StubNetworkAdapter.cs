@@ -73,13 +73,23 @@ namespace BattleRobots.Core
         private static readonly Dictionary<string, long> s_RoomCreatedAt =
             new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Remove all simulated rooms, passwords, pings, and creation times (call in TearDown).</summary>
+        /// <summary>
+        /// Server-side list of player display names per room, keyed by normalised room code.
+        /// Index 0 is always the host's name; subsequent entries are joiners in join order.
+        /// Populated by <see cref="Host"/> and extended by <see cref="Join(string,string)"/>.
+        /// Cleared by <see cref="ClearRooms"/>.
+        /// </summary>
+        private static readonly Dictionary<string, List<string>> s_RoomPlayerNames =
+            new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Remove all simulated rooms, passwords, pings, creation times, and player names (call in TearDown).</summary>
         public static void ClearRooms()
         {
             s_ActiveRooms.Clear();
             s_RoomPasswords.Clear();
             s_RoomPings.Clear();
             s_RoomCreatedAt.Clear();
+            s_RoomPlayerNames.Clear();
         }
 
         // ── Host identity ─────────────────────────────────────────────────────
@@ -91,6 +101,14 @@ namespace BattleRobots.Core
         /// simulate different room owners.
         /// </summary>
         public string HostPlayerName { get; set; } = "Host";
+
+        /// <summary>
+        /// Display name appended to a room's <c>playerNames</c> list when
+        /// <see cref="Join(string,string)"/> succeeds.
+        /// Defaults to <c>"Player"</c>. Tests can override this to simulate
+        /// specific player identities joining a room.
+        /// </summary>
+        public string JoinPlayerName { get; set; } = "Player";
 
         /// <summary>
         /// Assign a simulated latency to an existing room so that the next
@@ -145,6 +163,9 @@ namespace BattleRobots.Core
 
         /// <inheritdoc/>
         public Action<List<RoomEntry>> OnRoomListReceived { get; set; }
+
+        /// <inheritdoc/>
+        public Action<RoomEntry> OnRoomUpdated { get; set; }
 
         // ── Test-inspection surface ───────────────────────────────────────────
 
@@ -214,9 +235,15 @@ namespace BattleRobots.Core
             string code = Normalise(roomCode);
             int    cap  = maxPlayers > 0 ? maxPlayers : 2;
 
-            LastRoomCode        = code;
+            LastRoomCode = code;
+
+            // Initialise player-name list with the host as the first entry.
+            var names = new List<string> { HostPlayerName };
+            s_RoomPlayerNames[code] = names;
+
             s_ActiveRooms[code] = new RoomEntry(code, playerCount: 1, maxPlayers: cap,
-                                                isPrivate: isPrivate, hostName: HostPlayerName);
+                                                isPrivate: isPrivate, hostName: HostPlayerName,
+                                                playerNames: new List<string>(names));
 
             if (isPrivate && !string.IsNullOrEmpty(password))
                 s_RoomPasswords[code] = password;
@@ -280,10 +307,23 @@ namespace BattleRobots.Core
                 }
             }
 
-            // Successful join — increment player count and write back (struct copy).
-            // Preserve hostName so RequestRoomList continues to return it correctly.
-            s_ActiveRooms[code] = new RoomEntry(code, room.playerCount + 1, room.maxPlayers,
-                                                room.isPrivate, hostName: room.hostName);
+            // Append joining player name to the server-side list.
+            if (!s_RoomPlayerNames.TryGetValue(code, out List<string> names))
+            {
+                names = new List<string>();
+                s_RoomPlayerNames[code] = names;
+            }
+            names.Add(JoinPlayerName);
+
+            // Write back updated entry (struct copy); preserve all existing fields.
+            var updatedEntry = new RoomEntry(code, room.playerCount + 1, room.maxPlayers,
+                                             room.isPrivate, room.pingMs, room.hostName,
+                                             room.createdAt, new List<string>(names));
+            s_ActiveRooms[code] = updatedEntry;
+
+            // Notify subscribers that this room's state has changed.
+            OnRoomUpdated?.Invoke(updatedEntry);
+
             OnRoomJoined?.Invoke(code);
         }
 
@@ -315,6 +355,8 @@ namespace BattleRobots.Core
                     entry.pingMs = ping;
                 if (s_RoomCreatedAt.TryGetValue(kvp.Key, out long ts))
                     entry.createdAt = ts;
+                if (s_RoomPlayerNames.TryGetValue(kvp.Key, out List<string> names))
+                    entry.playerNames = new List<string>(names); // defensive copy
                 rooms.Add(entry);
             }
 

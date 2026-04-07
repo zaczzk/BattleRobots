@@ -128,6 +128,16 @@ namespace BattleRobots.Core
         Action<byte[]> OnMatchStateReceived { get; set; }
 
         /// <summary>
+        /// Invoked by the adapter whenever the state of a room changes — for example,
+        /// when a player joins or leaves. Passes the fully-updated <see cref="RoomEntry"/>
+        /// so subscribers can update their UI without re-fetching the full room list.
+        ///
+        /// Adapters that do not support real-time room updates may leave this unimplemented
+        /// (null callback is acceptable; callers must guard against null).
+        /// </summary>
+        Action<RoomEntry> OnRoomUpdated { get; set; }
+
+        /// <summary>
         /// Invoked by the adapter in response to <see cref="RequestRoomList"/>.
         /// Passes the current list of available <see cref="RoomEntry"/> values.
         /// The adapter owns the list allocation; the callee must not hold a long-lived

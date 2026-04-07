@@ -81,6 +81,11 @@ namespace BattleRobots.Core
                  "0 means the creation time is unknown or was not provided by the adapter.")]
         public long createdAt;
 
+        [Tooltip("Display names of all players currently in the room. " +
+                 "Index 0 is always the host when the list is populated. " +
+                 "Null or empty when the adapter does not provide per-player names.")]
+        public List<string> playerNames;
+
         /// <summary>
         /// Convenience constructor for use in tests and the stub adapter.
         /// </summary>
@@ -91,9 +96,13 @@ namespace BattleRobots.Core
         /// <param name="pingMs">Round-trip latency in ms to the room host. 0 = unknown.</param>
         /// <param name="hostName">Display name of the room host. Defaults to empty string.</param>
         /// <param name="createdAt">UTC ticks of room creation. 0 = unknown.</param>
+        /// <param name="playerNames">
+        ///   List of all player display names in the room (host at index 0).
+        ///   Defaults to null (adapter did not supply names).
+        /// </param>
         public RoomEntry(string roomCode, int playerCount, int maxPlayers = 2,
                          bool isPrivate = false, int pingMs = 0, string hostName = "",
-                         long createdAt = 0L)
+                         long createdAt = 0L, List<string> playerNames = null)
         {
             this.roomCode    = roomCode    ?? string.Empty;
             this.playerCount = playerCount;
@@ -102,6 +111,7 @@ namespace BattleRobots.Core
             this.pingMs      = Mathf.Max(0, pingMs);
             this.hostName    = hostName ?? string.Empty;
             this.createdAt   = createdAt < 0L ? 0L : createdAt;
+            this.playerNames = playerNames;
         }
 
         /// <summary>
@@ -186,6 +196,32 @@ namespace BattleRobots.Core
                 _rooms.AddRange(rooms);
 
             _onRoomsUpdated?.Raise();
+        }
+
+        /// <summary>
+        /// Replaces an existing entry whose <see cref="RoomEntry.roomCode"/> matches
+        /// <paramref name="updated"/>'s code, then fires <see cref="_onRoomsUpdated"/>.
+        ///
+        /// Used by <see cref="NetworkEventBridge"/> to apply real-time room-state changes
+        /// (e.g. a player joining) without re-fetching the full list.
+        ///
+        /// If no matching entry is found the call is a no-op (the room may have been
+        /// removed between a <see cref="RequestRoomList"/> and the incoming update).
+        /// </summary>
+        public void UpdateRoom(RoomEntry updated)
+        {
+            for (int i = 0; i < _rooms.Count; i++)
+            {
+                if (string.Equals(_rooms[i].roomCode, updated.roomCode, StringComparison.OrdinalIgnoreCase))
+                {
+                    _rooms[i] = updated;
+                    _onRoomsUpdated?.Raise();
+                    return;
+                }
+            }
+
+            // Silently ignore — room may have been cleared by a concurrent SetRooms call.
+            Debug.LogWarning($"[RoomListSO] UpdateRoom: room '{updated.roomCode}' not found in current list.");
         }
 
         /// <summary>

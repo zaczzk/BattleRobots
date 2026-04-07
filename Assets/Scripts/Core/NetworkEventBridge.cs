@@ -307,6 +307,12 @@ namespace BattleRobots.Core
                 // Push the result into the SO; this fires _onRoomsUpdated so RoomListUI rebuilds.
                 _roomList?.SetRooms(rooms);
             };
+
+            adapter.OnRoomUpdated = (entry) =>
+            {
+                // Patch the in-memory list for the changed room without a full refresh.
+                _roomList?.UpdateRoom(entry);
+            };
         }
 
 #if UNITY_EDITOR
