@@ -4,6 +4,24 @@ using UnityEngine;
 
 namespace BattleRobots.Core
 {
+    // ── RoomSortMode ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Controls the ordering of rooms returned by
+    /// <see cref="RoomListSO.GetSortedFilteredRooms"/>.
+    /// </summary>
+    public enum RoomSortMode
+    {
+        /// <summary>Preserve the order rooms were received from the network.</summary>
+        None,
+
+        /// <summary>Rooms with the most current players appear first.</summary>
+        ByPlayerCountDesc,
+
+        /// <summary>Rooms sorted A→Z by room code (case-insensitive ordinal).</summary>
+        ByRoomCodeAsc,
+    }
+
     // ── RoomEntry ─────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -123,31 +141,85 @@ namespace BattleRobots.Core
 
         /// <summary>
         /// Returns a snapshot of rooms whose <see cref="RoomEntry.roomCode"/> starts
-        /// with <paramref name="prefix"/> (case-insensitive).
+        /// with <paramref name="prefix"/> (case-insensitive), in their original order.
         ///
         /// A null or empty <paramref name="prefix"/> returns the full room list
         /// without allocating a new collection.
         ///
-        /// Called by <c>RoomListUI.Rebuild</c> when a search prefix is active.
-        /// Allocations here are acceptable: Rebuild runs only on user interaction,
-        /// never in Update / FixedUpdate.
+        /// Backward-compatible wrapper around <see cref="GetSortedFilteredRooms"/>.
+        /// Prefer that method when a sort order is needed.
         /// </summary>
         public IReadOnlyList<RoomEntry> GetFilteredRooms(string prefix)
         {
-            if (string.IsNullOrEmpty(prefix))
-                return _rooms;
+            return GetSortedFilteredRooms(prefix, RoomSortMode.None);
+        }
 
-            var filtered = new List<RoomEntry>(_rooms.Count);
-            for (int i = 0; i < _rooms.Count; i++)
+        /// <summary>
+        /// Returns a snapshot of rooms filtered by <paramref name="prefix"/> and
+        /// ordered according to <paramref name="sort"/>.
+        ///
+        /// Filtering is applied first; sorting is applied to the filtered results.
+        /// A null or empty <paramref name="prefix"/> skips the filter step.
+        ///
+        /// Allocations are acceptable here — this method is called only on user
+        /// interaction (keystrokes, button clicks), never in Update / FixedUpdate.
+        /// </summary>
+        public IReadOnlyList<RoomEntry> GetSortedFilteredRooms(string prefix, RoomSortMode sort)
+        {
+            // ── 1. Filter ─────────────────────────────────────────────────────
+
+            List<RoomEntry> result;
+
+            if (string.IsNullOrEmpty(prefix))
             {
-                RoomEntry entry = _rooms[i];
-                if (!string.IsNullOrEmpty(entry.roomCode) &&
-                    entry.roomCode.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                // No filter: copy the full list so we can sort in-place safely.
+                result = new List<RoomEntry>(_rooms);
+            }
+            else
+            {
+                result = new List<RoomEntry>(_rooms.Count);
+                for (int i = 0; i < _rooms.Count; i++)
                 {
-                    filtered.Add(entry);
+                    RoomEntry entry = _rooms[i];
+                    if (!string.IsNullOrEmpty(entry.roomCode) &&
+                        entry.roomCode.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        result.Add(entry);
+                    }
                 }
             }
-            return filtered;
+
+            // ── 2. Sort ───────────────────────────────────────────────────────
+
+            switch (sort)
+            {
+                case RoomSortMode.ByPlayerCountDesc:
+                    result.Sort(CompareByPlayerCountDesc);
+                    break;
+
+                case RoomSortMode.ByRoomCodeAsc:
+                    result.Sort(CompareByRoomCodeAsc);
+                    break;
+
+                // RoomSortMode.None — preserve insertion order.
+                default:
+                    break;
+            }
+
+            return result;
+        }
+
+        // ── Sort comparers (static — no closure allocation) ───────────────────
+
+        private static int CompareByPlayerCountDesc(RoomEntry a, RoomEntry b)
+        {
+            // Descending: larger count first.
+            return b.playerCount.CompareTo(a.playerCount);
+        }
+
+        private static int CompareByRoomCodeAsc(RoomEntry a, RoomEntry b)
+        {
+            return string.Compare(a.roomCode, b.roomCode, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

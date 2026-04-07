@@ -85,6 +85,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T047 | Room bookmarking / favourites | 55 | **Done** 2026-04-07 | SaveData.favouriteRoomCodes; FavouriteRoomsSO SO (AddFavourite/RemoveFavourite/IsFavourite O(1)/Clear/LoadFromData/BuildData + auto-persist via SaveSystem); FavouriteButtonUI MB (BattleRobots.UI, star toggle, colour feedback); RoomEntryUI extended Setup overload accepting FavouriteRoomsSO; FavouriteRoomsTests.cs 21 EditMode cases. |
 | T048 | Room history (recently-visited rooms) | 50 | **Done** 2026-04-07 | SaveData.recentRoomCodes; RecentRoomsSO SO (ring-buffer cap 10, newest-first, RecordVisit dedup+prepend, Clear, LoadFromData/BuildData, auto-persist, VoidGameEvent); RecentRoomsUI MB (BattleRobots.UI, OnEnable rebuild, empty-state, VoidGameEventListener wiring); RecentRoomEntryUI MB (room code label + join button); NetworkEventBridge extended with _recentRooms field + RecordVisit on OnRoomJoined; RecentRoomsTests.cs 18 EditMode cases. |
 | T049 | Room search / filter by code prefix | 50 | **Done** 2026-04-07 | RoomListSO.GetFilteredRooms(prefix) (case-insensitive, null/empty = all); RoomListUI.ApplyFilter(prefix) + Rebuild uses filtered list; RoomSearchUI MB (InputField onValueChanged → ApplyFilter, clear button, OnDisable resets filter); RoomSearchTests.cs 10 EditMode cases. |
+| T050 | Room sort order (player count desc / room code asc) | 45 | **Done** 2026-04-07 | RoomSortMode enum (Core); RoomListSO.GetSortedFilteredRooms(prefix,sort); RoomListUI.ApplySortMode(mode); RoomSortUI MB (3-button group, active highlight); GetFilteredRooms backward-compat wrapper; RoomSortTests.cs 10 EditMode cases |
 
 ---
 
@@ -92,7 +93,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T050 — (next task TBD) | PM Agent | 2026-04-07 | See Session Handoff |
+| T051 — (next task TBD) | PM Agent | 2026-04-07 | See Session Handoff |
 
 ---
 
@@ -143,6 +144,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T041 — Player connection status badge | 2026-04-06 | ConnectionBadgeUI (BattleRobots.UI): Image badge + Text label; CurrentState property; OnDisconnected/OnConnecting/OnConnected/OnMatchJoined/OnReconnecting callbacks; colour mapping (grey/yellow/green/darker-green/orange); no Update. ConnectionStateLabel (BattleRobots.UI): Text label; CurrentState + CurrentText properties; same 5 callbacks; configurable state strings. ConnectionBadgeTests.cs: 10 EditMode cases covering default state, state transitions (Connecting/Connected/InMatch/Reconnecting/Disconnected), and label text contracts. EditMode asmdef extended with BattleRobots.UI reference. |
 | T042 — Network room-list browser | 2026-04-06 | RoomEntry [Serializable] struct (roomCode, playerCount, constructor). RoomListSO (Core SO): List<RoomEntry> with SetRooms/Clear mutators; IReadOnlyList<RoomEntry> Rooms; Count; VoidGameEvent _onRoomsUpdated fires on every mutation; null-safe. RoomEntryUI (UI MB): row prefab component; Setup(RoomEntry, Action<string>) pushes data in; Join Button fires callback with roomCode; interactable=false on empty code; Awake AddListener, OnDestroy cleanup. RoomListUI (UI MB): rebuilds on OnRoomsUpdated() (wired via sibling VoidGameEventListener); instantiates RoomEntryUI prefab per room; HandleJoinRequested delegates to NetworkEventBridge.BeginJoin; empty-state label toggled; optional Refresh button; OnEnable rebuilds. RoomListTests.cs: 12 EditMode cases (DefaultState×2, SetRooms×5, Clear×2, RoomEntry struct×2). Scene .unity wiring deferred to Editor session. |
 | T044 — Network room capacity | 2026-04-06 | RoomEntry.maxPlayers field + IsFull property + 3-arg constructor (default maxPlayers=2). INetworkAdapter.Host(string,int) overload. StubNetworkAdapter: s_ActiveRooms changed from HashSet to Dictionary<string,RoomEntry>; Host(string,int) stores capacity (playerCount=1); Join checks IsFull → fires OnRoomJoinFailed when full; RequestRoomList returns full RoomEntry from dict. NetworkEventBridge.BeginHost(string,int) overload; BeginHost(string) delegates to it with maxPlayers=2. RoomEntryUI: _playerCountLabel shows "N/MAX"; optional _fullBadge GO toggled on IsFull; _joinButton disabled when full. RoomListUI: _filterFullRooms bool toggle; Rebuild skips IsFull entries when enabled. RoomCapacityTests.cs: 10 EditMode cases. |
+| T050 — Room sort order | 2026-04-07 | RoomSortMode enum (None/ByPlayerCountDesc/ByRoomCodeAsc) in RoomListSO.cs. GetSortedFilteredRooms(prefix,sort): filter then in-place List.Sort with static comparers. GetFilteredRooms kept as backward-compat wrapper (None sort). RoomListUI._sortMode field + ApplySortMode(mode) public API; Rebuild calls GetSortedFilteredRooms. RoomSortUI (BattleRobots.UI): 3-button group, SetSort(mode), Image tint highlights, no Update. RoomSortTests.cs: 10 EditMode cases. |
 
 ---
 
@@ -184,32 +186,29 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-07 | PM Agent | Session 32: T046 Room join-failure UI feedback. StringGameEvent (Core SO, GameEvent<string> subclass, CreateAssetMenu). StringGameEventListener (Core MB, GameEventListener<string> shim). JoinFailureUI (BattleRobots.UI MB): ShowFailure(string)/Hide() API; IsVisible+LastReason observable properties; null-safe Text/_panel/_closeButton; Awake hides panel + wires close button; OnDestroy cleanup. NetworkEventBridge: _onRoomJoinFailedChannel StringGameEvent field added; RegisterAdapterCallbacks OnRoomJoinFailed lambda now raises channel after logging. JoinFailureTests.cs: 12 EditMode cases — StringGameEvent no-listener/null/empty raises; JoinFailureUI default-state/ShowFailure/Hide/empty-reason/multi-call; integration pattern (adapter→UI direct wiring, null-UI guard). |
 | 2026-04-07 | PM Agent | Session 35: T049 Room search/filter by code prefix. RoomListSO.GetFilteredRooms(string prefix): case-insensitive StartsWith, null/empty = all rooms, skips null codes. RoomListUI: _searchPrefix field + ApplyFilter(string) public method (stores prefix, calls Rebuild); Rebuild updated to call GetFilteredRooms(_searchPrefix) instead of accessing Rooms directly; uses System.Array.Empty fallback when _roomList null. RoomSearchUI (BattleRobots.UI MB): _searchInput InputField onValueChanged → ApplyFilter, _clearButton onClick → ClearFilter, _roomListUI RoomListUI ref; OnDisable resets filter to empty string; OnDestroy removes listeners; ClearFilter() public for external panel-open wiring; no Update. RoomSearchTests.cs: 10 EditMode cases (null prefix, empty prefix, matching prefix, single-char, full-code, no-match, lower-case input, upper-case input, empty room list, null code skipped). |
 | 2026-04-07 | PM Agent | Session 34: T048 Room history. SaveData.recentRoomCodes List<string> added (MatchRecord.cs). RecentRoomsSO (Core SO): ring-buffer cap=10, RecordVisit (dedup+prepend+trim), Clear, LoadFromData (skips null/empty, trims to cap), BuildData, PersistRecent, VoidGameEvent _onRecentRoomsChanged. RecentRoomEntryUI (BattleRobots.UI MB): room-code Text + Join Button, Setup(string,Action), Awake/OnDestroy listener lifecycle. RecentRoomsUI (BattleRobots.UI MB): OnEnable Rebuild, OnRecentRoomsUpdated for VoidGameEventListener wiring, empty-state label toggle, delegates to NetworkEventBridge.BeginJoin. NetworkEventBridge: _recentRooms RecentRoomsSO field; RegisterAdapterCallbacks OnRoomJoined now calls RecordVisit(roomCode). RecentRoomsTests.cs: 18 EditMode cases (default state ×3, RecordVisit ×7, Clear ×2, LoadFromData ×4, BuildData round-trip, SaveData field). |
+| 2026-04-07 | PM Agent | Session 36: T050 Room sort order. RoomSortMode enum (None/ByPlayerCountDesc/ByRoomCodeAsc) added to RoomListSO.cs. RoomListSO.GetSortedFilteredRooms(string prefix, RoomSortMode sort): filter-then-sort in one pass; static ComparByPlayerCountDesc + CompareByRoomCodeAsc delegates (no closure alloc). GetFilteredRooms kept as backward-compat wrapper calling GetSortedFilteredRooms(prefix, None). RoomListUI: _sortMode field; ApplySortMode(mode) public method (stores mode, Rebuild); Rebuild now calls GetSortedFilteredRooms(_searchPrefix, _sortMode). RoomSortUI (BattleRobots.UI MB): 3 serialized Button fields (None/ByPlayerCount/ByRoomCode), CurrentSort property, SetSort(mode) wires ApplySortMode + updates Image tint highlights; Awake AddListener, OnDestroy cleanup, OnEnable RefreshHighlights; no Update. RoomSortTests.cs: 10 EditMode cases covering None/ByPlayerCountDesc/ByRoomCodeAsc in isolation, filter+sort combined (AB prefix), case-insensitive code sort, empty list, no-match prefix. |
 | 2026-04-07 | PM Agent | Session 33: T047 Room bookmarking/favourites. SaveData.favouriteRoomCodes List<string> added to MatchRecord.cs. FavouriteRoomsSO (Core SO): internal List+HashSet dual-store (O(1) IsFavourite, insertion-order Favourites); AddFavourite/RemoveFavourite (idempotent, null-safe, auto-persist); Clear (skips if empty); LoadFromData (de-duplicates, skips null/empty); BuildData; PersistFavourites → SaveSystem.Load+mutate+Save. FavouriteButtonUI (BattleRobots.UI MB): Setup(FavouriteRoomsSO, roomCode); ToggleFavourite toggles add/remove + Refresh; IsFavourite observable property; star Image colour (gold/grey); Button interactable guard; Awake/OnDestroy listener lifecycle. RoomEntryUI: _favouriteButton field added; original Setup delegates to new overload; Setup(RoomEntry, Action<string>, FavouriteRoomsSO) shows/hides _favouriteButton and calls its Setup. FavouriteRoomsTests.cs: 21 EditMode cases (default state ×3, AddFavourite ×6, RemoveFavourite ×4, Clear ×2, LoadFromData ×4, BuildData round-trip, SaveData field). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T049 — Room search / filter by code prefix (RoomListSO.GetFilteredRooms, RoomListUI.ApplyFilter, RoomSearchUI MB, 10 EditMode tests).  
-**Milestone status:** M1–M6 Done. T001–T049 Done.
+**Last completed:** T050 — Room sort order (RoomSortMode enum, GetSortedFilteredRooms, RoomListUI.ApplySortMode, RoomSortUI, 10 EditMode tests).  
+**Milestone status:** M1–M6 Done. T001–T050 Done.
 
-**Next action:** T050 — Suggested: Room sort order (sort room list by player count descending, or by room code ascending). Deliverables:
-  - `RoomSortMode` enum (BattleRobots.Core, in RoomListSO.cs): None, ByPlayerCountDesc, ByRoomCodeAsc.
-  - `RoomListSO.GetSortedFilteredRooms(string prefix, RoomSortMode sort)` — combines prefix filter + sort in one pass; replaces `GetFilteredRooms`.
-  - `RoomListUI.ApplySortMode(RoomSortMode mode)` public method — stores sort mode, calls Rebuild; `ApplyFilter` calls Rebuild with current sort mode.
-  - `RoomSortUI.cs` (BattleRobots.UI MB) — toggle/button group for sort options, wired to `RoomListUI.ApplySortMode`.
-  - 8+ EditMode tests for sort logic (`RoomListSO`).
+**Next action:** T051 — Suggested: Room entry row improvements (e.g., player-count progress bar or "slots remaining" indicator in RoomEntryUI; or room age/timestamp display). Alternative: PlayMode tests for the room browser pipeline (RoomListUI.Rebuild + filter + sort integration).
 
 **Blockers:** None.  
 **Architecture notes:**
-  - T049 is fully additive — `RoomListUI._searchPrefix` defaults to `string.Empty`, so existing scenes without `RoomSearchUI` wired show all rooms as before.
-  - `RoomSearchUI.ApplyFilter` is called on every keystroke; Rebuild should remain cheap (no Instantiate when filter yields zero rows, only label toggle).
-  - `RecentRoomsSO.PersistRecent()` loads the whole save file per mutation — same low-frequency trade-off as FavouriteRoomsSO.
-  - GameBootstrapper should be extended to call `RecentRoomsSO.LoadFromData(save.recentRoomCodes)` at startup (deferred to Editor session).
+  - T050 is fully additive — `RoomListUI._sortMode` defaults to `RoomSortMode.None`, so existing scenes without `RoomSortUI` wired preserve original network order.
+  - `GetFilteredRooms` kept as backward-compat wrapper; existing tests all pass unchanged.
+  - `RoomSortUI.SetSort()` is public — can be called programmatically to pre-select a sort order when opening the panel.
   - Deferred Inspector wiring (carry-forward):
-      □ GameBootstrapper._recentRooms → RecentRoomsSO asset + LoadFromData call (NEW T048)
-      □ NetworkEventBridge._recentRooms → RecentRoomsSO asset (NEW T048)
-      □ RecentRoomsUI._recentRooms + _bridge + _rowPrefab + _scrollContent (NEW T048)
+      □ RoomSortUI._roomListUI → RoomListUI on the same panel
+      □ RoomSortUI._noneButton / _byPlayerCountButton / _byRoomCodeButton → Button references
+      □ GameBootstrapper._recentRooms → RecentRoomsSO asset + LoadFromData call (T048)
+      □ NetworkEventBridge._recentRooms → RecentRoomsSO asset (T048)
+      □ RecentRoomsUI._recentRooms + _bridge + _rowPrefab + _scrollContent (T048)
       □ GameBootstrapper._favouriteRooms → FavouriteRoomsSO asset + LoadFromData call
       □ RoomListUI: pass FavouriteRoomsSO to RoomEntryUI.Setup(entry, onJoin, favourites)
       □ NetworkEventBridge._roomList → RoomListSO asset

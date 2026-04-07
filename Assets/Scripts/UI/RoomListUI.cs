@@ -78,6 +78,9 @@ namespace BattleRobots.UI
         // Active search prefix. Empty string = show all rooms.
         private string _searchPrefix = string.Empty;
 
+        // Active sort mode. Defaults to None (original network order).
+        private RoomSortMode _sortMode = RoomSortMode.None;
+
         // ── Lifecycle ─────────────────────────────────────────────────────────
 
         private void Awake()
@@ -126,6 +129,19 @@ namespace BattleRobots.UI
             Rebuild();
         }
 
+        /// <summary>
+        /// Changes the sort order of the displayed room list and rebuilds.
+        /// The current search prefix is preserved across sort-mode changes.
+        ///
+        /// Called by <see cref="RoomSortUI"/> when the player selects a sort option.
+        /// No Update cost — invoked only on user interaction.
+        /// </summary>
+        public void ApplySortMode(RoomSortMode mode)
+        {
+            _sortMode = mode;
+            Rebuild();
+        }
+
         // ── Internal ──────────────────────────────────────────────────────────
 
         /// <summary>
@@ -142,9 +158,9 @@ namespace BattleRobots.UI
             }
             _rows.Clear();
 
-            // Apply search prefix filter. Empty prefix returns the full list.
+            // Apply search prefix filter + sort. Empty prefix returns the full list.
             IReadOnlyList<RoomEntry> rooms = _roomList != null
-                ? _roomList.GetFilteredRooms(_searchPrefix)
+                ? _roomList.GetSortedFilteredRooms(_searchPrefix, _sortMode)
                 : System.Array.Empty<RoomEntry>();
 
             bool hasData = rooms.Count > 0;
