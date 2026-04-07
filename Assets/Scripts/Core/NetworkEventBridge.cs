@@ -48,6 +48,12 @@ namespace BattleRobots.Core
                  "RequestRoomList() will push adapter results into this SO so RoomListUI updates automatically.")]
         [SerializeField] private RoomListSO _roomList;
 
+        [Header("Failure Feedback")]
+        [Tooltip("(Optional) SO event channel raised when the adapter fires OnRoomJoinFailed. " +
+                 "Wire a StringGameEventListener on the JoinFailureUI GameObject to this channel " +
+                 "and point its Response at JoinFailureUI.ShowFailure.")]
+        [SerializeField] private StringGameEvent _onRoomJoinFailedChannel;
+
         // ── Runtime adapter ───────────────────────────────────────────────────
 
         private INetworkAdapter _adapter;
@@ -277,7 +283,9 @@ namespace BattleRobots.Core
             adapter.OnRoomJoinFailed = (reason) =>
             {
                 Debug.LogWarning($"[NetworkEventBridge] Room join failed: {reason}");
-                // Stay in Connected state; UI can show the error via the session SO.
+                // Raise the SO channel so JoinFailureUI (or any listener) can respond.
+                _onRoomJoinFailedChannel?.Raise(reason);
+                // Stay in Connected state; player may retry with a different room.
             };
 
             adapter.OnMatchStateReceived = (payload) =>

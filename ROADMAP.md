@@ -81,6 +81,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T043 | Room-list refresh polling (adapter RequestRoomList, bridge wiring, RoomListRefreshButton) | 75 | **Done** 2026-04-06 | INetworkAdapter.RequestRoomList + OnRoomListReceived; StubNetworkAdapter; NetworkEventBridge._roomList + RequestRoomList(); RoomListRefreshButton UI MB; 10 EditMode tests |
 | T044 | Network room capacity (maxPlayers, full-room filter, capacity label) | 70 | **Done** 2026-04-06 | RoomEntry.maxPlayers + IsFull; INetworkAdapter.Host(string,int); StubNetworkAdapter Dictionary + capacity-aware Join; NetworkEventBridge.BeginHost(string,int); RoomEntryUI "N/MAX" label + FULL badge + disabled join; RoomListUI _filterFullRooms toggle; 10 EditMode tests |
 | T045 | Room password / private rooms | 65 | **Done** 2026-04-06 | RoomEntry.isPrivate bool; INetworkAdapter Host(string,int,bool,string) + Join(string,string); StubNetworkAdapter s_RoomPasswords dict + password verification; ClearRooms clears passwords; NetworkEventBridge BeginHost/BeginJoin overloads; RoomEntryUI _privateBadge; RoomListUI _hidePrivateRooms + _passwordInputField; 12 EditMode tests |
+| T046 | Room join-failure UI feedback | 60 | **Done** 2026-04-07 | StringGameEvent SO channel + StringGameEventListener MB (Core). JoinFailureUI MB (BattleRobots.UI): ShowFailure(string)/Hide(), IsVisible+LastReason testable properties, null-safe Text/_panel/_closeButton. NetworkEventBridge extended: _onRoomJoinFailedChannel raises StringGameEvent on adapter OnRoomJoinFailed. JoinFailureTests.cs: 12 EditMode cases. |
 
 ---
 
@@ -88,7 +89,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T046 — (next task TBD) | PM Agent | 2026-04-06 | See Session Handoff |
+| T047 — (next task TBD) | PM Agent | 2026-04-07 | See Session Handoff |
 
 ---
 
@@ -177,22 +178,21 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 29: T043 Room-list refresh polling. INetworkAdapter: void RequestRoomList() + Action<List<RoomEntry>> OnRoomListReceived (using System.Collections.Generic added). StubNetworkAdapter: OnRoomListReceived property, RequestRoomListCallCount, RequestRoomList() converts s_ActiveRooms HashSet→List<RoomEntry> (playerCount=1 per stub convention) and invokes callback. NetworkEventBridge: RoomListSO _roomList field; RequestRoomList() delegates to adapter; RegisterAdapterCallbacks wires OnRoomListReceived → _roomList?.SetRooms(). RoomListRefreshButton (BattleRobots.UI): [RequireComponent(typeof(Button))], Awake/OnDestroy listener lifecycle, OnRefreshClicked→_bridge.RequestRoomList(), null guards. RoomListRefreshTests.cs: 10 EditMode cases (stub empty/1-room/multi-room/call-count/null-callback/code-match; bridge SO update; null SO guard; SetAdapter re-wire; interface property round-trip). |
 | 2026-04-06 | PM Agent | Session 30: T044 Network room capacity. RoomEntry struct extended: maxPlayers field + IsFull computed property + 3-arg constructor (default maxPlayers=2, clamps ≤0 to 2). INetworkAdapter: Host(string,int) overload added. StubNetworkAdapter: s_ActiveRooms converted from HashSet<string> to Dictionary<string,RoomEntry>; Host(string) delegates to Host(string,2); Host(string,int) stores RoomEntry(code,1,cap); Join checks IsFull → OnRoomJoinFailed("...full...") when room at capacity, else increments playerCount in dict + fires OnRoomJoined; RequestRoomList returns kvp.Value list preserving full RoomEntry. NetworkEventBridge: BeginHost(string) delegates to BeginHost(string,2); BeginHost(string,int) added, calls adapter.Host(roomCode,maxPlayers). RoomEntryUI: _playerCountLabel shows "N/MAX"; optional _fullBadge GameObject toggled on IsFull; _joinButton disabled when full or empty code. RoomListUI: _filterFullRooms bool SerializeField; Rebuild skips entry when _filterFullRooms && entry.IsFull. RoomCapacityTests.cs: 10 EditMode cases (constructor/default/IsFull×2; capacity in list; full-join rejected; non-full-join succeeds; playerCount increment; BeginHost capacity contract; SetRooms IsFull in SO). |
 | 2026-04-06 | PM Agent | Session 31: T045 Room password / private rooms. RoomEntry.isPrivate bool field (4-arg constructor, defaults false). INetworkAdapter: Host(string,int,bool,string) + Join(string,string) overloads. StubNetworkAdapter: s_RoomPasswords static dict stores server-side passwords; ClearRooms() clears both dicts; Host delegates chain; Join(string) delegates to Join(string,Empty); Join(string,string) checks not-found → full → private-password in priority order. NetworkEventBridge: BeginHost(string,int,bool,string) + BeginJoin(string,string) overloads; existing single/dual-arg overloads delegate down. RoomEntryUI: _privateBadge optional GO toggled on entry.isPrivate. RoomListUI: _hidePrivateRooms bool toggle + _passwordInputField optional InputField; HandleJoinRequested passes password to BeginJoin(code,password). RoomPrivacyTests.cs: 12 EditMode cases. |
+| 2026-04-07 | PM Agent | Session 32: T046 Room join-failure UI feedback. StringGameEvent (Core SO, GameEvent<string> subclass, CreateAssetMenu). StringGameEventListener (Core MB, GameEventListener<string> shim). JoinFailureUI (BattleRobots.UI MB): ShowFailure(string)/Hide() API; IsVisible+LastReason observable properties; null-safe Text/_panel/_closeButton; Awake hides panel + wires close button; OnDestroy cleanup. NetworkEventBridge: _onRoomJoinFailedChannel StringGameEvent field added; RegisterAdapterCallbacks OnRoomJoinFailed lambda now raises channel after logging. JoinFailureTests.cs: 12 EditMode cases — StringGameEvent no-listener/null/empty raises; JoinFailureUI default-state/ShowFailure/Hide/empty-reason/multi-call; integration pattern (adapter→UI direct wiring, null-UI guard). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T045 — Room password / private rooms (RoomEntry.isPrivate; INetworkAdapter.Host+Join with password overloads; StubNetworkAdapter server-side s_RoomPasswords dict; NetworkEventBridge BeginHost/BeginJoin overloads; RoomEntryUI _privateBadge; RoomListUI _hidePrivateRooms + _passwordInputField; 12 EditMode tests).  
-**Milestone status:** M1–M6 Done. T001–T045 Done.
+**Last completed:** T046 — Room join-failure UI feedback (StringGameEvent + StringGameEventListener Core event channel; JoinFailureUI BattleRobots.UI MB; NetworkEventBridge._onRoomJoinFailedChannel wired in RegisterAdapterCallbacks; 12 EditMode tests in JoinFailureTests.cs).  
+**Milestone status:** M1–M6 Done. T001–T046 Done.
 
-**Next action:** T046 — Suggested: Room join-failure UI feedback (OnRoomJoinFailed → show error panel/label). Deliverables:
-  - `JoinFailureUI.cs` (BattleRobots.UI MB): Text label showing the failure reason; shown/hidden via VoidGameEventListener + a string SO event channel.
-  - `StringGameEvent.cs` (Core): typed SO event channel for string messages.
-  - `StringGameEventListener.cs` (Core): typed MB listener.
-  - Wire NetworkEventBridge.OnRoomJoinFailed → StringGameEvent → JoinFailureUI.
-  - 8+ EditMode tests.
-
-Alternatively: T046 — Room bookmarking / favourites (persist favourite room codes to SaveSystem).
+**Next action:** T047 — Suggested: Room bookmarking / favourites. Persist a list of favourite room codes in SaveSystem. Deliverables:
+  - Add `List<string> favouriteRoomCodes` to `SaveData` (in MatchRecord.cs).
+  - `FavouriteRoomsSO.cs` (Core SO): `IReadOnlyList<string> Favourites`; `AddFavourite(string)`/`RemoveFavourite(string)`/`IsFavourite(string)`/`Clear()`; fires `VoidGameEvent` on change; persists through `SaveSystem` on each mutation.
+  - `FavouriteButtonUI.cs` (BattleRobots.UI MB): star toggle button that calls AddFavourite/RemoveFavourite; updates visual state via IsFavourite.
+  - Wire `RoomEntryUI` to accept an optional `FavouriteRoomsSO` and show/update the favourite button per row.
+  - 10+ EditMode tests.
 
 **Blockers:** None.  
 **Architecture notes:**
