@@ -49,6 +49,10 @@ namespace BattleRobots.Core
                  "0 means unknown / not yet measured. Negative values are clamped to 0.")]
         public int pingMs;
 
+        [Tooltip("Display name of the player who created (hosts) this room. " +
+                 "Empty string when the host name is not provided.")]
+        public string hostName;
+
         /// <summary>
         /// Convenience constructor for use in tests and the stub adapter.
         /// </summary>
@@ -57,14 +61,16 @@ namespace BattleRobots.Core
         /// <param name="maxPlayers">Capacity cap. Defaults to 2 (standard 1v1 match).</param>
         /// <param name="isPrivate">Whether a password is required to join. Defaults to false.</param>
         /// <param name="pingMs">Round-trip latency in ms to the room host. 0 = unknown.</param>
+        /// <param name="hostName">Display name of the room host. Defaults to empty string.</param>
         public RoomEntry(string roomCode, int playerCount, int maxPlayers = 2,
-                         bool isPrivate = false, int pingMs = 0)
+                         bool isPrivate = false, int pingMs = 0, string hostName = "")
         {
             this.roomCode    = roomCode    ?? string.Empty;
             this.playerCount = playerCount;
             this.maxPlayers  = maxPlayers > 0 ? maxPlayers : 2;
             this.isPrivate   = isPrivate;
             this.pingMs      = Mathf.Max(0, pingMs);
+            this.hostName    = hostName ?? string.Empty;
         }
 
         /// <summary>

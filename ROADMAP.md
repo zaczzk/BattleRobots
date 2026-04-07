@@ -90,6 +90,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T052 | RoomEntryUI slots-remaining label + RoomListUI favourites forwarding | 65 | **Done** 2026-04-07 | RoomEntry.SlotsRemaining computed property (0 when full/maxPlayers≤0); _slotsRemainingLabel on RoomEntryUI; _favouriteRoomsSO on RoomListUI forwarded in Rebuild; 9 EditMode tests |
 | T053 | RoomEntryUI copy-to-clipboard button | 60 | **Done** 2026-04-07 | _copyButton + _copiedFeedbackLabel; HandleCopyClicked (GUIUtility.systemCopyBuffer, LastCopiedCode, "Copied!" coroutine 1.5 s); Setup wires interactable; 8 EditMode tests |
 | T054 | RoomEntryUI ping/latency badge | 55 | **Done** 2026-04-07 | RoomEntry.pingMs field (clamped ≥0, optional 5th ctor arg); StubNetworkAdapter.SetRoomPing + s_RoomPings dict + ClearRooms clears pings; RoomEntryUI._pingBadge (Image colour-coded) + _pingLabel (Text "N ms", empty when 0); GetPingColor public static (grey≤0 / green≤80 / yellow≤150 / red≥151); ApplyPingBadge private; 12 EditMode tests |
+| T055 | RoomEntryUI host-name label | 50 | **Done** 2026-04-07 | RoomEntry.hostName string field (optional 6th ctor arg, null→empty); StubNetworkAdapter.HostPlayerName property (default "Host", stored per room in Host()); Join preserves hostName; RoomEntryUI._hostNameLabel optional Text wired in Setup; 10 EditMode tests (RoomHostNameTests.cs) |
 
 ---
 
@@ -97,7 +98,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T055 — (next pending task TBD) | PM Agent | — | Identify next backlog item |
+| T056 — (next pending task TBD) | PM Agent | — | See Session Handoff for next action |
 
 ---
 
@@ -198,22 +199,24 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-07 | PM Agent | Session 33: T047 Room bookmarking/favourites. SaveData.favouriteRoomCodes List<string> added to MatchRecord.cs. FavouriteRoomsSO (Core SO): internal List+HashSet dual-store (O(1) IsFavourite, insertion-order Favourites); AddFavourite/RemoveFavourite (idempotent, null-safe, auto-persist); Clear (skips if empty); LoadFromData (de-duplicates, skips null/empty); BuildData; PersistFavourites → SaveSystem.Load+mutate+Save. FavouriteButtonUI (BattleRobots.UI MB): Setup(FavouriteRoomsSO, roomCode); ToggleFavourite toggles add/remove + Refresh; IsFavourite observable property; star Image colour (gold/grey); Button interactable guard; Awake/OnDestroy listener lifecycle. RoomEntryUI: _favouriteButton field added; original Setup delegates to new overload; Setup(RoomEntry, Action<string>, FavouriteRoomsSO) shows/hides _favouriteButton and calls its Setup. FavouriteRoomsTests.cs: 21 EditMode cases (default state ×3, AddFavourite ×6, RemoveFavourite ×4, Clear ×2, LoadFromData ×4, BuildData round-trip, SaveData field). |
 | 2026-04-07 | PM Agent | Session 39: T053 Room-code copy-to-clipboard. RoomEntryUI extended: _copyButton (Button) wired in Awake/OnDestroy, _copiedFeedbackLabel (Text) shows "Copied!" on click, HandleCopyClicked() public (GUIUtility.systemCopyBuffer = _roomCode, LastCopiedCode observable property, starts ClearCopiedFeedback coroutine that reverts label after 1.5 s; no-op on empty code). Setup sets _copyButton.interactable based on code presence. RoomCopyTests.cs: 8 EditMode cases (LastCopiedCode default, systemCopyBuffer set, LastCopiedCode updated, feedback label "Copied!", empty-code no-copy, null label no-throw, empty-code button not interactable, valid-code button interactable). Fields injected via reflection to bypass Inspector. |
 | 2026-04-07 | PM Agent | Session 40: T054 Room ping/latency badge. RoomEntry.pingMs int field (Tooltip; Mathf.Max(0,…) clamp in 5-arg constructor; backward-compatible — 4-arg ctor unchanged). StubNetworkAdapter: s_RoomPings static dict; SetRoomPing(string,int) public static; ClearRooms() clears pings; RequestRoomList populates entry.pingMs from dict. RoomEntryUI: _pingBadge (Image, optional) + _pingLabel (Text, optional) Inspector fields; ApplyPingBadge(int) private; GetPingColor(int) public static (grey≤0/green≤80/yellow≤150/red≥151); ApplyPingBadge called at end of Setup overload. RoomPingBadgeTests.cs: 12 EditMode cases (RoomEntry default/ctor/clamp; GetPingColor ×5; Setup badge color; null badge no-throw; StubSetRoomPing→RequestRoomList; ClearRooms clears pings). |
+| 2026-04-07 | PM Agent | Session 41: T055 RoomEntryUI host-name label. RoomEntry.hostName string field (optional 6th ctor arg, null→empty guard). StubNetworkAdapter.HostPlayerName string property (default "Host"): stored in RoomEntry on Host(); Join preserves hostName on playerCount increment. RoomEntryUI._hostNameLabel optional Text SerializeField wired in Setup (empty when hostName absent). RoomHostNameTests.cs: 10 EditMode cases (default/ctor/null-coercion; HostPlayerName default; Host stores name; RequestRoomList returns name; two rooms with different names; ClearRooms resets; UI Setup; null label no-throw). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T054 — RoomEntryUI ping/latency badge.  
-**Milestone status:** M1–M6 Done. T001–T054 Done.
+**Last completed:** T055 — RoomEntryUI host-name label.  
+**Milestone status:** M1–M6 Done. T001–T055 Done.
 
-**Next action:** T055 — Suggest: `RoomEntryUI` host-name label — show the host's display name alongside the room code. Add `hostName string` to `RoomEntry`, populate in StubNetworkAdapter.Host, display in RoomEntryUI with optional Text field. ~10 EditMode tests.  
-  Alternatively, tackle any deferred Inspector-wiring item below.
+**Next action:** T056 — Suggest: `RoomEntryUI` room-age / created-time display — add `createdAt long` (UTC ticks) to `RoomEntry`, compute age string ("Just now" / "Xm ago"), display in optional Text field. ~8 EditMode tests.  
+  Alternatively: `RoomListUI` section headers grouping rooms by ping tier (Excellent/Good/High), or tackle any deferred Inspector-wiring item below.
 
 **Blockers:** None.  
 **Architecture notes:**
-  - T054: `GetPingColor` is public static (no MB instantiation required in tests). `ApplyPingBadge` is private — tested indirectly via `Setup` + badge Image.color assertion. `RoomEntry.pingMs` is a plain serialised field so existing struct-literal tests still compile (field defaults to 0).
-  - Ping thresholds (grey/green/yellow/red) intentionally match `PingDisplayUI.GetPingColor` for visual consistency.
+  - T055: `RoomEntry.hostName` is optional 6th ctor arg (default `""`); existing tests using 3–5 arg constructors compile unchanged. `StubNetworkAdapter.HostPlayerName` is an instance property (default `"Host"`), not static — each stub instance can simulate a different host. `Join(string,string)` now preserves `hostName` when incrementing `playerCount`.
+  - T054: `GetPingColor` is public static (no MB instantiation required in tests). `ApplyPingBadge` is private — tested indirectly via `Setup` + badge Image.color assertion.
   - Deferred Inspector wiring (carry-forward):
+      □ RoomEntryUI._hostNameLabel → Text child GO in prefab  ← T055 Done (wire in prefab)
       □ RoomEntryUI._pingBadge → Image child GO + _pingLabel → Text child GO in prefab  ← T054 Done (wire in prefab)
       □ RoomEntryUI._copyButton + _copiedFeedbackLabel → Button + Text in prefab  ← T053 Done (wire in prefab)
       □ RoomSortUI._roomListUI → RoomListUI on the same panel

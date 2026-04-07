@@ -72,6 +72,16 @@ namespace BattleRobots.Core
             s_RoomPings.Clear();
         }
 
+        // ── Host identity ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Display name stored as <see cref="RoomEntry.hostName"/> when
+        /// <see cref="Host(string)"/> (or any overload) is called on this instance.
+        /// Defaults to <c>"Host"</c>. Tests can change this between Host calls to
+        /// simulate different room owners.
+        /// </summary>
+        public string HostPlayerName { get; set; } = "Host";
+
         /// <summary>
         /// Assign a simulated latency to an existing room so that the next
         /// <see cref="RequestRoomList"/> call returns it in <see cref="RoomEntry.pingMs"/>.
@@ -178,7 +188,7 @@ namespace BattleRobots.Core
 
             LastRoomCode        = code;
             s_ActiveRooms[code] = new RoomEntry(code, playerCount: 1, maxPlayers: cap,
-                                                isPrivate: isPrivate);
+                                                isPrivate: isPrivate, hostName: HostPlayerName);
 
             if (isPrivate && !string.IsNullOrEmpty(password))
                 s_RoomPasswords[code] = password;
@@ -243,8 +253,9 @@ namespace BattleRobots.Core
             }
 
             // Successful join — increment player count and write back (struct copy).
+            // Preserve hostName so RequestRoomList continues to return it correctly.
             s_ActiveRooms[code] = new RoomEntry(code, room.playerCount + 1, room.maxPlayers,
-                                                room.isPrivate);
+                                                room.isPrivate, hostName: room.hostName);
             OnRoomJoined?.Invoke(code);
         }
 

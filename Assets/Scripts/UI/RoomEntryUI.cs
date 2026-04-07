@@ -29,6 +29,7 @@ namespace BattleRobots.UI
     ///   □ _copiedFeedbackLabel  → (optional) Text showing "Copied!" for 1.5 s after copy
     ///   □ _pingBadge            → (optional) Image coloured by latency (grey/green/yellow/red)
     ///   □ _pingLabel            → (optional) Text showing "N ms" (empty when pingMs = 0)
+    ///   □ _hostNameLabel        → (optional) Text showing the host's display name
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RoomEntryUI : MonoBehaviour
@@ -79,6 +80,11 @@ namespace BattleRobots.UI
         [Tooltip("(Optional) Text label showing the numeric latency, e.g. '42 ms'. " +
                  "Empty when pingMs is 0 (unknown).")]
         [SerializeField] private Text _pingLabel;
+
+        [Header("Host Name (optional)")]
+        [Tooltip("(Optional) Text label showing the display name of the room host. " +
+                 "Hidden (empty string) when hostName is not provided.")]
+        [SerializeField] private Text _hostNameLabel;
 
         // ── Runtime state ─────────────────────────────────────────────────────
 
@@ -176,6 +182,10 @@ namespace BattleRobots.UI
                 if (favourites != null)
                     _favouriteButton.Setup(favourites, _roomCode);
             }
+
+            // Host name label: show the room owner's display name, or hide when absent.
+            if (_hostNameLabel != null)
+                _hostNameLabel.text = entry.hostName ?? string.Empty;
 
             // Apply the ping latency badge (colour dot + numeric label).
             ApplyPingBadge(entry.pingMs);
