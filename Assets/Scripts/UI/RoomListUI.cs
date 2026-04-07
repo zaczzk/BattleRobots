@@ -75,6 +75,9 @@ namespace BattleRobots.UI
         // Pool of active row instances; cleared and rebuilt on each Rebuild call.
         private readonly List<RoomEntryUI> _rows = new List<RoomEntryUI>();
 
+        // Active search prefix. Empty string = show all rooms.
+        private string _searchPrefix = string.Empty;
+
         // ── Lifecycle ─────────────────────────────────────────────────────────
 
         private void Awake()
@@ -107,6 +110,22 @@ namespace BattleRobots.UI
             Rebuild();
         }
 
+        /// <summary>
+        /// Applies a case-insensitive prefix filter to the room list and rebuilds.
+        /// Pass <c>null</c> or an empty string to clear the filter and show all rooms.
+        ///
+        /// Called by <see cref="RoomSearchUI"/> whenever the InputField text changes.
+        /// No Update cost — invoked only on user interaction.
+        /// </summary>
+        /// <param name="prefix">
+        /// The leading characters to match against <see cref="RoomEntry.roomCode"/>.
+        /// </param>
+        public void ApplyFilter(string prefix)
+        {
+            _searchPrefix = prefix ?? string.Empty;
+            Rebuild();
+        }
+
         // ── Internal ──────────────────────────────────────────────────────────
 
         /// <summary>
@@ -123,7 +142,12 @@ namespace BattleRobots.UI
             }
             _rows.Clear();
 
-            bool hasData = _roomList != null && _roomList.Count > 0;
+            // Apply search prefix filter. Empty prefix returns the full list.
+            IReadOnlyList<RoomEntry> rooms = _roomList != null
+                ? _roomList.GetFilteredRooms(_searchPrefix)
+                : System.Array.Empty<RoomEntry>();
+
+            bool hasData = rooms.Count > 0;
 
             // Empty-state label toggle.
             if (_emptyStateLabel != null)
@@ -132,7 +156,6 @@ namespace BattleRobots.UI
             if (!hasData || _entryPrefab == null || _scrollContent == null)
                 return;
 
-            IReadOnlyList<RoomEntry> rooms = _roomList.Rooms;
             for (int i = 0; i < rooms.Count; i++)
             {
                 RoomEntry entry = rooms[i];

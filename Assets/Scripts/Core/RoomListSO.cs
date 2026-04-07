@@ -120,5 +120,34 @@ namespace BattleRobots.Core
             _rooms.Clear();
             _onRoomsUpdated?.Raise();
         }
+
+        /// <summary>
+        /// Returns a snapshot of rooms whose <see cref="RoomEntry.roomCode"/> starts
+        /// with <paramref name="prefix"/> (case-insensitive).
+        ///
+        /// A null or empty <paramref name="prefix"/> returns the full room list
+        /// without allocating a new collection.
+        ///
+        /// Called by <c>RoomListUI.Rebuild</c> when a search prefix is active.
+        /// Allocations here are acceptable: Rebuild runs only on user interaction,
+        /// never in Update / FixedUpdate.
+        /// </summary>
+        public IReadOnlyList<RoomEntry> GetFilteredRooms(string prefix)
+        {
+            if (string.IsNullOrEmpty(prefix))
+                return _rooms;
+
+            var filtered = new List<RoomEntry>(_rooms.Count);
+            for (int i = 0; i < _rooms.Count; i++)
+            {
+                RoomEntry entry = _rooms[i];
+                if (!string.IsNullOrEmpty(entry.roomCode) &&
+                    entry.roomCode.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    filtered.Add(entry);
+                }
+            }
+            return filtered;
+        }
     }
 }
