@@ -44,7 +44,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T006 | ArticulationBody joint wrapper (HingeJointAB) | 75 | **Done** | Drive applies torque; no Rigidbody |
 | T007 | DamageSystem — HealthSO + DamageEvent channel | 70 | **Done** | Damage reduces health SO; death event fires |
 | T008 | Arena scene scaffold (ground, walls, spawn points) | 60 | **Done** | Scene loads; robots spawn at markers |
-| T009 | ShopUI — part browser, buy button, wallet display | 55 | Pending | UI reads wallet SO; buy fires deduct |
+| T009 | ShopUI — part browser, buy button, wallet display | 55 | **Done** | UI reads wallet SO; buy fires deduct |
 | T010 | MatchManager — round timer, win condition | 55 | **Done** | Correct winner determined; MatchRecord written |
 | T011 | MainMenu + LoadingScreen UI | 40 | Pending | Scene transitions work; no GC in Update |
 | T012 | VFX: impact sparks, destruction explosion | 30 | Pending | Pooled particles; zero alloc |
@@ -55,7 +55,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T009 — ShopUI | PM Agent | 2026-04-07 | Next: part browser panel, buy button, wallet balance label — all wired to PlayerWallet SO via IntGameEventListener |
+| T011 — MainMenu + LoadingScreen UI | PM Agent | 2026-04-07 | Next: MainMenuManager MB (scene-load calls, no GC), LoadingScreen MB (async load progress bar via AsyncOperation), SO event channel for scene transition request |
 
 ---
 
@@ -72,6 +72,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T007 — DamageSystem | 2026-04-06 | HealthSO + DamageInfo struct + DamageGameEvent channel + DamageReceiver |
 | T008 — Arena scene scaffold | 2026-04-07 | ArenaConfig SO (ground/wall dims, SpawnPointData list), SpawnPointMarker MB (Gizmo), ArenaManager MB (HandleMatchStarted positions robots). Scene assets deferred to Editor session. |
 | T010 — MatchManager | 2026-04-07 | Round timer in Update (no allocs), death/expiry win conditions, MatchRecord written via SaveSystem, wallet rewarded via PlayerWallet SO, _onMatchEnded VoidGameEvent raised. |
+| T009 — ShopUI | 2026-04-07 | PartDefinition SO (identity, category, cost, stat modifiers), ShopCatalog SO (master list + FindByName), ShopManager MB (BattleRobots.UI; BuyPart/GetAllParts/GetPartsByCategory; VoidGameEvent channels for success/fail). |
 
 ---
 
@@ -82,21 +83,22 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-05 | PM Agent | Session 1: Repo bootstrap. Created ROADMAP.md, .gitignore, folder structure, Core SO event channel system (GameEvent, VoidGameEvent, GameEventListenerT), PlayerWallet SO, MatchRecord, XOR SaveSystem. |
 | 2026-04-06 | PM Agent | Session 2: T005 RobotDefinition SO (PartSlot, PartCategory, ValidateSlots, Editor drawer). T006 HingeJointAB (RevoluteJoint, SetTargetVelocity, ApplyTorque, no Rigidbody). T007 DamageSystem (DamageInfo struct, DamageGameEvent channel, DamageGameEventListener, HealthSO with FloatGameEvent/VoidGameEvent channels, DamageReceiver bridging events to HealthSO). M1 fully complete; M2 core Physics in place. |
 | 2026-04-07 | PM Agent | Session 3: T008 Arena scaffold (ArenaConfig SO, SpawnPointMarker MB with Gizmos, ArenaManager MB). T010 MatchManager (round timer, death/expiry win conditions, MatchRecord persistence, wallet rewards, VoidGameEvent channels). M3 core loop complete in C#; scene asset wiring deferred to Editor session. |
+| 2026-04-07 | PM Agent | Session 4: T009 ShopUI C# layer — PartDefinition SO (name, description, thumbnail, PartCategory, cost, stat modifiers), ShopCatalog SO (part list, FindByName), ShopManager MB in BattleRobots.UI (BuyPart, GetAllParts, GetPartsByCategory, IsOwned, VoidGameEvent channels). No Physics refs. Scene/prefab wiring deferred to Editor session. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T008 (ArenaConfig SO + SpawnPointMarker + ArenaManager), T010 (MatchManager)  
-**Next action:** T009 — ShopUI. C# deliverables (no Editor needed):
-  - `PartDefinition.cs` SO (BattleRobots.Core) — part identity, category, cost, thumbnail
-  - `ShopCatalog.cs` SO (BattleRobots.Core) — list of PartDefinitions available for purchase
-  - `ShopManager.cs` (BattleRobots.UI) — reads ShopCatalog + PlayerWallet SO; exposes BuyPart(PartDefinition) method; fires VoidGameEvent on purchase; UI wiring deferred to Editor session
-  
-**Blockers:** None for C# work. All scene/prefab/.unity asset creation deferred until Editor session.  
+**Last completed:** T009 (ShopUI C# layer — PartDefinition, ShopCatalog, ShopManager)  
+**Next action:** T011 — MainMenu + LoadingScreen UI. C# deliverables (no Editor needed):
+  - `SceneLoader.cs` (BattleRobots.UI) — static helper wrapping `SceneManager.LoadSceneAsync`; no GC; `IntGameEvent` channel for scene-load-progress float broadcasts
+  - `MainMenuManager.cs` (BattleRobots.UI) — MB with `LoadArena()` / `LoadShop()` / `QuitGame()` methods; wires to Button.onClick in Inspector
+  - `LoadingScreenManager.cs` (BattleRobots.UI) — MB that subscribes to load-progress event; updates a progress bar value each frame during async load; hides itself when load completes
+
+**Blockers:** None for C# work. All Canvas/.unity scene assets deferred to Editor session.  
 **Architecture notes:**
-- `PartDefinition` and `ShopCatalog` → `BattleRobots.Core` (pure data SOs)
-- `ShopManager` → `BattleRobots.UI` namespace; must NOT reference BattleRobots.Physics
-- Wire PlayerWallet balance changes to UI label via `IntGameEventListener` in Inspector
-- ArenaManager and MatchManager both receive MatchStarted via `VoidGameEventListener` MB on same GO; Response wired to `HandleMatchStarted()` in Inspector
-- MatchManager `_arenaIndex` field: assign from ArenaConfig.ArenaIndex at runtime (or wire in Inspector) to keep MatchRecord consistent
+- All three files → `BattleRobots.UI` namespace; must NOT reference BattleRobots.Physics
+- Use `FloatGameEvent` SO channel (already exists) to broadcast async load progress → UI slider
+- No `new` allocations inside `Update` or coroutine hot path
+- `SceneLoader` must be a static utility class (not a MonoBehaviour) to avoid scene dependency
+- T009 ShopManager: scene wiring — add MB to persistent Manager GO; assign ShopCatalog SO, PlayerWallet SO, and two VoidGameEvent SOs (_onPurchaseSucceeded, _onPurchaseFailed) in Inspector; wallet balance label wired via IntGameEventListener → TextMeshProUGUI on same GO
