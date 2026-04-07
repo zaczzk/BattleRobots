@@ -45,6 +45,10 @@ namespace BattleRobots.Core
                  "The password itself is never transmitted to clients; only this flag is.")]
         public bool isPrivate;
 
+        [Tooltip("Estimated round-trip latency to the room host in milliseconds. " +
+                 "0 means unknown / not yet measured. Negative values are clamped to 0.")]
+        public int pingMs;
+
         /// <summary>
         /// Convenience constructor for use in tests and the stub adapter.
         /// </summary>
@@ -52,12 +56,15 @@ namespace BattleRobots.Core
         /// <param name="playerCount">Current number of players in the room.</param>
         /// <param name="maxPlayers">Capacity cap. Defaults to 2 (standard 1v1 match).</param>
         /// <param name="isPrivate">Whether a password is required to join. Defaults to false.</param>
-        public RoomEntry(string roomCode, int playerCount, int maxPlayers = 2, bool isPrivate = false)
+        /// <param name="pingMs">Round-trip latency in ms to the room host. 0 = unknown.</param>
+        public RoomEntry(string roomCode, int playerCount, int maxPlayers = 2,
+                         bool isPrivate = false, int pingMs = 0)
         {
             this.roomCode    = roomCode    ?? string.Empty;
             this.playerCount = playerCount;
             this.maxPlayers  = maxPlayers > 0 ? maxPlayers : 2;
             this.isPrivate   = isPrivate;
+            this.pingMs      = Mathf.Max(0, pingMs);
         }
 
         /// <summary>

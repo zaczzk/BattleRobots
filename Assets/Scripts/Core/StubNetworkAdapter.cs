@@ -56,11 +56,36 @@ namespace BattleRobots.Core
         private static readonly Dictionary<string, string> s_RoomPasswords =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Remove all simulated rooms and their passwords (call in TearDown).</summary>
+        /// <summary>
+        /// Server-side simulated ping store, keyed by normalised room code.
+        /// Populated via <see cref="SetRoomPing"/>; used by <see cref="RequestRoomList"/>
+        /// to populate <see cref="RoomEntry.pingMs"/> for each returned room.
+        /// </summary>
+        private static readonly Dictionary<string, int> s_RoomPings =
+            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Remove all simulated rooms, passwords, and pings (call in TearDown).</summary>
         public static void ClearRooms()
         {
             s_ActiveRooms.Clear();
             s_RoomPasswords.Clear();
+            s_RoomPings.Clear();
+        }
+
+        /// <summary>
+        /// Assign a simulated latency to an existing room so that the next
+        /// <see cref="RequestRoomList"/> call returns it in <see cref="RoomEntry.pingMs"/>.
+        ///
+        /// <paramref name="pingMs"/> is clamped to ≥ 0. Call after <see cref="Host"/>
+        /// has registered the room.
+        /// </summary>
+        public static void SetRoomPing(string roomCode, int pingMs)
+        {
+            string code = string.IsNullOrWhiteSpace(roomCode)
+                ? string.Empty
+                : roomCode.Trim().ToUpperInvariant();
+
+            s_RoomPings[code] = Math.Max(0, pingMs);
         }
 
         // ── INetworkAdapter callbacks ─────────────────────────────────────────
@@ -234,8 +259,9 @@ namespace BattleRobots.Core
 
         /// <summary>
         /// Simulate a room-list response. Returns all rooms currently in
-        /// <see cref="s_ActiveRooms"/> — including their <c>playerCount</c> and
-        /// <c>maxPlayers</c> capacity — via <see cref="OnRoomListReceived"/>.
+        /// <see cref="s_ActiveRooms"/> — including <c>playerCount</c>,
+        /// <c>maxPlayers</c>, and any <c>pingMs</c> set via
+        /// <see cref="SetRoomPing"/> — via <see cref="OnRoomListReceived"/>.
         /// </summary>
         public void RequestRoomList()
         {
@@ -243,7 +269,14 @@ namespace BattleRobots.Core
 
             var rooms = new List<RoomEntry>(s_ActiveRooms.Count);
             foreach (var kvp in s_ActiveRooms)
-                rooms.Add(kvp.Value);
+            {
+                RoomEntry entry = kvp.Value;
+                if (s_RoomPings.TryGetValue(kvp.Key, out int ping))
+                {
+                    entry.pingMs = ping;
+                }
+                rooms.Add(entry);
+            }
 
             OnRoomListReceived?.Invoke(rooms);
         }

@@ -27,6 +27,8 @@ namespace BattleRobots.UI
     ///   □ _favouriteButton      → (optional) FavouriteButtonUI child component
     ///   □ _copyButton           → (optional) Button that copies room code to clipboard
     ///   □ _copiedFeedbackLabel  → (optional) Text showing "Copied!" for 1.5 s after copy
+    ///   □ _pingBadge            → (optional) Image coloured by latency (grey/green/yellow/red)
+    ///   □ _pingLabel            → (optional) Text showing "N ms" (empty when pingMs = 0)
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RoomEntryUI : MonoBehaviour
@@ -68,6 +70,15 @@ namespace BattleRobots.UI
         [Tooltip("(Optional) Text label that briefly shows 'Copied!' for 1.5 s after the " +
                  "copy button is pressed, then reverts to empty.")]
         [SerializeField] private Text _copiedFeedbackLabel;
+
+        [Header("Ping Badge (optional)")]
+        [Tooltip("(Optional) Image used as a coloured latency indicator dot. " +
+                 "Colour: grey = unknown (0 ms), green ≤ 80 ms, yellow ≤ 150 ms, red ≥ 151 ms.")]
+        [SerializeField] private Image _pingBadge;
+
+        [Tooltip("(Optional) Text label showing the numeric latency, e.g. '42 ms'. " +
+                 "Empty when pingMs is 0 (unknown).")]
+        [SerializeField] private Text _pingLabel;
 
         // ── Runtime state ─────────────────────────────────────────────────────
 
@@ -165,6 +176,40 @@ namespace BattleRobots.UI
                 if (favourites != null)
                     _favouriteButton.Setup(favourites, _roomCode);
             }
+
+            // Apply the ping latency badge (colour dot + numeric label).
+            ApplyPingBadge(entry.pingMs);
+        }
+
+        /// <summary>
+        /// Updates the ping badge colour and label for the given latency.
+        /// Colour thresholds match <see cref="PingDisplayUI"/>:
+        ///   grey = 0 (unknown), green ≤ 80 ms, yellow ≤ 150 ms, red ≥ 151 ms.
+        /// </summary>
+        private void ApplyPingBadge(int pingMs)
+        {
+            if (_pingBadge != null)
+                _pingBadge.color = GetPingColor(pingMs);
+
+            if (_pingLabel != null)
+                _pingLabel.text = pingMs > 0 ? $"{pingMs} ms" : string.Empty;
+        }
+
+        /// <summary>
+        /// Maps a latency value to a display colour using the standard thresholds.
+        /// Exposed as public static so tests can verify the mapping without instantiating
+        /// the full MonoBehaviour.
+        ///   0 ms  → grey  (unknown / not measured)
+        ///   ≤ 80  → green (excellent)
+        ///   ≤ 150 → yellow (acceptable)
+        ///   ≥ 151 → red   (high latency)
+        /// </summary>
+        public static Color GetPingColor(int pingMs)
+        {
+            if (pingMs <= 0)   return new Color(0.5f, 0.5f, 0.5f); // grey — unknown
+            if (pingMs <= 80)  return Color.green;
+            if (pingMs <= 150) return Color.yellow;
+            return Color.red;
         }
 
         // ── Private ───────────────────────────────────────────────────────────
