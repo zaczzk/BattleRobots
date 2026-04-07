@@ -82,7 +82,16 @@ namespace BattleRobots.Core
         private static readonly Dictionary<string, List<string>> s_RoomPlayerNames =
             new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Remove all simulated rooms, passwords, pings, creation times, and player names (call in TearDown).</summary>
+        /// <summary>
+        /// Server-side simulated spectator count store, keyed by normalised room code.
+        /// Populated via <see cref="SetSpectatorCount"/>; used by <see cref="RequestRoomList"/>
+        /// to populate <see cref="RoomEntry.spectatorCount"/> for each returned room.
+        /// 0 (default) means no spectators (or not tracked).
+        /// </summary>
+        private static readonly Dictionary<string, int> s_SpectatorCounts =
+            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Remove all simulated rooms, passwords, pings, creation times, player names, and spectator counts (call in TearDown).</summary>
         public static void ClearRooms()
         {
             s_ActiveRooms.Clear();
@@ -90,6 +99,27 @@ namespace BattleRobots.Core
             s_RoomPings.Clear();
             s_RoomCreatedAt.Clear();
             s_RoomPlayerNames.Clear();
+            s_SpectatorCounts.Clear();
+        }
+
+        /// <summary>
+        /// Assign a simulated spectator count to an existing room so that the next
+        /// <see cref="RequestRoomList"/> call returns it in <see cref="RoomEntry.spectatorCount"/>.
+        ///
+        /// <paramref name="count"/> is clamped to ≥ 0. Call after <see cref="Host"/> has
+        /// registered the room. Pass 0 to clear a previously-set value.
+        /// </summary>
+        public static void SetSpectatorCount(string roomCode, int count)
+        {
+            string code = string.IsNullOrWhiteSpace(roomCode)
+                ? string.Empty
+                : roomCode.Trim().ToUpperInvariant();
+
+            int clamped = Math.Max(0, count);
+            if (clamped == 0)
+                s_SpectatorCounts.Remove(code);
+            else
+                s_SpectatorCounts[code] = clamped;
         }
 
         // ── Host identity ─────────────────────────────────────────────────────
@@ -166,6 +196,9 @@ namespace BattleRobots.Core
 
         /// <inheritdoc/>
         public Action<RoomEntry> OnRoomUpdated { get; set; }
+
+        /// <inheritdoc/>
+        public Action<string, int> OnSpectatorCountChanged { get; set; }
 
         // ── Test-inspection surface ───────────────────────────────────────────
 
@@ -357,6 +390,8 @@ namespace BattleRobots.Core
                     entry.createdAt = ts;
                 if (s_RoomPlayerNames.TryGetValue(kvp.Key, out List<string> names))
                     entry.playerNames = new List<string>(names); // defensive copy
+                if (s_SpectatorCounts.TryGetValue(kvp.Key, out int spectators))
+                    entry.spectatorCount = spectators;
                 rooms.Add(entry);
             }
 

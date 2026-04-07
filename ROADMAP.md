@@ -95,6 +95,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T057 | RoomListUI ping-tier section headers (Excellent/Good/High/Unknown) | 40 | **Done** 2026-04-07 | PingTier enum (Core, Excellent=0/Good=1/High=2/Unknown=3); RoomEntryUI.GetPingTier + GetTierLabel public static; RoomListUI: _groupByPingTier bool + _sectionHeaderPrefab Text; SortByTier stable sort; EmitSectionHeader; RebuildGrouped/RebuildFlat split; 14 EditMode tests (RoomPingTierTests.cs) |
 | T058 | RoomListUI section collapse/expand toggle per ping tier | 35 | **Done** 2026-04-07 | SectionHeaderUI MB (Button + label + indicator ▼/▶, Setup/HandleClicked/IsCollapsed/Tier); RoomListUI: _sectionHeaderUIPrefab + _collapsedTiers HashSet<PingTier> + ToggleTierCollapse + IsTierCollapsed + updated EmitSectionHeader + RebuildGrouped skips collapsed rows; 12 EditMode tests (SectionCollapseTests.cs) |
 | T059 | RoomEntry joined-player name list | 70 | **Done** 2026-04-07 | RoomEntry.playerNames List<string> (8th ctor arg, null default, host at index 0); INetworkAdapter.OnRoomUpdated Action<RoomEntry>; StubNetworkAdapter: JoinPlayerName property (default "Player"), s_RoomPlayerNames dict, Host() seeds names, Join() appends+fires OnRoomUpdated; RoomListSO.UpdateRoom(RoomEntry) replaces entry by roomCode + fires _onRoomsUpdated; NetworkEventBridge wires OnRoomUpdated→UpdateRoom; RoomEntryUI._playerNamesLabel optional Text (comma-joined); 11 EditMode tests (RoomPlayerNamesTests.cs) |
+| T060 | Room spectator count | 65 | **Done** 2026-04-07 | RoomEntry.spectatorCount int (9th ctor arg, clamped ≥0); INetworkAdapter.OnSpectatorCountChanged Action<string,int>; StubNetworkAdapter.SetSpectatorCount static helper + s_SpectatorCounts dict (ClearRooms clears, RequestRoomList populates); RoomEntryUI._spectatorCountLabel optional Text ("N watching" or empty); 8 EditMode tests |
 
 ---
 
@@ -102,7 +103,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T060 — (next task TBD) | PM Agent | — | See Session Handoff for next action |
+| T061 — (next task TBD) | PM Agent | — | See Session Handoff for next action |
 
 ---
 
@@ -208,23 +209,24 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-07 | PM Agent | Session 44: T058 Section collapse/expand per ping tier. SectionHeaderUI MB (BattleRobots.UI, [RequireComponent(Button)], Setup(label,tier,isCollapsed,onToggle), HandleClicked toggles IsCollapsed + fires callback, RefreshIndicator ▼/▶, null-safe Awake/OnDestroy). RoomListUI: _sectionHeaderUIPrefab SectionHeaderUI field; _collapsedTiers HashSet<PingTier>; ToggleTierCollapse(tier) adds/removes from set + Rebuild; IsTierCollapsed(tier) public query; EmitSectionHeader updated to prefer SectionHeaderUI over Text fallback, passes ToggleTierCollapse as callback; RebuildGrouped skips rows whose tier is in _collapsedTiers (header still shown). SectionCollapseTests.cs: 12 EditMode cases (SectionHeaderUI default/Setup tier+collapsed/HandleClicked toggle/callback/null-callback/double-Setup; RoomListUI IsTierCollapsed defaults/ToggleCollapse/ToggleTwiceExpands/independent/all-four-collapse-expand). |
 | 2026-04-07 | PM Agent | Session 43: T057 RoomListUI ping-tier section headers. PingTier enum (Core, in RoomListSO.cs: Excellent=0/Good=1/High=2/Unknown=3 — ordering drives display priority). RoomEntryUI: GetPingTier(int) public static (0/neg→Unknown/≤80→Excellent/≤150→Good/151+→High); GetTierLabel(PingTier) public static (localised header strings). RoomListUI: _groupByPingTier bool + _sectionHeaderPrefab Text Inspector fields; _headers List<GameObject> runtime pool; Rebuild splits into RebuildFlat (old path) / RebuildGrouped (tier path); SortByTier internal static (stable — index tiebreak via (entry,idx) pairs); EmitSectionHeader instantiates _sectionHeaderPrefab (no-op when null). RoomPingTierTests.cs: 14 EditMode cases (GetPingTier×6, GetTierLabel×4, enum sort order×3, SortByTier stable sort×1). |
 | 2026-04-07 | PM Agent | Session 45: T059 RoomEntry joined-player name list. RoomEntry.playerNames List<string> (8th ctor arg, null default, host at index 0). INetworkAdapter.OnRoomUpdated Action<RoomEntry>. StubNetworkAdapter: JoinPlayerName property (default "Player"); s_RoomPlayerNames static dict; Host() seeds names with [HostPlayerName]; Join() appends JoinPlayerName + fires OnRoomUpdated with updated entry; RequestRoomList populates playerNames from dict; ClearRooms clears dict. RoomListSO.UpdateRoom(RoomEntry): replaces entry by case-insensitive roomCode match + fires _onRoomsUpdated (no-op with warning when not found). NetworkEventBridge.RegisterAdapterCallbacks: wires adapter.OnRoomUpdated → _roomList?.UpdateRoom(entry). RoomEntryUI._playerNamesLabel optional Text SerializeField; Setup comma-joins entry.playerNames (string.Join(", ", …), empty when null/empty). RoomPlayerNamesTests.cs: 11 EditMode cases. |
+| 2026-04-07 | PM Agent | Session 46: T060 Room spectator count. RoomEntry.spectatorCount int field (Tooltip, 9th ctor arg default 0, Mathf.Max(0,…) clamp). INetworkAdapter: OnSpectatorCountChanged Action<string,int> callback. StubNetworkAdapter: s_SpectatorCounts static dict; SetSpectatorCount(string,int) public static (clamped ≥0, 0 removes entry); ClearRooms clears dict; RequestRoomList populates entry.spectatorCount from dict. RoomEntryUI: _spectatorCountLabel optional Text SerializeField; Setup sets "N watching" when spectatorCount>0, else empty string. RoomSpectatorCountTests.cs: 8 EditMode cases (default=0, ctor set, neg clamped, SetCount→RequestList, ClearRooms, callback invoke, UI show, UI hide). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T059 — RoomEntry joined-player name list.  
-**Milestone status:** M1–M6 Done. T001–T059 Done.
+**Last completed:** T060 — Room spectator count.  
+**Milestone status:** M1–M6 Done. T001–T060 Done.
 
-**Next action:** T060 — Room spectator count (viewers who are watching but not playing). Suggested deliverables:
-  - `RoomEntry.spectatorCount int` field (optional 9th ctor arg; defaults to 0; clamped ≥ 0)
-  - `INetworkAdapter.OnSpectatorCountChanged Action<string, int>` callback — adapter fires when spectator count changes for a given roomCode
-  - `StubNetworkAdapter.SetSpectatorCount(string roomCode, int count)` static helper + `s_SpectatorCounts` dict; populates `entry.spectatorCount` in `RequestRoomList`
-  - `RoomEntryUI._spectatorCountLabel` optional Text — shows "N watching" or empty when 0
-  - EditMode tests ×8
+**Next action:** T061 — Suggest next RICE-ordered networking or UX feature. Recommended candidates:
+  - `RoomEntry.spectatorLimit int` (max spectators cap + badge when limit reached)
+  - Room owner transfer (new INetworkAdapter callback + UI transfer button)
+  - Room kick/ban (host-only button per player row in player names list)
+  - Room chat channel (StringGameEvent channel, ChatSO ring-buffer, ChatUI scroll panel)
 
 **Blockers:** None.  
 **Architecture notes:**
+  - T060: `RoomEntry.spectatorCount` is optional 9th ctor arg (default 0); negative values clamped via `Mathf.Max(0,…)`. `StubNetworkAdapter.SetSpectatorCount` follows the same static-helper pattern as `SetRoomPing` / `SetRoomCreatedAt`. `OnSpectatorCountChanged` is declared in the interface for real adapters; the stub exposes it as an auto-property so tests can assign/invoke the callback directly.
   - T058: `SectionHeaderUI` uses `[RequireComponent(typeof(Button))]` — in Editor, AddComponent auto-adds Button; in EditMode tests, GetComponent<Button>() may return null (guarded in Awake). `HandleClicked` is public to allow direct test invocation. `IsTierCollapsed` public query allows tests to verify state without reflection.
   - T058: `_sectionHeaderUIPrefab` takes priority over `_sectionHeaderPrefab` (Text) when both are assigned — both fields preserved so existing prefab setups continue to work without reimport.
   - T058: `_collapsedTiers` survives `Rebuild()` calls — collapse state persists across room-list refreshes. Collapse state resets only if the `RoomListUI` GameObject is destroyed/re-created.
@@ -233,6 +235,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
   - T055: `RoomEntry.hostName` is optional 6th ctor arg (default `""`); existing tests using 3–5 arg constructors compile unchanged. `StubNetworkAdapter.HostPlayerName` is an instance property (default `"Host"`), not static — each stub instance can simulate a different host. `Join(string,string)` now preserves `hostName` when incrementing `playerCount`.
   - T054: `GetPingColor` is public static (no MB instantiation required in tests). `ApplyPingBadge` is private — tested indirectly via `Setup` + badge Image.color assertion.
   - Deferred Inspector wiring (carry-forward):
+      □ RoomEntryUI._spectatorCountLabel → Text child GO in prefab  ← T060 Done (wire in prefab)
       □ RoomEntryUI._ageLabel → Text child GO in prefab  ← T056 Done (wire in prefab)
       □ RoomEntryUI._hostNameLabel → Text child GO in prefab  ← T055 Done (wire in prefab)
       □ RoomEntryUI._pingBadge → Image child GO + _pingLabel → Text child GO in prefab  ← T054 Done (wire in prefab)

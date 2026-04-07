@@ -138,6 +138,15 @@ namespace BattleRobots.Core
         Action<RoomEntry> OnRoomUpdated { get; set; }
 
         /// <summary>
+        /// Invoked by the adapter when the spectator count for a room changes.
+        /// Parameters: roomCode (string), new spectator count (int ≥ 0).
+        ///
+        /// Adapters that do not support spectator tracking may leave this unimplemented
+        /// (null callback is acceptable; callers must guard against null).
+        /// </summary>
+        Action<string, int> OnSpectatorCountChanged { get; set; }
+
+        /// <summary>
         /// Invoked by the adapter in response to <see cref="RequestRoomList"/>.
         /// Passes the current list of available <see cref="RoomEntry"/> values.
         /// The adapter owns the list allocation; the callee must not hold a long-lived

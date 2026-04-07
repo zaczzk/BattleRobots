@@ -32,6 +32,7 @@ namespace BattleRobots.UI
     ///   □ _hostNameLabel        → (optional) Text showing the host's display name
     ///   □ _ageLabel             → (optional) Text showing relative room age ("Just now", "3m ago", etc.)
     ///   □ _playerNamesLabel     → (optional) Text showing comma-joined player names ("Alice, Bob")
+    ///   □ _spectatorCountLabel  → (optional) Text showing "N watching" (empty when 0)
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RoomEntryUI : MonoBehaviour
@@ -98,6 +99,11 @@ namespace BattleRobots.UI
         [Tooltip("(Optional) Text label showing all player display names comma-joined, " +
                  "e.g. 'Alice, Bob'. Empty when playerNames is null or empty.")]
         [SerializeField] private Text _playerNamesLabel;
+
+        [Header("Spectators (optional)")]
+        [Tooltip("(Optional) Text label showing the number of spectators watching this room, " +
+                 "e.g. '3 watching'. Empty when spectatorCount is 0 (none or not reported).")]
+        [SerializeField] private Text _spectatorCountLabel;
 
         // ── Runtime state ─────────────────────────────────────────────────────
 
@@ -214,6 +220,14 @@ namespace BattleRobots.UI
                     entry.playerNames != null && entry.playerNames.Count > 0
                         ? string.Join(", ", entry.playerNames)
                         : string.Empty;
+            }
+
+            // Spectator count: show "N watching" when non-zero, otherwise hide the label.
+            if (_spectatorCountLabel != null)
+            {
+                _spectatorCountLabel.text = entry.spectatorCount > 0
+                    ? $"{entry.spectatorCount} watching"
+                    : string.Empty;
             }
         }
 

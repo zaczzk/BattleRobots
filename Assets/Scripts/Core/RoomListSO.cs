@@ -86,6 +86,10 @@ namespace BattleRobots.Core
                  "Null or empty when the adapter does not provide per-player names.")]
         public List<string> playerNames;
 
+        [Tooltip("Number of spectators currently watching this room without playing. " +
+                 "0 means none or not reported by the adapter. Negative values are clamped to 0.")]
+        public int spectatorCount;
+
         /// <summary>
         /// Convenience constructor for use in tests and the stub adapter.
         /// </summary>
@@ -100,18 +104,24 @@ namespace BattleRobots.Core
         ///   List of all player display names in the room (host at index 0).
         ///   Defaults to null (adapter did not supply names).
         /// </param>
+        /// <param name="spectatorCount">
+        ///   Number of spectators watching without playing. Negative values clamped to 0.
+        ///   Defaults to 0 (none or not reported).
+        /// </param>
         public RoomEntry(string roomCode, int playerCount, int maxPlayers = 2,
                          bool isPrivate = false, int pingMs = 0, string hostName = "",
-                         long createdAt = 0L, List<string> playerNames = null)
+                         long createdAt = 0L, List<string> playerNames = null,
+                         int spectatorCount = 0)
         {
-            this.roomCode    = roomCode    ?? string.Empty;
-            this.playerCount = playerCount;
-            this.maxPlayers  = maxPlayers > 0 ? maxPlayers : 2;
-            this.isPrivate   = isPrivate;
-            this.pingMs      = Mathf.Max(0, pingMs);
-            this.hostName    = hostName ?? string.Empty;
-            this.createdAt   = createdAt < 0L ? 0L : createdAt;
-            this.playerNames = playerNames;
+            this.roomCode       = roomCode    ?? string.Empty;
+            this.playerCount    = playerCount;
+            this.maxPlayers     = maxPlayers > 0 ? maxPlayers : 2;
+            this.isPrivate      = isPrivate;
+            this.pingMs         = Mathf.Max(0, pingMs);
+            this.hostName       = hostName ?? string.Empty;
+            this.createdAt      = createdAt < 0L ? 0L : createdAt;
+            this.playerNames    = playerNames;
+            this.spectatorCount = Mathf.Max(0, spectatorCount);
         }
 
         /// <summary>
