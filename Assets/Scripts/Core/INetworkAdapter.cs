@@ -113,6 +113,24 @@ namespace BattleRobots.Core
         /// </summary>
         void SendChatMessage(string message);
 
+        // ── Moderation ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Remove <paramref name="playerName"/> from the room identified by
+        /// <paramref name="roomCode"/>. Only the room host should call this method.
+        ///
+        /// On success the adapter must:
+        ///   1. Remove the player from the room's player list and decrement
+        ///      <see cref="RoomEntry.playerCount"/>.
+        ///   2. Invoke <see cref="OnPlayerKicked"/> with the kicked player's display name.
+        ///   3. Invoke <see cref="OnRoomUpdated"/> with the updated <see cref="RoomEntry"/>
+        ///      so room-browser UIs can refresh without a full list reload.
+        ///
+        /// No-op (no callbacks fired) if the room does not exist.
+        /// Adapters that do not support kick may leave this as a no-op.
+        /// </summary>
+        void KickPlayer(string roomCode, string playerName);
+
         // ── Callbacks (set by NetworkEventBridge before calling Connect) ──────
 
         /// <summary>Invoked by the adapter when the connection to the backend succeeds.</summary>
@@ -175,6 +193,18 @@ namespace BattleRobots.Core
         /// reference to it.
         /// </summary>
         Action<List<RoomEntry>> OnRoomListReceived { get; set; }
+
+        /// <summary>
+        /// Invoked by the adapter after a <see cref="KickPlayer"/> call succeeds.
+        /// Payload is the display name of the player who was removed from the room.
+        ///
+        /// Both the host's client (to update the player list) and the kicked player's
+        /// client (to show a "You were kicked" overlay) receive this callback.
+        ///
+        /// Adapters that do not support kick may leave this unimplemented
+        /// (null callback is acceptable; callers must guard against null).
+        /// </summary>
+        Action<string> OnPlayerKicked { get; set; }
 
         // ── Diagnostics ───────────────────────────────────────────────────────
 

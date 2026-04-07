@@ -203,6 +203,9 @@ namespace BattleRobots.Core
         /// <inheritdoc/>
         public Action<string> OnChatMessageReceived { get; set; }
 
+        /// <inheritdoc/>
+        public Action<string> OnPlayerKicked { get; set; }
+
         // ── Test-inspection surface ───────────────────────────────────────────
 
         /// <summary>All payloads passed to <see cref="SendMatchState"/>, in order.</summary>
@@ -219,6 +222,12 @@ namespace BattleRobots.Core
 
         /// <summary>Number of times <see cref="RequestRoomList"/> has been called.</summary>
         public int RequestRoomListCallCount { get; private set; }
+
+        /// <summary>Number of times <see cref="KickPlayer"/> has been called.</summary>
+        public int KickCallCount { get; private set; }
+
+        /// <summary>Display name of the most recently kicked player, or empty string if none.</summary>
+        public string LastKickedPlayer { get; private set; } = string.Empty;
 
         /// <summary>Last room code passed to <see cref="Host"/> or <see cref="Join"/>.</summary>
         public string LastRoomCode { get; private set; } = string.Empty;
@@ -364,6 +373,45 @@ namespace BattleRobots.Core
             OnRoomUpdated?.Invoke(updatedEntry);
 
             OnRoomJoined?.Invoke(code);
+        }
+
+        /// <summary>
+        /// Remove <paramref name="playerName"/> from the room and fire
+        /// <see cref="OnPlayerKicked"/> and <see cref="OnRoomUpdated"/>.
+        ///
+        /// No-op (no callbacks) if <paramref name="roomCode"/> does not exist in
+        /// <see cref="s_ActiveRooms"/>. Null or empty <paramref name="playerName"/>
+        /// is silently ignored.
+        /// </summary>
+        public void KickPlayer(string roomCode, string playerName)
+        {
+            KickCallCount++;
+
+            if (string.IsNullOrEmpty(playerName)) return;
+
+            string code = Normalise(roomCode);
+            if (!s_ActiveRooms.TryGetValue(code, out RoomEntry room)) return;
+
+            LastKickedPlayer = playerName;
+
+            // Remove from server-side player-name list.
+            if (s_RoomPlayerNames.TryGetValue(code, out List<string> names))
+                names.Remove(playerName);
+
+            // Decrement player count (floor at 0).
+            int newCount = Math.Max(0, room.playerCount - 1);
+
+            List<string> updatedNames = s_RoomPlayerNames.TryGetValue(code, out List<string> n)
+                ? new List<string>(n)
+                : null;
+
+            var updated = new RoomEntry(code, newCount, room.maxPlayers, room.isPrivate,
+                                        room.pingMs, room.hostName, room.createdAt,
+                                        updatedNames, room.spectatorCount);
+            s_ActiveRooms[code] = updated;
+
+            OnPlayerKicked?.Invoke(playerName);
+            OnRoomUpdated?.Invoke(updated);
         }
 
         /// <summary>

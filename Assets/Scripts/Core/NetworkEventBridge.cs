@@ -68,6 +68,13 @@ namespace BattleRobots.Core
                  "Wire a StringGameEventListener on ChatUI to ChatUI.AppendMessage.")]
         [SerializeField] private StringGameEvent _onChatReceivedChannel;
 
+        [Header("Moderation")]
+        [Tooltip("(Optional) SO event channel raised when the adapter fires OnPlayerKicked. " +
+                 "Wire a StringGameEventListener on the KickedUI GameObject to this channel " +
+                 "and point its Response at KickedUI.ShowKicked. " +
+                 "The payload is the kicked player's display name.")]
+        [SerializeField] private StringGameEvent _onPlayerKickedChannel;
+
         // ── Runtime adapter ───────────────────────────────────────────────────
 
         private INetworkAdapter _adapter;
@@ -243,6 +250,38 @@ namespace BattleRobots.Core
             _adapter?.SendChatMessage(formatted);
         }
 
+        // ── Moderation ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Ask the adapter to remove <paramref name="playerName"/> from
+        /// <paramref name="roomCode"/>. Only the host should call this.
+        ///
+        /// Guards:
+        ///   • No-op (with warning) if the session is not currently in a match room.
+        ///   • No-op if <paramref name="playerName"/> is null or whitespace.
+        ///
+        /// Wire to a per-player "Kick" button's onClick in the Inspector, passing the
+        /// player's display name as a static parameter or from a script.
+        /// </summary>
+        public void BeginKick(string roomCode, string playerName)
+        {
+            if (_session == null) return;
+
+            if (!_session.IsInMatch)
+            {
+                Debug.LogWarning("[NetworkEventBridge] BeginKick called while not in a match room. Ignored.", this);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(playerName))
+            {
+                Debug.LogWarning("[NetworkEventBridge] BeginKick called with null/empty playerName. Ignored.", this);
+                return;
+            }
+
+            _adapter?.KickPlayer(roomCode, playerName);
+        }
+
         // ── Room discovery ────────────────────────────────────────────────────
 
         /// <summary>
@@ -351,6 +390,12 @@ namespace BattleRobots.Core
                 _chat?.AddMessage(message);
                 // Raise the SO event channel so Inspector-wired listeners react.
                 _onChatReceivedChannel?.Raise(message);
+            };
+
+            adapter.OnPlayerKicked = (playerName) =>
+            {
+                // Raise the SO channel so KickedUI (or any listener) can respond.
+                _onPlayerKickedChannel?.Raise(playerName);
             };
         }
 
