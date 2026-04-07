@@ -88,6 +88,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T050 | Room sort order (player count desc / room code asc) | 45 | **Done** 2026-04-07 | RoomSortMode enum (Core); RoomListSO.GetSortedFilteredRooms(prefix,sort); RoomListUI.ApplySortMode(mode); RoomSortUI MB (3-button group, active highlight); GetFilteredRooms backward-compat wrapper; RoomSortTests.cs 10 EditMode cases |
 | T051 | Room browser pipeline integration tests | 80 | **Done** 2026-04-07 | 12 EditMode cases covering full adapter→SO→filter/sort pipeline; state changes reflected through refresh; edge cases (clear, large list, no-match, single-entry all-sort-modes) |
 | T052 | RoomEntryUI slots-remaining label + RoomListUI favourites forwarding | 65 | **Done** 2026-04-07 | RoomEntry.SlotsRemaining computed property (0 when full/maxPlayers≤0); _slotsRemainingLabel on RoomEntryUI; _favouriteRoomsSO on RoomListUI forwarded in Rebuild; 9 EditMode tests |
+| T053 | RoomEntryUI copy-to-clipboard button | 60 | **Done** 2026-04-07 | _copyButton + _copiedFeedbackLabel; HandleCopyClicked (GUIUtility.systemCopyBuffer, LastCopiedCode, "Copied!" coroutine 1.5 s); Setup wires interactable; 8 EditMode tests |
 
 ---
 
@@ -95,7 +96,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T053 — (next pending task TBD) | PM Agent | — | Identify next backlog item |
+| T054 — (next pending task TBD) | PM Agent | — | Identify next backlog item |
 
 ---
 
@@ -194,26 +195,24 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-07 | PM Agent | Session 37: T051 Room browser pipeline integration tests. RoomBrowserIntegrationTests.cs (12 EditMode cases). Wires stub callback manually mirroring NetworkEventBridge.RegisterAdapterCallbacks. Group A: filter-by-prefix, sort-by-player-count, combined filter+sort, multi-refresh no-stale-data. Group B: join→playerCount increment, full room IsFull, private flag preserved, maxPlayers preserved. Group C: clear→refresh empties SO, 10-room large list, no-match prefix, single entry all 3 sort modes. |
 | 2026-04-07 | PM Agent | Session 38: T052 RoomEntryUI enhancements. RoomEntry.SlotsRemaining computed property (Core struct; 0 when IsFull or maxPlayers≤0; Mathf.Max(0,…) guards negative). RoomEntryUI: _slotsRemainingLabel optional Text SerializeField; Setup populates "N left" or empty string. RoomListUI: _favouriteRoomsSO optional FavouriteRoomsSO SerializeField; Rebuild now calls 3-arg row.Setup(entry, onJoin, _favouriteRoomsSO). RoomEntryEnhancementsTests.cs: 9 EditMode cases (SlotsRemaining×5, FavouriteRoomsSO contract×3, IsFull/SlotsRemaining coherence×1). |
 | 2026-04-07 | PM Agent | Session 33: T047 Room bookmarking/favourites. SaveData.favouriteRoomCodes List<string> added to MatchRecord.cs. FavouriteRoomsSO (Core SO): internal List+HashSet dual-store (O(1) IsFavourite, insertion-order Favourites); AddFavourite/RemoveFavourite (idempotent, null-safe, auto-persist); Clear (skips if empty); LoadFromData (de-duplicates, skips null/empty); BuildData; PersistFavourites → SaveSystem.Load+mutate+Save. FavouriteButtonUI (BattleRobots.UI MB): Setup(FavouriteRoomsSO, roomCode); ToggleFavourite toggles add/remove + Refresh; IsFavourite observable property; star Image colour (gold/grey); Button interactable guard; Awake/OnDestroy listener lifecycle. RoomEntryUI: _favouriteButton field added; original Setup delegates to new overload; Setup(RoomEntry, Action<string>, FavouriteRoomsSO) shows/hides _favouriteButton and calls its Setup. FavouriteRoomsTests.cs: 21 EditMode cases (default state ×3, AddFavourite ×6, RemoveFavourite ×4, Clear ×2, LoadFromData ×4, BuildData round-trip, SaveData field). |
+| 2026-04-07 | PM Agent | Session 39: T053 Room-code copy-to-clipboard. RoomEntryUI extended: _copyButton (Button) wired in Awake/OnDestroy, _copiedFeedbackLabel (Text) shows "Copied!" on click, HandleCopyClicked() public (GUIUtility.systemCopyBuffer = _roomCode, LastCopiedCode observable property, starts ClearCopiedFeedback coroutine that reverts label after 1.5 s; no-op on empty code). Setup sets _copyButton.interactable based on code presence. RoomCopyTests.cs: 8 EditMode cases (LastCopiedCode default, systemCopyBuffer set, LastCopiedCode updated, feedback label "Copied!", empty-code no-copy, null label no-throw, empty-code button not interactable, valid-code button interactable). Fields injected via reflection to bypass Inspector. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T052 — RoomEntryUI slots-remaining label + RoomListUI favourites forwarding.  
-**Milestone status:** M1–M6 Done. T001–T052 Done.
+**Last completed:** T053 — RoomEntryUI copy-to-clipboard button.  
+**Milestone status:** M1–M6 Done. T001–T053 Done.
 
-**Next action:** T053 — Suggest: Room-code copy-to-clipboard button on `RoomEntryUI`.
-  1. Add an optional `_copyButton` (Button) to `RoomEntryUI`. On click: copy `_roomCode` to `GUIUtility.systemCopyBuffer`.
-  2. Add an optional `_copiedFeedbackLabel` (Text) that briefly shows "Copied!" via a coroutine and reverts to empty after ~1.5 s.
-  3. 6–8 EditMode tests covering: default state, HandleCopyClicked sets GUIUtility.systemCopyBuffer, label text, and edge cases (null room code, null label).
-  — OR —
-  Pick from deferred Inspector-wiring items below if a pure-code task is preferred.
+**Next action:** T054 — Suggest: `RoomEntryUI` ping/latency badge — show the ping of a room host (e.g. a coloured dot: green <80 ms, yellow <150 ms, red ≥150 ms) using the `PingSO` or a new per-room `pingMs` field on `RoomEntry`.  
+  Alternatively, pick any deferred Inspector-wiring item below as a pure-code closure task.
 
 **Blockers:** None.  
 **Architecture notes:**
-  - T052: `RoomEntry.SlotsRemaining` uses `Mathf.Max(0, maxPlayers - playerCount)` so it never goes negative even if playerCount > maxPlayers (stub fast-update edge case).
-  - `RoomListUI._favouriteRoomsSO` marked T052 ✓ in deferred list below.
+  - T053: `HandleCopyClicked()` is public (testable without reflection for the handler body). Fields `_copyButton` and `_copiedFeedbackLabel` remain private SerializeField — tests inject via reflection. `LastCopiedCode` observable property allows assertion without reading `GUIUtility.systemCopyBuffer` in isolation.
+  - `StopCoroutine(nameof(ClearCopiedFeedback))` before `StartCoroutine(nameof(...))` is the idiomatic restart pattern — safe to call even when no coroutine is running.
   - Deferred Inspector wiring (carry-forward):
+      □ RoomEntryUI._copyButton + _copiedFeedbackLabel → Button + Text in prefab  ← T053 Done (wire in prefab)
       □ RoomSortUI._roomListUI → RoomListUI on the same panel
       □ RoomSortUI._noneButton / _byPlayerCountButton / _byRoomCodeButton → Button references
       □ GameBootstrapper._recentRooms → RecentRoomsSO asset + LoadFromData call (T048)
@@ -226,7 +225,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
       □ RoomEntryUI._favouriteButton → FavouriteButtonUI child component
       □ RoomEntryUI._fullBadge → optional FULL badge GameObject
       □ RoomEntryUI._privateBadge → optional PRIVATE badge GameObject
-      □ RoomEntryUI._slotsRemainingLabel → optional Text  ← T052 Done (wire in prefab)
+      ✓ RoomEntryUI._slotsRemainingLabel → optional Text  ← T052 Done (wire in prefab)
       □ RoomListUI._passwordInputField → optional password InputField
       □ ConnectionBadgeUI: 5 VoidGameEventListeners → OnDisconnected/OnConnecting/OnConnected/OnMatchJoined/OnReconnecting
       □ ConnectionStateLabel: same 5 channels
