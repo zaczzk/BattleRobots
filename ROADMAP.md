@@ -96,6 +96,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T058 | RoomListUI section collapse/expand toggle per ping tier | 35 | **Done** 2026-04-07 | SectionHeaderUI MB (Button + label + indicator ▼/▶, Setup/HandleClicked/IsCollapsed/Tier); RoomListUI: _sectionHeaderUIPrefab + _collapsedTiers HashSet<PingTier> + ToggleTierCollapse + IsTierCollapsed + updated EmitSectionHeader + RebuildGrouped skips collapsed rows; 12 EditMode tests (SectionCollapseTests.cs) |
 | T059 | RoomEntry joined-player name list | 70 | **Done** 2026-04-07 | RoomEntry.playerNames List<string> (8th ctor arg, null default, host at index 0); INetworkAdapter.OnRoomUpdated Action<RoomEntry>; StubNetworkAdapter: JoinPlayerName property (default "Player"), s_RoomPlayerNames dict, Host() seeds names, Join() appends+fires OnRoomUpdated; RoomListSO.UpdateRoom(RoomEntry) replaces entry by roomCode + fires _onRoomsUpdated; NetworkEventBridge wires OnRoomUpdated→UpdateRoom; RoomEntryUI._playerNamesLabel optional Text (comma-joined); 11 EditMode tests (RoomPlayerNamesTests.cs) |
 | T060 | Room spectator count | 65 | **Done** 2026-04-07 | RoomEntry.spectatorCount int (9th ctor arg, clamped ≥0); INetworkAdapter.OnSpectatorCountChanged Action<string,int>; StubNetworkAdapter.SetSpectatorCount static helper + s_SpectatorCounts dict (ClearRooms clears, RequestRoomList populates); RoomEntryUI._spectatorCountLabel optional Text ("N watching" or empty); 8 EditMode tests |
+| T061 | Room chat channel (ChatSO, INetworkAdapter chat, NetworkEventBridge, ChatUI) | 70 | **Done** 2026-04-07 | ChatSO ring-buffer SO; INetworkAdapter.SendChatMessage+OnChatMessageReceived; StubNetworkAdapter.SentChatMessages+SendChatMessage; NetworkEventBridge.SendChat+_chat+_onChatReceivedChannel; ChatUI scroll panel; 10 EditMode tests |
+| T062 | Room kick/ban (host-only per-player button) | 60 | Pending | KickPlayer(roomCode,playerName) in adapter; OnPlayerKicked callback; NetworkEventBridge.BeginKick; KickedUI overlay; 8 EditMode tests |
 
 ---
 
@@ -103,7 +105,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T061 — (next task TBD) | PM Agent | — | See Session Handoff for next action |
+| T062 — Room kick/ban (host-only) | PM Agent | 2026-04-07 | Next: host-kick-player button per player row + INetworkAdapter.KickPlayer + StubNetworkAdapter + NetworkEventBridge.BeginKick + KickTests |
 
 ---
 
@@ -157,6 +159,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T050 — Room sort order | 2026-04-07 | RoomSortMode enum (None/ByPlayerCountDesc/ByRoomCodeAsc) in RoomListSO.cs. GetSortedFilteredRooms(prefix,sort): filter then in-place List.Sort with static comparers. GetFilteredRooms kept as backward-compat wrapper (None sort). RoomListUI._sortMode field + ApplySortMode(mode) public API; Rebuild calls GetSortedFilteredRooms. RoomSortUI (BattleRobots.UI): 3-button group, SetSort(mode), Image tint highlights, no Update. RoomSortTests.cs: 10 EditMode cases. |
 | T051 — Room browser pipeline integration tests | 2026-04-07 | RoomBrowserIntegrationTests.cs (12 EditMode cases). Group A (4): filter by prefix, sort by player-count desc, combined filter+sort, multi-refresh with no stale data. Group B (4): join→refresh increments playerCount in SO, full room IsFull==true, private flag preserved, maxPlayers preserved. Group C (4): clear→refresh empties SO, 10-room large list, no-match prefix returns empty, single-entry with all 3 sort modes. |
 | T052 — RoomEntryUI enhancements | 2026-04-07 | RoomEntry.SlotsRemaining (Core struct property: 0 when IsFull or maxPlayers≤0, else maxPlayers−playerCount clamped ≥0). RoomEntryUI: _slotsRemainingLabel optional Text; Setup populates "N left" or empty string. RoomListUI: _favouriteRoomsSO optional FavouriteRoomsSO SerializeField; Rebuild now calls row.Setup(entry, onJoin, _favouriteRoomsSO) 3-arg overload. RoomEntryEnhancementsTests.cs: 9 EditMode cases (SlotsRemaining×5, FavouriteRoomsSO data contract×3, IsFull/SlotsRemaining coherence×1). |
+| T061 — Room chat channel | 2026-04-07 | ChatSO ring-buffer SO (Core); INetworkAdapter.SendChatMessage+OnChatMessageReceived; StubNetworkAdapter.SentChatMessages+SendChatMessage+callback; NetworkEventBridge._chat+_onChatReceivedChannel+SendChat+wiring; ChatUI MB (UI, AppendMessage, HandleSend, ClearPanel, history replay); ChatTests.cs 10 EditMode cases. |
 
 ---
 
@@ -210,22 +213,28 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-07 | PM Agent | Session 43: T057 RoomListUI ping-tier section headers. PingTier enum (Core, in RoomListSO.cs: Excellent=0/Good=1/High=2/Unknown=3 — ordering drives display priority). RoomEntryUI: GetPingTier(int) public static (0/neg→Unknown/≤80→Excellent/≤150→Good/151+→High); GetTierLabel(PingTier) public static (localised header strings). RoomListUI: _groupByPingTier bool + _sectionHeaderPrefab Text Inspector fields; _headers List<GameObject> runtime pool; Rebuild splits into RebuildFlat (old path) / RebuildGrouped (tier path); SortByTier internal static (stable — index tiebreak via (entry,idx) pairs); EmitSectionHeader instantiates _sectionHeaderPrefab (no-op when null). RoomPingTierTests.cs: 14 EditMode cases (GetPingTier×6, GetTierLabel×4, enum sort order×3, SortByTier stable sort×1). |
 | 2026-04-07 | PM Agent | Session 45: T059 RoomEntry joined-player name list. RoomEntry.playerNames List<string> (8th ctor arg, null default, host at index 0). INetworkAdapter.OnRoomUpdated Action<RoomEntry>. StubNetworkAdapter: JoinPlayerName property (default "Player"); s_RoomPlayerNames static dict; Host() seeds names with [HostPlayerName]; Join() appends JoinPlayerName + fires OnRoomUpdated with updated entry; RequestRoomList populates playerNames from dict; ClearRooms clears dict. RoomListSO.UpdateRoom(RoomEntry): replaces entry by case-insensitive roomCode match + fires _onRoomsUpdated (no-op with warning when not found). NetworkEventBridge.RegisterAdapterCallbacks: wires adapter.OnRoomUpdated → _roomList?.UpdateRoom(entry). RoomEntryUI._playerNamesLabel optional Text SerializeField; Setup comma-joins entry.playerNames (string.Join(", ", …), empty when null/empty). RoomPlayerNamesTests.cs: 11 EditMode cases. |
 | 2026-04-07 | PM Agent | Session 46: T060 Room spectator count. RoomEntry.spectatorCount int field (Tooltip, 9th ctor arg default 0, Mathf.Max(0,…) clamp). INetworkAdapter: OnSpectatorCountChanged Action<string,int> callback. StubNetworkAdapter: s_SpectatorCounts static dict; SetSpectatorCount(string,int) public static (clamped ≥0, 0 removes entry); ClearRooms clears dict; RequestRoomList populates entry.spectatorCount from dict. RoomEntryUI: _spectatorCountLabel optional Text SerializeField; Setup sets "N watching" when spectatorCount>0, else empty string. RoomSpectatorCountTests.cs: 8 EditMode cases (default=0, ctor set, neg clamped, SetCount→RequestList, ClearRooms, callback invoke, UI show, UI hide). |
+| 2026-04-07 | PM Agent | Session 47: T061 Room chat channel. ChatSO (Core SO): string[] ring-buffer, _capacity=50, AddMessage/Clear/Count/GetMessages (oldest-first), fires StringGameEvent _onMessageReceived, null/empty guard, EnsureBuffer lazy-alloc. INetworkAdapter: SendChatMessage(string) method + OnChatMessageReceived Action<string> callback. StubNetworkAdapter: OnChatMessageReceived auto-property; SentChatMessages List<string>(8); SendChatMessage(null-guarded, appends list — no loopback). NetworkEventBridge: _chat ChatSO + _onChatReceivedChannel StringGameEvent Inspector fields; SendChat(sender,text) public method (formats "sender: text", delegates to adapter); RegisterAdapterCallbacks wires OnChatMessageReceived → _chat?.AddMessage + channel?.Raise. ChatUI (BattleRobots.UI MB): _scrollContent/messagePrefab/inputField/sendButton/bridge/localPlayerName/_chatSO; Awake wires send button; OnEnable replays history from ChatSO; AppendMessage/HandleSend (format+send+clear+refocus)/ClearPanel; no Update; no Physics refs. ChatTests.cs: 10 EditMode cases (ring-buffer store, capacity overflow eviction, Clear, event fires via StringGameEventListener reflection injection, null/empty ignored, SentChatMessages, null-message guard, OnChatMessageReceived invokable, Bridge.SendChat format, Bridge incoming→ChatSO). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T060 — Room spectator count.  
-**Milestone status:** M1–M6 Done. T001–T060 Done.
+**Last completed:** T061 — Room chat channel.  
+**Milestone status:** M1–M6 Done. T001–T061 Done.
 
-**Next action:** T061 — Suggest next RICE-ordered networking or UX feature. Recommended candidates:
-  - `RoomEntry.spectatorLimit int` (max spectators cap + badge when limit reached)
-  - Room owner transfer (new INetworkAdapter callback + UI transfer button)
-  - Room kick/ban (host-only button per player row in player names list)
-  - Room chat channel (StringGameEvent channel, ChatSO ring-buffer, ChatUI scroll panel)
+**Next action:** T062 — Room kick/ban (host-only). C# deliverables:
+  - `INetworkAdapter`: `KickPlayer(string roomCode, string playerName)` method + `OnPlayerKicked Action<string>` callback (payload = kicked player's name)
+  - `StubNetworkAdapter`: `SentKickRequests List<(string roomCode, string playerName)>` + `KickPlayer` implementation (removes from s_RoomPlayerNames, decrements playerCount, fires OnPlayerKicked) + `OnPlayerKicked` auto-property
+  - `NetworkEventBridge`: `_onPlayerKickedChannel StringGameEvent` optional field; `BeginKick(string playerName)` public method (reads current room from `_session.CurrentRoomCode`); wire `OnPlayerKicked → _onPlayerKickedChannel?.Raise`
+  - `KickedUI.cs` (BattleRobots.UI): overlay panel shown when local player is kicked; `ShowKicked(string reason)` / `Hide()`; Back-to-lobby button wired via Inspector; `StringGameEventListener` for wiring
+  - `KickTests.cs`: 8 EditMode cases
 
 **Blockers:** None.  
 **Architecture notes:**
+  - T061: `ChatSO._buffer` is lazily allocated via `EnsureBuffer()` — handles SO reimport without manual `OnEnable`. `GetMessages()` returns oldest-first by unwinding from `_head` when buffer is full.
+  - T061: `StubNetworkAdapter.SendChatMessage` does NOT auto-loopback to `OnChatMessageReceived` (follows same pattern as `SendMatchState`/`SentPayloads`). Tests simulate receive by invoking the callback directly.
+  - T061: `ChatUI.OnEnable` replays from `_chatSO.GetMessages()` — allocates one list; acceptable since it's a cold path (panel open). No allocation in `AppendMessage` path (delegates to `SpawnRow` which `Instantiate`s a prefab row, also a cold path).
+  - T062 note: `NetworkSessionSO.CurrentRoomCode` must be checked — confirm it exists or add it before writing `BeginKick`.
   - T060: `RoomEntry.spectatorCount` is optional 9th ctor arg (default 0); negative values clamped via `Mathf.Max(0,…)`. `StubNetworkAdapter.SetSpectatorCount` follows the same static-helper pattern as `SetRoomPing` / `SetRoomCreatedAt`. `OnSpectatorCountChanged` is declared in the interface for real adapters; the stub exposes it as an auto-property so tests can assign/invoke the callback directly.
   - T058: `SectionHeaderUI` uses `[RequireComponent(typeof(Button))]` — in Editor, AddComponent auto-adds Button; in EditMode tests, GetComponent<Button>() may return null (guarded in Awake). `HandleClicked` is public to allow direct test invocation. `IsTierCollapsed` public query allows tests to verify state without reflection.
   - T058: `_sectionHeaderUIPrefab` takes priority over `_sectionHeaderPrefab` (Text) when both are assigned — both fields preserved so existing prefab setups continue to work without reimport.

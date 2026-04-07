@@ -200,10 +200,16 @@ namespace BattleRobots.Core
         /// <inheritdoc/>
         public Action<string, int> OnSpectatorCountChanged { get; set; }
 
+        /// <inheritdoc/>
+        public Action<string> OnChatMessageReceived { get; set; }
+
         // ── Test-inspection surface ───────────────────────────────────────────
 
         /// <summary>All payloads passed to <see cref="SendMatchState"/>, in order.</summary>
         public List<byte[]> SentPayloads { get; } = new List<byte[]>(8);
+
+        /// <summary>All messages passed to <see cref="SendChatMessage"/>, in order.</summary>
+        public List<string> SentChatMessages { get; } = new List<string>(8);
 
         /// <summary>Number of times <see cref="Connect"/> has been called.</summary>
         public int ConnectCallCount { get; private set; }
@@ -367,6 +373,17 @@ namespace BattleRobots.Core
         {
             if (payload == null) return;
             SentPayloads.Add(payload);
+        }
+
+        /// <summary>
+        /// Record the chat message for test inspection.
+        /// Does not auto-fire <see cref="OnChatMessageReceived"/> (tests can do so
+        /// explicitly to simulate a loopback from the remote peer).
+        /// </summary>
+        public void SendChatMessage(string message)
+        {
+            if (message == null) return;
+            SentChatMessages.Add(message);
         }
 
         /// <summary>

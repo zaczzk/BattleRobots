@@ -59,6 +59,15 @@ namespace BattleRobots.Core
                  "Leave unassigned to disable recent-rooms tracking.")]
         [SerializeField] private RecentRoomsSO _recentRooms;
 
+        [Header("Chat")]
+        [Tooltip("(Optional) ChatSO ring-buffer. Incoming chat messages are forwarded here via AddMessage. " +
+                 "Leave unassigned to disable chat history buffering.")]
+        [SerializeField] private ChatSO _chat;
+
+        [Tooltip("(Optional) SO event channel raised when a chat message is received from the adapter. " +
+                 "Wire a StringGameEventListener on ChatUI to ChatUI.AppendMessage.")]
+        [SerializeField] private StringGameEvent _onChatReceivedChannel;
+
         // ── Runtime adapter ───────────────────────────────────────────────────
 
         private INetworkAdapter _adapter;
@@ -212,6 +221,28 @@ namespace BattleRobots.Core
             // Session state is updated via the OnDisconnected callback registered in Awake.
         }
 
+        // ── Chat ─────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Broadcast a chat message to all players in the current room.
+        ///
+        /// The message is formatted as "<paramref name="senderName"/>: <paramref name="text"/>"
+        /// before being passed to the adapter, so the transport layer stays format-agnostic.
+        /// Null or empty <paramref name="senderName"/> is replaced with "Unknown".
+        /// Null or whitespace-only <paramref name="text"/> is silently ignored.
+        ///
+        /// Wire a UI button's OnClick to this method via a UnityEvent that supplies the
+        /// text from an InputField — or call it directly from <see cref="BattleRobots.UI.ChatUI"/>.
+        /// </summary>
+        public void SendChat(string senderName, string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return;
+
+            string sender    = string.IsNullOrWhiteSpace(senderName) ? "Unknown" : senderName;
+            string formatted = $"{sender}: {text}";
+            _adapter?.SendChatMessage(formatted);
+        }
+
         // ── Room discovery ────────────────────────────────────────────────────
 
         /// <summary>
@@ -312,6 +343,14 @@ namespace BattleRobots.Core
             {
                 // Patch the in-memory list for the changed room without a full refresh.
                 _roomList?.UpdateRoom(entry);
+            };
+
+            adapter.OnChatMessageReceived = (message) =>
+            {
+                // Buffer in the ChatSO ring buffer (if assigned).
+                _chat?.AddMessage(message);
+                // Raise the SO event channel so Inspector-wired listeners react.
+                _onChatReceivedChannel?.Raise(message);
             };
         }
 

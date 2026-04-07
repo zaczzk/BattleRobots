@@ -101,6 +101,18 @@ namespace BattleRobots.Core
         /// </summary>
         void SendMatchState(byte[] payload);
 
+        // ── Chat messaging ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Broadcast a chat message to all players in the current room.
+        ///
+        /// The adapter is responsible for delivery. The message string is pre-formatted
+        /// by the caller (e.g. "Alice: Hello!") so the adapter stays transport-agnostic.
+        ///
+        /// Implementors must never allocate on the call site.
+        /// </summary>
+        void SendChatMessage(string message);
+
         // ── Callbacks (set by NetworkEventBridge before calling Connect) ──────
 
         /// <summary>Invoked by the adapter when the connection to the backend succeeds.</summary>
@@ -145,6 +157,16 @@ namespace BattleRobots.Core
         /// (null callback is acceptable; callers must guard against null).
         /// </summary>
         Action<string, int> OnSpectatorCountChanged { get; set; }
+
+        /// <summary>
+        /// Invoked by the adapter when a chat message is received from a remote player.
+        /// The payload is the pre-formatted string delivered by the sender
+        /// (e.g. "Alice: Hello!").
+        ///
+        /// Adapters that do not support in-room chat may leave this unimplemented
+        /// (null callback is acceptable; callers must guard against null).
+        /// </summary>
+        Action<string> OnChatMessageReceived { get; set; }
 
         /// <summary>
         /// Invoked by the adapter in response to <see cref="RequestRoomList"/>.
