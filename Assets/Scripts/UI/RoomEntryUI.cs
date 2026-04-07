@@ -30,6 +30,7 @@ namespace BattleRobots.UI
     ///   □ _pingBadge            → (optional) Image coloured by latency (grey/green/yellow/red)
     ///   □ _pingLabel            → (optional) Text showing "N ms" (empty when pingMs = 0)
     ///   □ _hostNameLabel        → (optional) Text showing the host's display name
+    ///   □ _ageLabel             → (optional) Text showing relative room age ("Just now", "3m ago", etc.)
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RoomEntryUI : MonoBehaviour
@@ -85,6 +86,12 @@ namespace BattleRobots.UI
         [Tooltip("(Optional) Text label showing the display name of the room host. " +
                  "Hidden (empty string) when hostName is not provided.")]
         [SerializeField] private Text _hostNameLabel;
+
+        [Header("Room Age (optional)")]
+        [Tooltip("(Optional) Text label showing how long ago the room was created, " +
+                 "e.g. 'Just now', '3m ago', '2h ago'. Hidden (empty string) when " +
+                 "createdAt is 0 (unknown).")]
+        [SerializeField] private Text _ageLabel;
 
         // ── Runtime state ─────────────────────────────────────────────────────
 
@@ -189,6 +196,10 @@ namespace BattleRobots.UI
 
             // Apply the ping latency badge (colour dot + numeric label).
             ApplyPingBadge(entry.pingMs);
+
+            // Room age label: compute relative time string from createdAt ticks.
+            if (_ageLabel != null)
+                _ageLabel.text = GetAgeString(entry.createdAt, DateTime.UtcNow.Ticks);
         }
 
         /// <summary>
@@ -220,6 +231,36 @@ namespace BattleRobots.UI
             if (pingMs <= 80)  return Color.green;
             if (pingMs <= 150) return Color.yellow;
             return Color.red;
+        }
+
+        /// <summary>
+        /// Converts a room creation timestamp into a human-readable relative age string.
+        ///
+        /// Exposed as public static so unit tests can verify the mapping without
+        /// instantiating the full MonoBehaviour.
+        ///
+        /// Rules:
+        ///   0 or negative createdAt → empty string (unknown creation time)
+        ///   age &lt;  60 seconds       → "Just now"
+        ///   age &lt;  60 minutes       → "Xm ago"
+        ///   age &lt;  24 hours         → "Xh ago"
+        ///   age ≥  24 hours         → "Xd ago"
+        /// </summary>
+        /// <param name="createdAtTicks">UTC ticks of room creation (from <see cref="RoomEntry.createdAt"/>).</param>
+        /// <param name="nowTicks">UTC ticks representing "now". In production pass <c>DateTime.UtcNow.Ticks</c>.</param>
+        public static string GetAgeString(long createdAtTicks, long nowTicks)
+        {
+            if (createdAtTicks <= 0L) return string.Empty;
+
+            long elapsedTicks = nowTicks - createdAtTicks;
+            if (elapsedTicks < 0L) return string.Empty; // clock skew / future timestamp
+
+            double seconds = (double)elapsedTicks / TimeSpan.TicksPerSecond;
+
+            if (seconds < 60.0)          return "Just now";
+            if (seconds < 3600.0)        return $"{(int)(seconds / 60.0)}m ago";
+            if (seconds < 86400.0)       return $"{(int)(seconds / 3600.0)}h ago";
+            return                              $"{(int)(seconds / 86400.0)}d ago";
         }
 
         // ── Private ───────────────────────────────────────────────────────────

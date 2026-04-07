@@ -64,12 +64,22 @@ namespace BattleRobots.Core
         private static readonly Dictionary<string, int> s_RoomPings =
             new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Remove all simulated rooms, passwords, and pings (call in TearDown).</summary>
+        /// <summary>
+        /// Server-side simulated creation timestamp store, keyed by normalised room code.
+        /// Populated via <see cref="SetRoomCreatedAt"/>; used by <see cref="RequestRoomList"/>
+        /// to populate <see cref="RoomEntry.createdAt"/> for each returned room.
+        /// 0 (default) means creation time is unknown.
+        /// </summary>
+        private static readonly Dictionary<string, long> s_RoomCreatedAt =
+            new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Remove all simulated rooms, passwords, pings, and creation times (call in TearDown).</summary>
         public static void ClearRooms()
         {
             s_ActiveRooms.Clear();
             s_RoomPasswords.Clear();
             s_RoomPings.Clear();
+            s_RoomCreatedAt.Clear();
         }
 
         // ── Host identity ─────────────────────────────────────────────────────
@@ -96,6 +106,24 @@ namespace BattleRobots.Core
                 : roomCode.Trim().ToUpperInvariant();
 
             s_RoomPings[code] = Math.Max(0, pingMs);
+        }
+
+        /// <summary>
+        /// Assign a simulated creation timestamp (UTC ticks) to an existing room so that
+        /// the next <see cref="RequestRoomList"/> call returns it in
+        /// <see cref="RoomEntry.createdAt"/>. Pass 0 to clear a previously-set value.
+        /// Call after <see cref="Host"/> has registered the room.
+        /// </summary>
+        public static void SetRoomCreatedAt(string roomCode, long createdAtTicks)
+        {
+            string code = string.IsNullOrWhiteSpace(roomCode)
+                ? string.Empty
+                : roomCode.Trim().ToUpperInvariant();
+
+            if (createdAtTicks <= 0L)
+                s_RoomCreatedAt.Remove(code);
+            else
+                s_RoomCreatedAt[code] = createdAtTicks;
         }
 
         // ── INetworkAdapter callbacks ─────────────────────────────────────────
@@ -271,8 +299,9 @@ namespace BattleRobots.Core
         /// <summary>
         /// Simulate a room-list response. Returns all rooms currently in
         /// <see cref="s_ActiveRooms"/> — including <c>playerCount</c>,
-        /// <c>maxPlayers</c>, and any <c>pingMs</c> set via
-        /// <see cref="SetRoomPing"/> — via <see cref="OnRoomListReceived"/>.
+        /// <c>maxPlayers</c>, any <c>pingMs</c> set via <see cref="SetRoomPing"/>,
+        /// and any <c>createdAt</c> set via <see cref="SetRoomCreatedAt"/> —
+        /// via <see cref="OnRoomListReceived"/>.
         /// </summary>
         public void RequestRoomList()
         {
@@ -283,9 +312,9 @@ namespace BattleRobots.Core
             {
                 RoomEntry entry = kvp.Value;
                 if (s_RoomPings.TryGetValue(kvp.Key, out int ping))
-                {
                     entry.pingMs = ping;
-                }
+                if (s_RoomCreatedAt.TryGetValue(kvp.Key, out long ts))
+                    entry.createdAt = ts;
                 rooms.Add(entry);
             }
 

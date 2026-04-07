@@ -53,6 +53,10 @@ namespace BattleRobots.Core
                  "Empty string when the host name is not provided.")]
         public string hostName;
 
+        [Tooltip("UTC ticks (DateTime.UtcNow.Ticks) at the moment the room was created. " +
+                 "0 means the creation time is unknown or was not provided by the adapter.")]
+        public long createdAt;
+
         /// <summary>
         /// Convenience constructor for use in tests and the stub adapter.
         /// </summary>
@@ -62,8 +66,10 @@ namespace BattleRobots.Core
         /// <param name="isPrivate">Whether a password is required to join. Defaults to false.</param>
         /// <param name="pingMs">Round-trip latency in ms to the room host. 0 = unknown.</param>
         /// <param name="hostName">Display name of the room host. Defaults to empty string.</param>
+        /// <param name="createdAt">UTC ticks of room creation. 0 = unknown.</param>
         public RoomEntry(string roomCode, int playerCount, int maxPlayers = 2,
-                         bool isPrivate = false, int pingMs = 0, string hostName = "")
+                         bool isPrivate = false, int pingMs = 0, string hostName = "",
+                         long createdAt = 0L)
         {
             this.roomCode    = roomCode    ?? string.Empty;
             this.playerCount = playerCount;
@@ -71,6 +77,7 @@ namespace BattleRobots.Core
             this.isPrivate   = isPrivate;
             this.pingMs      = Mathf.Max(0, pingMs);
             this.hostName    = hostName ?? string.Empty;
+            this.createdAt   = createdAt < 0L ? 0L : createdAt;
         }
 
         /// <summary>

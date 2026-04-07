@@ -91,6 +91,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T053 | RoomEntryUI copy-to-clipboard button | 60 | **Done** 2026-04-07 | _copyButton + _copiedFeedbackLabel; HandleCopyClicked (GUIUtility.systemCopyBuffer, LastCopiedCode, "Copied!" coroutine 1.5 s); Setup wires interactable; 8 EditMode tests |
 | T054 | RoomEntryUI ping/latency badge | 55 | **Done** 2026-04-07 | RoomEntry.pingMs field (clamped ≥0, optional 5th ctor arg); StubNetworkAdapter.SetRoomPing + s_RoomPings dict + ClearRooms clears pings; RoomEntryUI._pingBadge (Image colour-coded) + _pingLabel (Text "N ms", empty when 0); GetPingColor public static (grey≤0 / green≤80 / yellow≤150 / red≥151); ApplyPingBadge private; 12 EditMode tests |
 | T055 | RoomEntryUI host-name label | 50 | **Done** 2026-04-07 | RoomEntry.hostName string field (optional 6th ctor arg, null→empty); StubNetworkAdapter.HostPlayerName property (default "Host", stored per room in Host()); Join preserves hostName; RoomEntryUI._hostNameLabel optional Text wired in Setup; 10 EditMode tests (RoomHostNameTests.cs) |
+| T056 | RoomEntryUI room-age / created-time display | 45 | **Done** 2026-04-07 | RoomEntry.createdAt long (7th ctor arg, neg→0); StubNetworkAdapter.SetRoomCreatedAt + s_RoomCreatedAt dict; ClearRooms and RequestRoomList extended; RoomEntryUI._ageLabel optional Text + GetAgeString(long,long) public static ("Just now"/<60s, "Xm ago"/<60m, "Xh ago"/<24h, "Xd ago"); 12 EditMode tests (RoomAgeTests.cs) |
 
 ---
 
@@ -98,7 +99,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T056 — (next pending task TBD) | PM Agent | — | See Session Handoff for next action |
+| T057 — (next pending task TBD) | PM Agent | — | See Session Handoff for next action |
 
 ---
 
@@ -200,22 +201,24 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-07 | PM Agent | Session 39: T053 Room-code copy-to-clipboard. RoomEntryUI extended: _copyButton (Button) wired in Awake/OnDestroy, _copiedFeedbackLabel (Text) shows "Copied!" on click, HandleCopyClicked() public (GUIUtility.systemCopyBuffer = _roomCode, LastCopiedCode observable property, starts ClearCopiedFeedback coroutine that reverts label after 1.5 s; no-op on empty code). Setup sets _copyButton.interactable based on code presence. RoomCopyTests.cs: 8 EditMode cases (LastCopiedCode default, systemCopyBuffer set, LastCopiedCode updated, feedback label "Copied!", empty-code no-copy, null label no-throw, empty-code button not interactable, valid-code button interactable). Fields injected via reflection to bypass Inspector. |
 | 2026-04-07 | PM Agent | Session 40: T054 Room ping/latency badge. RoomEntry.pingMs int field (Tooltip; Mathf.Max(0,…) clamp in 5-arg constructor; backward-compatible — 4-arg ctor unchanged). StubNetworkAdapter: s_RoomPings static dict; SetRoomPing(string,int) public static; ClearRooms() clears pings; RequestRoomList populates entry.pingMs from dict. RoomEntryUI: _pingBadge (Image, optional) + _pingLabel (Text, optional) Inspector fields; ApplyPingBadge(int) private; GetPingColor(int) public static (grey≤0/green≤80/yellow≤150/red≥151); ApplyPingBadge called at end of Setup overload. RoomPingBadgeTests.cs: 12 EditMode cases (RoomEntry default/ctor/clamp; GetPingColor ×5; Setup badge color; null badge no-throw; StubSetRoomPing→RequestRoomList; ClearRooms clears pings). |
 | 2026-04-07 | PM Agent | Session 41: T055 RoomEntryUI host-name label. RoomEntry.hostName string field (optional 6th ctor arg, null→empty guard). StubNetworkAdapter.HostPlayerName string property (default "Host"): stored in RoomEntry on Host(); Join preserves hostName on playerCount increment. RoomEntryUI._hostNameLabel optional Text SerializeField wired in Setup (empty when hostName absent). RoomHostNameTests.cs: 10 EditMode cases (default/ctor/null-coercion; HostPlayerName default; Host stores name; RequestRoomList returns name; two rooms with different names; ClearRooms resets; UI Setup; null label no-throw). |
+| 2026-04-07 | PM Agent | Session 42: T056 RoomEntryUI room-age display. RoomEntry.createdAt long (optional 7th ctor arg, neg→0 clamp, Serializable Tooltip). StubNetworkAdapter: s_RoomCreatedAt static dict; SetRoomCreatedAt(string,long) public static (≤0 removes entry); ClearRooms clears it; RequestRoomList populates entry.createdAt from dict. RoomEntryUI: _ageLabel optional Text SerializeField; GetAgeString(long,long) public static ("" when 0/negative/future; "Just now" <60s; "Xm ago" <60m; "Xh ago" <24h; "Xd ago" ≥24h); called in Setup with DateTime.UtcNow.Ticks as nowTicks. RoomAgeTests.cs: 12 EditMode cases (RoomEntry default/ctor/neg-clamp; GetAgeString zero/sub-60s/minutes/hours/days; SetRoomCreatedAt pipeline; ClearRooms clears; UI Setup known/zero age). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T055 — RoomEntryUI host-name label.  
-**Milestone status:** M1–M6 Done. T001–T055 Done.
+**Last completed:** T056 — RoomEntryUI room-age display.  
+**Milestone status:** M1–M6 Done. T001–T056 Done.
 
-**Next action:** T056 — Suggest: `RoomEntryUI` room-age / created-time display — add `createdAt long` (UTC ticks) to `RoomEntry`, compute age string ("Just now" / "Xm ago"), display in optional Text field. ~8 EditMode tests.  
-  Alternatively: `RoomListUI` section headers grouping rooms by ping tier (Excellent/Good/High), or tackle any deferred Inspector-wiring item below.
+**Next action:** T057 — Suggested: `RoomListUI` section headers grouping rooms by ping tier (Excellent ≤80 ms / Good ≤150 ms / High >150 ms / Unknown 0 ms). Or: `RoomEntry` player name list (host + joined players), or any deferred Inspector-wiring item below.
 
 **Blockers:** None.  
 **Architecture notes:**
+  - T056: `RoomEntry.createdAt` is optional 7th ctor arg (default 0); negative values clamped to 0. `GetAgeString` is public static on `RoomEntryUI` — testable without MonoBehaviour instantiation. `StubNetworkAdapter.SetRoomCreatedAt` follows same static-helper pattern as `SetRoomPing`.
   - T055: `RoomEntry.hostName` is optional 6th ctor arg (default `""`); existing tests using 3–5 arg constructors compile unchanged. `StubNetworkAdapter.HostPlayerName` is an instance property (default `"Host"`), not static — each stub instance can simulate a different host. `Join(string,string)` now preserves `hostName` when incrementing `playerCount`.
   - T054: `GetPingColor` is public static (no MB instantiation required in tests). `ApplyPingBadge` is private — tested indirectly via `Setup` + badge Image.color assertion.
   - Deferred Inspector wiring (carry-forward):
+      □ RoomEntryUI._ageLabel → Text child GO in prefab  ← T056 Done (wire in prefab)
       □ RoomEntryUI._hostNameLabel → Text child GO in prefab  ← T055 Done (wire in prefab)
       □ RoomEntryUI._pingBadge → Image child GO + _pingLabel → Text child GO in prefab  ← T054 Done (wire in prefab)
       □ RoomEntryUI._copyButton + _copiedFeedbackLabel → Button + Text in prefab  ← T053 Done (wire in prefab)
