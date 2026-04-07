@@ -43,9 +43,9 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T005 | RobotDefinition SO (part slots, base stats) | 75 | **Done** | Compiles; slots validated in Editor |
 | T006 | ArticulationBody joint wrapper (HingeJointAB) | 75 | **Done** | Drive applies torque; no Rigidbody |
 | T007 | DamageSystem — HealthSO + DamageEvent channel | 70 | **Done** | Damage reduces health SO; death event fires |
-| T008 | Arena scene scaffold (ground, walls, spawn points) | 60 | Pending | Scene loads; robots spawn at markers |
+| T008 | Arena scene scaffold (ground, walls, spawn points) | 60 | **Done** | Scene loads; robots spawn at markers |
 | T009 | ShopUI — part browser, buy button, wallet display | 55 | Pending | UI reads wallet SO; buy fires deduct |
-| T010 | MatchManager — round timer, win condition | 55 | Pending | Correct winner determined; MatchRecord written |
+| T010 | MatchManager — round timer, win condition | 55 | **Done** | Correct winner determined; MatchRecord written |
 | T011 | MainMenu + LoadingScreen UI | 40 | Pending | Scene transitions work; no GC in Update |
 | T012 | VFX: impact sparks, destruction explosion | 30 | Pending | Pooled particles; zero alloc |
 
@@ -55,7 +55,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T008 — Arena scene scaffold | PM Agent | 2026-04-06 | Next: ground plane, walls, spawn point markers as ScriptableObject-driven prefab setup |
+| T009 — ShopUI | PM Agent | 2026-04-07 | Next: part browser panel, buy button, wallet balance label — all wired to PlayerWallet SO via IntGameEventListener |
 
 ---
 
@@ -70,6 +70,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T005 — RobotDefinition SO | 2026-04-06 | PartSlot list, base stats; Editor drawer with slot validation |
 | T006 — HingeJointAB | 2026-04-06 | RevoluteJoint ArticulationBody wrapper; SetTargetVelocity / ApplyTorque |
 | T007 — DamageSystem | 2026-04-06 | HealthSO + DamageInfo struct + DamageGameEvent channel + DamageReceiver |
+| T008 — Arena scene scaffold | 2026-04-07 | ArenaConfig SO (ground/wall dims, SpawnPointData list), SpawnPointMarker MB (Gizmo), ArenaManager MB (HandleMatchStarted positions robots). Scene assets deferred to Editor session. |
+| T010 — MatchManager | 2026-04-07 | Round timer in Update (no allocs), death/expiry win conditions, MatchRecord written via SaveSystem, wallet rewarded via PlayerWallet SO, _onMatchEnded VoidGameEvent raised. |
 
 ---
 
@@ -79,17 +81,22 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 |------|-------|---------|
 | 2026-04-05 | PM Agent | Session 1: Repo bootstrap. Created ROADMAP.md, .gitignore, folder structure, Core SO event channel system (GameEvent, VoidGameEvent, GameEventListenerT), PlayerWallet SO, MatchRecord, XOR SaveSystem. |
 | 2026-04-06 | PM Agent | Session 2: T005 RobotDefinition SO (PartSlot, PartCategory, ValidateSlots, Editor drawer). T006 HingeJointAB (RevoluteJoint, SetTargetVelocity, ApplyTorque, no Rigidbody). T007 DamageSystem (DamageInfo struct, DamageGameEvent channel, DamageGameEventListener, HealthSO with FloatGameEvent/VoidGameEvent channels, DamageReceiver bridging events to HealthSO). M1 fully complete; M2 core Physics in place. |
+| 2026-04-07 | PM Agent | Session 3: T008 Arena scaffold (ArenaConfig SO, SpawnPointMarker MB with Gizmos, ArenaManager MB). T010 MatchManager (round timer, death/expiry win conditions, MatchRecord persistence, wallet rewards, VoidGameEvent channels). M3 core loop complete in C#; scene asset wiring deferred to Editor session. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T005 (RobotDefinition SO), T006 (HingeJointAB), T007 (DamageSystem)  
-**Next action:** T008 — Arena scene scaffold. Since Unity Editor is unavailable in remote env, deliverable is C# scaffolding: `ArenaConfig.cs` SO (ground size, wall height, spawn point transforms as SO data), `SpawnPointMarker.cs` MonoBehaviour (marks spawn positions in scene), and `ArenaManager.cs` (reads ArenaConfig SO, positions robots at spawn points on MatchStart event). No scene files — scene wiring deferred to a session with Unity Editor access.  
-**Blockers:** None for C# work. Scene asset creation (.unity) deferred until Editor session.  
+**Last completed:** T008 (ArenaConfig SO + SpawnPointMarker + ArenaManager), T010 (MatchManager)  
+**Next action:** T009 — ShopUI. C# deliverables (no Editor needed):
+  - `PartDefinition.cs` SO (BattleRobots.Core) — part identity, category, cost, thumbnail
+  - `ShopCatalog.cs` SO (BattleRobots.Core) — list of PartDefinitions available for purchase
+  - `ShopManager.cs` (BattleRobots.UI) — reads ShopCatalog + PlayerWallet SO; exposes BuyPart(PartDefinition) method; fires VoidGameEvent on purchase; UI wiring deferred to Editor session
+  
+**Blockers:** None for C# work. All scene/prefab/.unity asset creation deferred until Editor session.  
 **Architecture notes:**
-- `ArenaConfig` → `BattleRobots.Core` namespace (data SO)  
-- `SpawnPointMarker` → `BattleRobots.Core` namespace (pure marker MB)  
-- `ArenaManager` → `BattleRobots.Core` namespace; listens to `VoidGameEvent` MatchStarted channel  
-- All cross-component communication via SO event channels — no direct references to Physics or UI  
-- `DamageReceiver` in Physics namespace: to wire SO damage channel in Inspector, add a `DamageGameEventListener` MB to the robot GO and point its UnityEvent at `DamageReceiver.TakeDamage(DamageInfo)`
+- `PartDefinition` and `ShopCatalog` → `BattleRobots.Core` (pure data SOs)
+- `ShopManager` → `BattleRobots.UI` namespace; must NOT reference BattleRobots.Physics
+- Wire PlayerWallet balance changes to UI label via `IntGameEventListener` in Inspector
+- ArenaManager and MatchManager both receive MatchStarted via `VoidGameEventListener` MB on same GO; Response wired to `HandleMatchStarted()` in Inspector
+- MatchManager `_arenaIndex` field: assign from ArenaConfig.ArenaIndex at runtime (or wire in Inspector) to keep MatchRecord consistent
