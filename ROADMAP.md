@@ -82,6 +82,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T044 | Network room capacity (maxPlayers, full-room filter, capacity label) | 70 | **Done** 2026-04-06 | RoomEntry.maxPlayers + IsFull; INetworkAdapter.Host(string,int); StubNetworkAdapter Dictionary + capacity-aware Join; NetworkEventBridge.BeginHost(string,int); RoomEntryUI "N/MAX" label + FULL badge + disabled join; RoomListUI _filterFullRooms toggle; 10 EditMode tests |
 | T045 | Room password / private rooms | 65 | **Done** 2026-04-06 | RoomEntry.isPrivate bool; INetworkAdapter Host(string,int,bool,string) + Join(string,string); StubNetworkAdapter s_RoomPasswords dict + password verification; ClearRooms clears passwords; NetworkEventBridge BeginHost/BeginJoin overloads; RoomEntryUI _privateBadge; RoomListUI _hidePrivateRooms + _passwordInputField; 12 EditMode tests |
 | T046 | Room join-failure UI feedback | 60 | **Done** 2026-04-07 | StringGameEvent SO channel + StringGameEventListener MB (Core). JoinFailureUI MB (BattleRobots.UI): ShowFailure(string)/Hide(), IsVisible+LastReason testable properties, null-safe Text/_panel/_closeButton. NetworkEventBridge extended: _onRoomJoinFailedChannel raises StringGameEvent on adapter OnRoomJoinFailed. JoinFailureTests.cs: 12 EditMode cases. |
+| T047 | Room bookmarking / favourites | 55 | **Done** 2026-04-07 | SaveData.favouriteRoomCodes; FavouriteRoomsSO SO (AddFavourite/RemoveFavourite/IsFavourite O(1)/Clear/LoadFromData/BuildData + auto-persist via SaveSystem); FavouriteButtonUI MB (BattleRobots.UI, star toggle, colour feedback); RoomEntryUI extended Setup overload accepting FavouriteRoomsSO; FavouriteRoomsTests.cs 21 EditMode cases. |
 
 ---
 
@@ -89,7 +90,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T047 — (next task TBD) | PM Agent | 2026-04-07 | See Session Handoff |
+| T048 — (next task TBD) | PM Agent | 2026-04-07 | See Session Handoff |
 
 ---
 
@@ -179,32 +180,36 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 30: T044 Network room capacity. RoomEntry struct extended: maxPlayers field + IsFull computed property + 3-arg constructor (default maxPlayers=2, clamps ≤0 to 2). INetworkAdapter: Host(string,int) overload added. StubNetworkAdapter: s_ActiveRooms converted from HashSet<string> to Dictionary<string,RoomEntry>; Host(string) delegates to Host(string,2); Host(string,int) stores RoomEntry(code,1,cap); Join checks IsFull → OnRoomJoinFailed("...full...") when room at capacity, else increments playerCount in dict + fires OnRoomJoined; RequestRoomList returns kvp.Value list preserving full RoomEntry. NetworkEventBridge: BeginHost(string) delegates to BeginHost(string,2); BeginHost(string,int) added, calls adapter.Host(roomCode,maxPlayers). RoomEntryUI: _playerCountLabel shows "N/MAX"; optional _fullBadge GameObject toggled on IsFull; _joinButton disabled when full or empty code. RoomListUI: _filterFullRooms bool SerializeField; Rebuild skips entry when _filterFullRooms && entry.IsFull. RoomCapacityTests.cs: 10 EditMode cases (constructor/default/IsFull×2; capacity in list; full-join rejected; non-full-join succeeds; playerCount increment; BeginHost capacity contract; SetRooms IsFull in SO). |
 | 2026-04-06 | PM Agent | Session 31: T045 Room password / private rooms. RoomEntry.isPrivate bool field (4-arg constructor, defaults false). INetworkAdapter: Host(string,int,bool,string) + Join(string,string) overloads. StubNetworkAdapter: s_RoomPasswords static dict stores server-side passwords; ClearRooms() clears both dicts; Host delegates chain; Join(string) delegates to Join(string,Empty); Join(string,string) checks not-found → full → private-password in priority order. NetworkEventBridge: BeginHost(string,int,bool,string) + BeginJoin(string,string) overloads; existing single/dual-arg overloads delegate down. RoomEntryUI: _privateBadge optional GO toggled on entry.isPrivate. RoomListUI: _hidePrivateRooms bool toggle + _passwordInputField optional InputField; HandleJoinRequested passes password to BeginJoin(code,password). RoomPrivacyTests.cs: 12 EditMode cases. |
 | 2026-04-07 | PM Agent | Session 32: T046 Room join-failure UI feedback. StringGameEvent (Core SO, GameEvent<string> subclass, CreateAssetMenu). StringGameEventListener (Core MB, GameEventListener<string> shim). JoinFailureUI (BattleRobots.UI MB): ShowFailure(string)/Hide() API; IsVisible+LastReason observable properties; null-safe Text/_panel/_closeButton; Awake hides panel + wires close button; OnDestroy cleanup. NetworkEventBridge: _onRoomJoinFailedChannel StringGameEvent field added; RegisterAdapterCallbacks OnRoomJoinFailed lambda now raises channel after logging. JoinFailureTests.cs: 12 EditMode cases — StringGameEvent no-listener/null/empty raises; JoinFailureUI default-state/ShowFailure/Hide/empty-reason/multi-call; integration pattern (adapter→UI direct wiring, null-UI guard). |
+| 2026-04-07 | PM Agent | Session 33: T047 Room bookmarking/favourites. SaveData.favouriteRoomCodes List<string> added to MatchRecord.cs. FavouriteRoomsSO (Core SO): internal List+HashSet dual-store (O(1) IsFavourite, insertion-order Favourites); AddFavourite/RemoveFavourite (idempotent, null-safe, auto-persist); Clear (skips if empty); LoadFromData (de-duplicates, skips null/empty); BuildData; PersistFavourites → SaveSystem.Load+mutate+Save. FavouriteButtonUI (BattleRobots.UI MB): Setup(FavouriteRoomsSO, roomCode); ToggleFavourite toggles add/remove + Refresh; IsFavourite observable property; star Image colour (gold/grey); Button interactable guard; Awake/OnDestroy listener lifecycle. RoomEntryUI: _favouriteButton field added; original Setup delegates to new overload; Setup(RoomEntry, Action<string>, FavouriteRoomsSO) shows/hides _favouriteButton and calls its Setup. FavouriteRoomsTests.cs: 21 EditMode cases (default state ×3, AddFavourite ×6, RemoveFavourite ×4, Clear ×2, LoadFromData ×4, BuildData round-trip, SaveData field). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T046 — Room join-failure UI feedback (StringGameEvent + StringGameEventListener Core event channel; JoinFailureUI BattleRobots.UI MB; NetworkEventBridge._onRoomJoinFailedChannel wired in RegisterAdapterCallbacks; 12 EditMode tests in JoinFailureTests.cs).  
-**Milestone status:** M1–M6 Done. T001–T046 Done.
+**Last completed:** T047 — Room bookmarking/favourites (FavouriteRoomsSO Core SO; FavouriteButtonUI UI MB; RoomEntryUI extended; SaveData.favouriteRoomCodes; 21 EditMode tests).  
+**Milestone status:** M1–M6 Done. T001–T047 Done.
 
-**Next action:** T047 — Suggested: Room bookmarking / favourites. Persist a list of favourite room codes in SaveSystem. Deliverables:
-  - Add `List<string> favouriteRoomCodes` to `SaveData` (in MatchRecord.cs).
-  - `FavouriteRoomsSO.cs` (Core SO): `IReadOnlyList<string> Favourites`; `AddFavourite(string)`/`RemoveFavourite(string)`/`IsFavourite(string)`/`Clear()`; fires `VoidGameEvent` on change; persists through `SaveSystem` on each mutation.
-  - `FavouriteButtonUI.cs` (BattleRobots.UI MB): star toggle button that calls AddFavourite/RemoveFavourite; updates visual state via IsFavourite.
-  - Wire `RoomEntryUI` to accept an optional `FavouriteRoomsSO` and show/update the favourite button per row.
+**Next action:** T048 — Suggested: Room history (recently-visited rooms). Persist a ring-buffer of recently joined room codes (cap 10) in SaveSystem. Deliverables:
+  - Add `List<string> recentRoomCodes` (max 10, newest-first) to `SaveData` (MatchRecord.cs).
+  - `RecentRoomsSO.cs` (Core SO): `IReadOnlyList<string> Recent`; `RecordVisit(string)` (dedup, prepend, cap at 10, auto-persist); `Clear()`; `LoadFromData`/`BuildData`; fires `VoidGameEvent` on change.
+  - `RecentRoomsUI.cs` (BattleRobots.UI MB): scrollable list of recent room codes with quick-join buttons; `OnEnable` refresh; empty-state label; no Update.
+  - Wire `NetworkEventBridge.BeginJoin` to call `RecentRoomsSO.RecordVisit` on successful join.
   - 10+ EditMode tests.
 
 **Blockers:** None.  
 **Architecture notes:**
-  - All T045 changes are additive and backwards-compatible — existing 2/3-arg `RoomEntry` constructors and single-arg `Join(string)` still work unchanged.
-  - Existing tests (RoomListTests, RoomCapacityTests, RoomListRefreshTests) continue passing; RoomPrivacyTests adds 12 new cases.
-  - Password is NEVER in the public `RoomEntry` struct — only `isPrivate` bool is visible to list browsers (server-side only in StubNetworkAdapter.s_RoomPasswords).
+  - T047 changes are fully additive and backwards-compatible — all existing Setup(RoomEntry, Action<string>) calls still compile because the original overload now delegates to the new 3-arg one.
+  - `FavouriteRoomsSO.PersistFavourites()` loads the whole save file on each mutation — acceptable for low-frequency starring; if perf becomes an issue, batch writes in a future task.
+  - GameBootstrapper should be extended to call `FavouriteRoomsSO.LoadFromData(save.favouriteRoomCodes)` at startup (deferred to Editor session — no scene changes in remote env).
   - Deferred Inspector wiring (carry-forward):
+      □ GameBootstrapper._favouriteRooms → FavouriteRoomsSO asset + LoadFromData call
+      □ RoomListUI: pass FavouriteRoomsSO to RoomEntryUI.Setup(entry, onJoin, favourites)
       □ NetworkEventBridge._roomList → RoomListSO asset
       □ RoomListUI._roomList + _bridge + _entryPrefab + _scrollContent
+      □ RoomEntryUI._favouriteButton → FavouriteButtonUI child component (NEW T047)
       □ RoomEntryUI._fullBadge → optional FULL badge GameObject
-      □ RoomEntryUI._privateBadge → optional PRIVATE badge GameObject (NEW T045)
-      □ RoomListUI._passwordInputField → optional password InputField (NEW T045)
+      □ RoomEntryUI._privateBadge → optional PRIVATE badge GameObject
+      □ RoomListUI._passwordInputField → optional password InputField
       □ ConnectionBadgeUI: 5 VoidGameEventListeners → OnDisconnected/OnConnecting/OnConnected/OnMatchJoined/OnReconnecting
       □ ConnectionStateLabel: same 5 channels
       □ PingMonitor._pingSO + _networkBridge

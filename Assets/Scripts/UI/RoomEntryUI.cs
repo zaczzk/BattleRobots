@@ -21,7 +21,9 @@ namespace BattleRobots.UI
     ///   □ _roomCodeLabel    → Text displaying the 4-char room code
     ///   □ _playerCountLabel → Text displaying "N/MAX" player capacity
     ///   □ _fullBadge        → (optional) GameObject shown only when the room is full
+    ///   □ _privateBadge     → (optional) GameObject shown when the room is private
     ///   □ _joinButton       → Button that triggers the join action (disabled when full)
+    ///   □ _favouriteButton  → (optional) FavouriteButtonUI child component
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RoomEntryUI : MonoBehaviour
@@ -46,6 +48,11 @@ namespace BattleRobots.UI
         [Header("Action")]
         [Tooltip("Button the user presses to join this room. Disabled when the room is full.")]
         [SerializeField] private Button _joinButton;
+
+        [Header("Favourite (optional)")]
+        [Tooltip("(Optional) FavouriteButtonUI child component. " +
+                 "Setup() will wire it automatically when a FavouriteRoomsSO is provided.")]
+        [SerializeField] private FavouriteButtonUI _favouriteButton;
 
         // ── Runtime state ─────────────────────────────────────────────────────
 
@@ -74,6 +81,16 @@ namespace BattleRobots.UI
         /// Join button is pressed. Call once immediately after instantiation.
         /// </summary>
         public void Setup(RoomEntry entry, Action<string> onJoin)
+            => Setup(entry, onJoin, null);
+
+        /// <summary>
+        /// Configure this row for the given <paramref name="entry"/> with optional
+        /// favourite-room support.
+        /// <paramref name="onJoin"/> is invoked with the room code when the Join button
+        /// is pressed. <paramref name="favourites"/> wires the star button — pass
+        /// <c>null</c> to hide/disable favourite functionality.
+        /// </summary>
+        public void Setup(RoomEntry entry, Action<string> onJoin, BattleRobots.Core.FavouriteRoomsSO favourites)
         {
             _roomCode = entry.roomCode ?? string.Empty;
             _onJoin   = onJoin;
@@ -100,6 +117,14 @@ namespace BattleRobots.UI
 
             if (_joinButton != null)
                 _joinButton.interactable = !string.IsNullOrEmpty(_roomCode) && !isFull;
+
+            // Wire the favourite star button if one is present and a SO was provided.
+            if (_favouriteButton != null)
+            {
+                _favouriteButton.gameObject.SetActive(favourites != null);
+                if (favourites != null)
+                    _favouriteButton.Setup(favourites, _roomCode);
+            }
         }
 
         // ── Private ───────────────────────────────────────────────────────────

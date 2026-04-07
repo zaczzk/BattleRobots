@@ -149,5 +149,12 @@ namespace BattleRobots.Core
         /// <see cref="SettingsSO.LoadKeyBindings"/>.
         /// </summary>
         public KeyBindingsData keyBindings = new KeyBindingsData();
+
+        /// <summary>
+        /// Room codes the player has starred as favourites.
+        /// Populated by <see cref="FavouriteRoomsSO.BuildData"/> and consumed by
+        /// <see cref="FavouriteRoomsSO.LoadFromData"/>.
+        /// </summary>
+        public List<string> favouriteRoomCodes = new List<string>();
     }
 }
