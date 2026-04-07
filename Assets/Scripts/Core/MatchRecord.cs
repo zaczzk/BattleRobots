@@ -120,6 +120,35 @@ namespace BattleRobots.Core
         public List<KeyBindingEntry> entries = new List<KeyBindingEntry>();
     }
 
+    // ── Player profile ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Persisted player profile data — display name, avatar selection, and
+    /// accumulated career statistics.
+    /// Serialized inside <see cref="SaveData.playerProfile"/>.
+    /// </summary>
+    [Serializable]
+    public sealed class PlayerProfileData
+    {
+        /// <summary>Player-chosen display name shown in the room list and lobby.</summary>
+        public string displayName = "Player";
+
+        /// <summary>Zero-based index into the game's avatar sprite array.</summary>
+        public int avatarIndex = 0;
+
+        /// <summary>Career total wins across all matches.</summary>
+        public int careerWins;
+
+        /// <summary>Career total losses.</summary>
+        public int careerLosses;
+
+        /// <summary>Career total currency earned.</summary>
+        public int careerEarnings;
+
+        /// <summary>Career total damage dealt.</summary>
+        public float careerDamageDone;
+    }
+
     /// <summary>
     /// Top-level save file container. Holds the running wallet balance,
     /// full match history, and player settings.
@@ -163,5 +192,12 @@ namespace BattleRobots.Core
         /// <see cref="RecentRoomsSO.LoadFromData"/>.
         /// </summary>
         public List<string> recentRoomCodes = new List<string>();
+
+        /// <summary>
+        /// Persisted player profile (display name, avatar, career stats).
+        /// Populated by <see cref="PlayerProfileSO.BuildData"/> and consumed by
+        /// <see cref="PlayerProfileSO.LoadFromData"/>.
+        /// </summary>
+        public PlayerProfileData playerProfile = new PlayerProfileData();
     }
 }

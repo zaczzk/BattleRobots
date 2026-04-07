@@ -20,6 +20,10 @@ namespace BattleRobots.Core
         [Tooltip("RobotLoadoutSO — restored from save file on startup; snapshotted on match save.")]
         [SerializeField] private RobotLoadoutSO _robotLoadout;
 
+        [Header("Player Profile")]
+        [Tooltip("PlayerProfileSO — restored from save file on startup; career stats updated on match save.")]
+        [SerializeField] private PlayerProfileSO _playerProfile;
+
         [Header("Events")]
         [SerializeField] private VoidGameEvent _onGameBootstrapped;
 
@@ -50,6 +54,9 @@ namespace BattleRobots.Core
 
             if (_robotLoadout != null)
                 _robotLoadout.LoadFromData(save.robotLoadout);
+
+            if (_playerProfile != null)
+                _playerProfile.LoadFromData(save.playerProfile);
         }
 
         /// <summary>
@@ -66,6 +73,12 @@ namespace BattleRobots.Core
 
             if (_robotLoadout != null)
                 save.robotLoadout = _robotLoadout.BuildData();
+
+            if (_playerProfile != null)
+            {
+                _playerProfile.UpdateFromMatchRecord(record);
+                save.playerProfile = _playerProfile.BuildData();
+            }
 
             SaveSystem.Save(save);
         }
