@@ -80,9 +80,14 @@ namespace BattleRobots.UI
                  "inserted before each tier group: Excellent → Good → High → Unknown.")]
         [SerializeField] private bool _groupByPingTier = false;
 
-        [Tooltip("(Optional) Text prefab used as a section header between ping-tier groups. " +
-                 "Required only when _groupByPingTier is enabled. Leave null to suppress headers " +
-                 "while still sorting by tier.")]
+        [Tooltip("(Optional) Interactive SectionHeaderUI prefab that adds a collapse/expand " +
+                 "toggle button to each tier group. When assigned, takes priority over " +
+                 "_sectionHeaderPrefab. Leave null to use the plain Text header.")]
+        [SerializeField] private SectionHeaderUI _sectionHeaderUIPrefab;
+
+        [Tooltip("(Optional) Plain Text prefab used as a non-interactive section header. " +
+                 "Used only when _sectionHeaderUIPrefab is not assigned. Leave null to suppress " +
+                 "headers while still sorting by tier.")]
         [SerializeField] private Text _sectionHeaderPrefab;
 
         // ── Runtime state ─────────────────────────────────────────────────────
@@ -98,6 +103,9 @@ namespace BattleRobots.UI
 
         // Active sort mode. Defaults to None (original network order).
         private RoomSortMode _sortMode = RoomSortMode.None;
+
+        // Ping tiers whose rows are currently hidden (collapsed by the player).
+        private readonly HashSet<PingTier> _collapsedTiers = new HashSet<PingTier>();
 
         // ── Lifecycle ─────────────────────────────────────────────────────────
 
@@ -159,6 +167,31 @@ namespace BattleRobots.UI
             _sortMode = mode;
             Rebuild();
         }
+
+        /// <summary>
+        /// Toggles the collapsed state of a ping-tier section and rebuilds the list.
+        /// When collapsed, all rows in that tier are hidden; the section header remains visible.
+        /// Calling this method a second time with the same tier re-expands it.
+        ///
+        /// Wired as the <c>onToggle</c> callback passed into each <see cref="SectionHeaderUI.Setup"/>.
+        /// No Update cost — invoked only on player interaction.
+        /// </summary>
+        public void ToggleTierCollapse(PingTier tier)
+        {
+            if (_collapsedTiers.Contains(tier))
+                _collapsedTiers.Remove(tier);
+            else
+                _collapsedTiers.Add(tier);
+
+            Rebuild();
+        }
+
+        /// <summary>
+        /// Returns true when the given <paramref name="tier"/> is currently collapsed.
+        /// Used by <see cref="SectionHeaderUI.Setup"/> to initialise the visual indicator
+        /// after a Rebuild creates a fresh header instance.
+        /// </summary>
+        public bool IsTierCollapsed(PingTier tier) => _collapsedTiers.Contains(tier);
 
         // ── Internal ──────────────────────────────────────────────────────────
 
@@ -225,7 +258,8 @@ namespace BattleRobots.UI
 
         /// <summary>
         /// Grouped rebuild: sorts rooms by ping tier, inserts a section header
-        /// Text at each tier boundary, then instantiates one row per room.
+        /// at each tier boundary, then instantiates one row per room.
+        /// Rows belonging to a collapsed tier are skipped (hidden).
         /// Used when <c>_groupByPingTier</c> is true.
         /// </summary>
         private void RebuildGrouped(IReadOnlyList<RoomEntry> rooms)
@@ -246,9 +280,13 @@ namespace BattleRobots.UI
                 PingTier tier = RoomEntryUI.GetPingTier(entry.pingMs);
                 if (tier != lastTier)
                 {
-                    EmitSectionHeader(RoomEntryUI.GetTierLabel(tier));
+                    EmitSectionHeader(RoomEntryUI.GetTierLabel(tier), tier);
                     lastTier = tier;
                 }
+
+                // Rows whose tier is collapsed are hidden; the header is still shown.
+                if (_collapsedTiers.Contains(tier))
+                    continue;
 
                 RoomEntryUI row = Instantiate(_entryPrefab, _scrollContent);
                 row.Setup(entry, HandleJoinRequested, _favouriteRoomsSO);
@@ -257,19 +295,36 @@ namespace BattleRobots.UI
         }
 
         /// <summary>
-        /// Instantiates a section header Text from the prefab (if wired) and
-        /// parents it to <see cref="_scrollContent"/>.
-        /// When <see cref="_sectionHeaderPrefab"/> is null the call is a no-op —
-        /// rooms are still sorted by tier; headers are simply not rendered.
+        /// Instantiates a section header and parents it to <see cref="_scrollContent"/>.
+        ///
+        /// When <see cref="_sectionHeaderUIPrefab"/> is assigned, an interactive
+        /// <see cref="SectionHeaderUI"/> is created with a collapse/expand toggle button.
+        /// Otherwise falls back to a plain <see cref="Text"/> from
+        /// <see cref="_sectionHeaderPrefab"/> (no interaction).
+        /// When both prefabs are null the call is a no-op — rooms are still sorted by
+        /// tier; only the header render is suppressed.
         /// </summary>
-        private void EmitSectionHeader(string label)
+        private void EmitSectionHeader(string label, PingTier tier)
         {
-            if (_sectionHeaderPrefab == null || _scrollContent == null)
+            if (_scrollContent == null)
                 return;
 
-            Text header = Instantiate(_sectionHeaderPrefab, _scrollContent);
-            header.text = label;
-            _headers.Add(header.gameObject);
+            // Interactive path: SectionHeaderUI with collapse/expand toggle.
+            if (_sectionHeaderUIPrefab != null)
+            {
+                SectionHeaderUI header = Instantiate(_sectionHeaderUIPrefab, _scrollContent);
+                header.Setup(label, tier, _collapsedTiers.Contains(tier), ToggleTierCollapse);
+                _headers.Add(header.gameObject);
+                return;
+            }
+
+            // Fallback: plain non-interactive Text header.
+            if (_sectionHeaderPrefab == null)
+                return;
+
+            Text textHeader = Instantiate(_sectionHeaderPrefab, _scrollContent);
+            textHeader.text = label;
+            _headers.Add(textHeader.gameObject);
         }
 
         /// <summary>
