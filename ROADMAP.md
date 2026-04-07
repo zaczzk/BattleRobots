@@ -83,6 +83,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T045 | Room password / private rooms | 65 | **Done** 2026-04-06 | RoomEntry.isPrivate bool; INetworkAdapter Host(string,int,bool,string) + Join(string,string); StubNetworkAdapter s_RoomPasswords dict + password verification; ClearRooms clears passwords; NetworkEventBridge BeginHost/BeginJoin overloads; RoomEntryUI _privateBadge; RoomListUI _hidePrivateRooms + _passwordInputField; 12 EditMode tests |
 | T046 | Room join-failure UI feedback | 60 | **Done** 2026-04-07 | StringGameEvent SO channel + StringGameEventListener MB (Core). JoinFailureUI MB (BattleRobots.UI): ShowFailure(string)/Hide(), IsVisible+LastReason testable properties, null-safe Text/_panel/_closeButton. NetworkEventBridge extended: _onRoomJoinFailedChannel raises StringGameEvent on adapter OnRoomJoinFailed. JoinFailureTests.cs: 12 EditMode cases. |
 | T047 | Room bookmarking / favourites | 55 | **Done** 2026-04-07 | SaveData.favouriteRoomCodes; FavouriteRoomsSO SO (AddFavourite/RemoveFavourite/IsFavourite O(1)/Clear/LoadFromData/BuildData + auto-persist via SaveSystem); FavouriteButtonUI MB (BattleRobots.UI, star toggle, colour feedback); RoomEntryUI extended Setup overload accepting FavouriteRoomsSO; FavouriteRoomsTests.cs 21 EditMode cases. |
+| T048 | Room history (recently-visited rooms) | 50 | **Done** 2026-04-07 | SaveData.recentRoomCodes; RecentRoomsSO SO (ring-buffer cap 10, newest-first, RecordVisit dedup+prepend, Clear, LoadFromData/BuildData, auto-persist, VoidGameEvent); RecentRoomsUI MB (BattleRobots.UI, OnEnable rebuild, empty-state, VoidGameEventListener wiring); RecentRoomEntryUI MB (room code label + join button); NetworkEventBridge extended with _recentRooms field + RecordVisit on OnRoomJoined; RecentRoomsTests.cs 18 EditMode cases. |
 
 ---
 
@@ -90,7 +91,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T048 — (next task TBD) | PM Agent | 2026-04-07 | See Session Handoff |
+| T049 — (next task TBD) | PM Agent | 2026-04-07 | See Session Handoff |
 
 ---
 
@@ -180,33 +181,35 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 30: T044 Network room capacity. RoomEntry struct extended: maxPlayers field + IsFull computed property + 3-arg constructor (default maxPlayers=2, clamps ≤0 to 2). INetworkAdapter: Host(string,int) overload added. StubNetworkAdapter: s_ActiveRooms converted from HashSet<string> to Dictionary<string,RoomEntry>; Host(string) delegates to Host(string,2); Host(string,int) stores RoomEntry(code,1,cap); Join checks IsFull → OnRoomJoinFailed("...full...") when room at capacity, else increments playerCount in dict + fires OnRoomJoined; RequestRoomList returns kvp.Value list preserving full RoomEntry. NetworkEventBridge: BeginHost(string) delegates to BeginHost(string,2); BeginHost(string,int) added, calls adapter.Host(roomCode,maxPlayers). RoomEntryUI: _playerCountLabel shows "N/MAX"; optional _fullBadge GameObject toggled on IsFull; _joinButton disabled when full or empty code. RoomListUI: _filterFullRooms bool SerializeField; Rebuild skips entry when _filterFullRooms && entry.IsFull. RoomCapacityTests.cs: 10 EditMode cases (constructor/default/IsFull×2; capacity in list; full-join rejected; non-full-join succeeds; playerCount increment; BeginHost capacity contract; SetRooms IsFull in SO). |
 | 2026-04-06 | PM Agent | Session 31: T045 Room password / private rooms. RoomEntry.isPrivate bool field (4-arg constructor, defaults false). INetworkAdapter: Host(string,int,bool,string) + Join(string,string) overloads. StubNetworkAdapter: s_RoomPasswords static dict stores server-side passwords; ClearRooms() clears both dicts; Host delegates chain; Join(string) delegates to Join(string,Empty); Join(string,string) checks not-found → full → private-password in priority order. NetworkEventBridge: BeginHost(string,int,bool,string) + BeginJoin(string,string) overloads; existing single/dual-arg overloads delegate down. RoomEntryUI: _privateBadge optional GO toggled on entry.isPrivate. RoomListUI: _hidePrivateRooms bool toggle + _passwordInputField optional InputField; HandleJoinRequested passes password to BeginJoin(code,password). RoomPrivacyTests.cs: 12 EditMode cases. |
 | 2026-04-07 | PM Agent | Session 32: T046 Room join-failure UI feedback. StringGameEvent (Core SO, GameEvent<string> subclass, CreateAssetMenu). StringGameEventListener (Core MB, GameEventListener<string> shim). JoinFailureUI (BattleRobots.UI MB): ShowFailure(string)/Hide() API; IsVisible+LastReason observable properties; null-safe Text/_panel/_closeButton; Awake hides panel + wires close button; OnDestroy cleanup. NetworkEventBridge: _onRoomJoinFailedChannel StringGameEvent field added; RegisterAdapterCallbacks OnRoomJoinFailed lambda now raises channel after logging. JoinFailureTests.cs: 12 EditMode cases — StringGameEvent no-listener/null/empty raises; JoinFailureUI default-state/ShowFailure/Hide/empty-reason/multi-call; integration pattern (adapter→UI direct wiring, null-UI guard). |
+| 2026-04-07 | PM Agent | Session 34: T048 Room history. SaveData.recentRoomCodes List<string> added (MatchRecord.cs). RecentRoomsSO (Core SO): ring-buffer cap=10, RecordVisit (dedup+prepend+trim), Clear, LoadFromData (skips null/empty, trims to cap), BuildData, PersistRecent, VoidGameEvent _onRecentRoomsChanged. RecentRoomEntryUI (BattleRobots.UI MB): room-code Text + Join Button, Setup(string,Action), Awake/OnDestroy listener lifecycle. RecentRoomsUI (BattleRobots.UI MB): OnEnable Rebuild, OnRecentRoomsUpdated for VoidGameEventListener wiring, empty-state label toggle, delegates to NetworkEventBridge.BeginJoin. NetworkEventBridge: _recentRooms RecentRoomsSO field; RegisterAdapterCallbacks OnRoomJoined now calls RecordVisit(roomCode). RecentRoomsTests.cs: 18 EditMode cases (default state ×3, RecordVisit ×7, Clear ×2, LoadFromData ×4, BuildData round-trip, SaveData field). |
 | 2026-04-07 | PM Agent | Session 33: T047 Room bookmarking/favourites. SaveData.favouriteRoomCodes List<string> added to MatchRecord.cs. FavouriteRoomsSO (Core SO): internal List+HashSet dual-store (O(1) IsFavourite, insertion-order Favourites); AddFavourite/RemoveFavourite (idempotent, null-safe, auto-persist); Clear (skips if empty); LoadFromData (de-duplicates, skips null/empty); BuildData; PersistFavourites → SaveSystem.Load+mutate+Save. FavouriteButtonUI (BattleRobots.UI MB): Setup(FavouriteRoomsSO, roomCode); ToggleFavourite toggles add/remove + Refresh; IsFavourite observable property; star Image colour (gold/grey); Button interactable guard; Awake/OnDestroy listener lifecycle. RoomEntryUI: _favouriteButton field added; original Setup delegates to new overload; Setup(RoomEntry, Action<string>, FavouriteRoomsSO) shows/hides _favouriteButton and calls its Setup. FavouriteRoomsTests.cs: 21 EditMode cases (default state ×3, AddFavourite ×6, RemoveFavourite ×4, Clear ×2, LoadFromData ×4, BuildData round-trip, SaveData field). |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T047 — Room bookmarking/favourites (FavouriteRoomsSO Core SO; FavouriteButtonUI UI MB; RoomEntryUI extended; SaveData.favouriteRoomCodes; 21 EditMode tests).  
-**Milestone status:** M1–M6 Done. T001–T047 Done.
+**Last completed:** T048 — Room history (RecentRoomsSO Core SO; RecentRoomsUI + RecentRoomEntryUI UI MBs; SaveData.recentRoomCodes; NetworkEventBridge extended; 18 EditMode tests).  
+**Milestone status:** M1–M6 Done. T001–T048 Done.
 
-**Next action:** T048 — Suggested: Room history (recently-visited rooms). Persist a ring-buffer of recently joined room codes (cap 10) in SaveSystem. Deliverables:
-  - Add `List<string> recentRoomCodes` (max 10, newest-first) to `SaveData` (MatchRecord.cs).
-  - `RecentRoomsSO.cs` (Core SO): `IReadOnlyList<string> Recent`; `RecordVisit(string)` (dedup, prepend, cap at 10, auto-persist); `Clear()`; `LoadFromData`/`BuildData`; fires `VoidGameEvent` on change.
-  - `RecentRoomsUI.cs` (BattleRobots.UI MB): scrollable list of recent room codes with quick-join buttons; `OnEnable` refresh; empty-state label; no Update.
-  - Wire `NetworkEventBridge.BeginJoin` to call `RecentRoomsSO.RecordVisit` on successful join.
-  - 10+ EditMode tests.
+**Next action:** T049 — Suggested: Room search / filter by code prefix. Allow the player to type the first 1–4 characters of a room code to filter the room-list browser in real time. Deliverables:
+  - `RoomSearchUI.cs` (BattleRobots.UI MB): InputField + clear button; on text change, delegates to RoomListUI.ApplyFilter(string prefix); no Update.
+  - `RoomListUI` extended: `ApplyFilter(string prefix)` method that re-runs Rebuild() with prefix guard; prefix stored as private field; empty/null prefix shows all rooms.
+  - 8+ EditMode tests for prefix-filtering logic (RoomListSO).
 
 **Blockers:** None.  
 **Architecture notes:**
-  - T047 changes are fully additive and backwards-compatible — all existing Setup(RoomEntry, Action<string>) calls still compile because the original overload now delegates to the new 3-arg one.
-  - `FavouriteRoomsSO.PersistFavourites()` loads the whole save file on each mutation — acceptable for low-frequency starring; if perf becomes an issue, batch writes in a future task.
-  - GameBootstrapper should be extended to call `FavouriteRoomsSO.LoadFromData(save.favouriteRoomCodes)` at startup (deferred to Editor session — no scene changes in remote env).
+  - T048 is fully additive — `NetworkEventBridge._recentRooms` is optional; existing sessions without a wired SO asset are unaffected.
+  - `RecentRoomsSO.PersistRecent()` loads the whole save file per mutation — same low-frequency trade-off as FavouriteRoomsSO.
+  - GameBootstrapper should be extended to call `RecentRoomsSO.LoadFromData(save.recentRoomCodes)` at startup (deferred to Editor session).
   - Deferred Inspector wiring (carry-forward):
+      □ GameBootstrapper._recentRooms → RecentRoomsSO asset + LoadFromData call (NEW T048)
+      □ NetworkEventBridge._recentRooms → RecentRoomsSO asset (NEW T048)
+      □ RecentRoomsUI._recentRooms + _bridge + _rowPrefab + _scrollContent (NEW T048)
       □ GameBootstrapper._favouriteRooms → FavouriteRoomsSO asset + LoadFromData call
       □ RoomListUI: pass FavouriteRoomsSO to RoomEntryUI.Setup(entry, onJoin, favourites)
       □ NetworkEventBridge._roomList → RoomListSO asset
       □ RoomListUI._roomList + _bridge + _entryPrefab + _scrollContent
-      □ RoomEntryUI._favouriteButton → FavouriteButtonUI child component (NEW T047)
+      □ RoomEntryUI._favouriteButton → FavouriteButtonUI child component
       □ RoomEntryUI._fullBadge → optional FULL badge GameObject
       □ RoomEntryUI._privateBadge → optional PRIVATE badge GameObject
       □ RoomListUI._passwordInputField → optional password InputField

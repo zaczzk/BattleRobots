@@ -54,6 +54,11 @@ namespace BattleRobots.Core
                  "and point its Response at JoinFailureUI.ShowFailure.")]
         [SerializeField] private StringGameEvent _onRoomJoinFailedChannel;
 
+        [Header("Recent Rooms")]
+        [Tooltip("(Optional) RecentRoomsSO to record a visit each time a room is successfully joined. " +
+                 "Leave unassigned to disable recent-rooms tracking.")]
+        [SerializeField] private RecentRoomsSO _recentRooms;
+
         // ── Runtime adapter ───────────────────────────────────────────────────
 
         private INetworkAdapter _adapter;
@@ -278,6 +283,7 @@ namespace BattleRobots.Core
             adapter.OnRoomJoined = (roomCode) =>
             {
                 _session?.JoinRoom(roomCode);
+                _recentRooms?.RecordVisit(roomCode);
             };
 
             adapter.OnRoomJoinFailed = (reason) =>

@@ -156,5 +156,12 @@ namespace BattleRobots.Core
         /// <see cref="FavouriteRoomsSO.LoadFromData"/>.
         /// </summary>
         public List<string> favouriteRoomCodes = new List<string>();
+
+        /// <summary>
+        /// Most-recently-joined room codes, newest-first, capped at 10 entries.
+        /// Populated by <see cref="RecentRoomsSO.BuildData"/> and consumed by
+        /// <see cref="RecentRoomsSO.LoadFromData"/>.
+        /// </summary>
+        public List<string> recentRoomCodes = new List<string>();
     }
 }
