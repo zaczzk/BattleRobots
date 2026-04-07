@@ -75,6 +75,18 @@ namespace BattleRobots.Core
                  "The payload is the kicked player's display name.")]
         [SerializeField] private StringGameEvent _onPlayerKickedChannel;
 
+        [Tooltip("(Optional) SO event channel raised when the adapter fires OnPlayerMuted. " +
+                 "Wire a StringGameEventListener on the MutedPlayerUI GameObject to this channel " +
+                 "and point its Response at MutedPlayerUI.ShowMuted. " +
+                 "The payload is the muted player's display name.")]
+        [SerializeField] private StringGameEvent _onPlayerMutedChannel;
+
+        [Tooltip("(Optional) SO event channel raised when the adapter fires OnPlayerUnmuted. " +
+                 "Wire a StringGameEventListener on the MutedPlayerUI GameObject to this channel " +
+                 "and point its Response at MutedPlayerUI.ShowUnmuted. " +
+                 "The payload is the unmuted player's display name.")]
+        [SerializeField] private StringGameEvent _onPlayerUnmutedChannel;
+
         // ── Runtime adapter ───────────────────────────────────────────────────
 
         private INetworkAdapter _adapter;
@@ -282,6 +294,66 @@ namespace BattleRobots.Core
             _adapter?.KickPlayer(roomCode, playerName);
         }
 
+        // ── Mute / unmute ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Ask the adapter to mute <paramref name="playerName"/> in
+        /// <paramref name="roomCode"/>. Only the host should call this.
+        ///
+        /// Guards:
+        ///   • No-op (with warning) if the session is not currently in a match room.
+        ///   • No-op if <paramref name="playerName"/> is null or whitespace.
+        ///
+        /// Wire to a per-player "Mute" button's onClick in the Inspector.
+        /// </summary>
+        public void BeginMute(string roomCode, string playerName)
+        {
+            if (_session == null) return;
+
+            if (!_session.IsInMatch)
+            {
+                Debug.LogWarning("[NetworkEventBridge] BeginMute called while not in a match room. Ignored.", this);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(playerName))
+            {
+                Debug.LogWarning("[NetworkEventBridge] BeginMute called with null/empty playerName. Ignored.", this);
+                return;
+            }
+
+            _adapter?.MutePlayer(roomCode, playerName);
+        }
+
+        /// <summary>
+        /// Ask the adapter to unmute <paramref name="playerName"/> in
+        /// <paramref name="roomCode"/>. Only the host should call this.
+        ///
+        /// Guards:
+        ///   • No-op (with warning) if the session is not currently in a match room.
+        ///   • No-op if <paramref name="playerName"/> is null or whitespace.
+        ///
+        /// Wire to a per-player "Unmute" button's onClick in the Inspector.
+        /// </summary>
+        public void BeginUnmute(string roomCode, string playerName)
+        {
+            if (_session == null) return;
+
+            if (!_session.IsInMatch)
+            {
+                Debug.LogWarning("[NetworkEventBridge] BeginUnmute called while not in a match room. Ignored.", this);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(playerName))
+            {
+                Debug.LogWarning("[NetworkEventBridge] BeginUnmute called with null/empty playerName. Ignored.", this);
+                return;
+            }
+
+            _adapter?.UnmutePlayer(roomCode, playerName);
+        }
+
         // ── Room discovery ────────────────────────────────────────────────────
 
         /// <summary>
@@ -396,6 +468,18 @@ namespace BattleRobots.Core
             {
                 // Raise the SO channel so KickedUI (or any listener) can respond.
                 _onPlayerKickedChannel?.Raise(playerName);
+            };
+
+            adapter.OnPlayerMuted = (playerName) =>
+            {
+                // Raise the SO channel so MutedPlayerUI (or any listener) can respond.
+                _onPlayerMutedChannel?.Raise(playerName);
+            };
+
+            adapter.OnPlayerUnmuted = (playerName) =>
+            {
+                // Raise the SO channel so MutedPlayerUI (or any listener) can respond.
+                _onPlayerUnmutedChannel?.Raise(playerName);
             };
         }
 

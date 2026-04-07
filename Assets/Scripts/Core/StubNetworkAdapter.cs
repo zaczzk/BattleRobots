@@ -91,7 +91,16 @@ namespace BattleRobots.Core
         private static readonly Dictionary<string, int> s_SpectatorCounts =
             new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Remove all simulated rooms, passwords, pings, creation times, player names, and spectator counts (call in TearDown).</summary>
+        /// <summary>
+        /// Server-side set of muted player names per room, keyed by normalised room code.
+        /// Muted players' chat messages are not forwarded to other room members.
+        /// Populated by <see cref="MutePlayer"/>; entries removed by <see cref="UnmutePlayer"/>
+        /// and cleared by <see cref="ClearRooms"/>.
+        /// </summary>
+        private static readonly Dictionary<string, HashSet<string>> s_MutedPlayers =
+            new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Remove all simulated rooms, passwords, pings, creation times, player names, spectator counts, and muted-player sets (call in TearDown).</summary>
         public static void ClearRooms()
         {
             s_ActiveRooms.Clear();
@@ -100,6 +109,7 @@ namespace BattleRobots.Core
             s_RoomCreatedAt.Clear();
             s_RoomPlayerNames.Clear();
             s_SpectatorCounts.Clear();
+            s_MutedPlayers.Clear();
         }
 
         /// <summary>
@@ -206,6 +216,12 @@ namespace BattleRobots.Core
         /// <inheritdoc/>
         public Action<string> OnPlayerKicked { get; set; }
 
+        /// <inheritdoc/>
+        public Action<string> OnPlayerMuted { get; set; }
+
+        /// <inheritdoc/>
+        public Action<string> OnPlayerUnmuted { get; set; }
+
         // ── Test-inspection surface ───────────────────────────────────────────
 
         /// <summary>All payloads passed to <see cref="SendMatchState"/>, in order.</summary>
@@ -228,6 +244,18 @@ namespace BattleRobots.Core
 
         /// <summary>Display name of the most recently kicked player, or empty string if none.</summary>
         public string LastKickedPlayer { get; private set; } = string.Empty;
+
+        /// <summary>Number of times <see cref="MutePlayer"/> has been called.</summary>
+        public int MuteCallCount { get; private set; }
+
+        /// <summary>Display name of the most recently muted player, or empty string if none.</summary>
+        public string LastMutedPlayer { get; private set; } = string.Empty;
+
+        /// <summary>Number of times <see cref="UnmutePlayer"/> has been called.</summary>
+        public int UnmuteCallCount { get; private set; }
+
+        /// <summary>Display name of the most recently unmuted player, or empty string if none.</summary>
+        public string LastUnmutedPlayer { get; private set; } = string.Empty;
 
         /// <summary>Last room code passed to <see cref="Host"/> or <see cref="Join"/>.</summary>
         public string LastRoomCode { get; private set; } = string.Empty;
@@ -412,6 +440,75 @@ namespace BattleRobots.Core
 
             OnPlayerKicked?.Invoke(playerName);
             OnRoomUpdated?.Invoke(updated);
+        }
+
+        /// <summary>
+        /// Silence <paramref name="playerName"/> in <paramref name="roomCode"/>.
+        ///
+        /// - No-op (no callbacks) if the room does not exist.
+        /// - No-op (no callbacks) if the player is already muted.
+        /// - Fires <see cref="OnPlayerMuted"/> with the player name on success.
+        /// - Increments <see cref="MuteCallCount"/> regardless of outcome.
+        /// </summary>
+        public void MutePlayer(string roomCode, string playerName)
+        {
+            MuteCallCount++;
+
+            if (string.IsNullOrEmpty(playerName)) return;
+
+            string code = Normalise(roomCode);
+            if (!s_ActiveRooms.ContainsKey(code)) return;
+
+            if (!s_MutedPlayers.TryGetValue(code, out HashSet<string> muted))
+            {
+                muted = new HashSet<string>(StringComparer.Ordinal);
+                s_MutedPlayers[code] = muted;
+            }
+
+            // Already muted — no-op.
+            if (!muted.Add(playerName)) return;
+
+            LastMutedPlayer = playerName;
+            OnPlayerMuted?.Invoke(playerName);
+        }
+
+        /// <summary>
+        /// Restore chat for a previously-muted <paramref name="playerName"/> in
+        /// <paramref name="roomCode"/>.
+        ///
+        /// - No-op (no callbacks) if the room does not exist.
+        /// - No-op (no callbacks) if the player is not muted.
+        /// - Fires <see cref="OnPlayerUnmuted"/> with the player name on success.
+        /// - Increments <see cref="UnmuteCallCount"/> regardless of outcome.
+        /// </summary>
+        public void UnmutePlayer(string roomCode, string playerName)
+        {
+            UnmuteCallCount++;
+
+            if (string.IsNullOrEmpty(playerName)) return;
+
+            string code = Normalise(roomCode);
+            if (!s_ActiveRooms.ContainsKey(code)) return;
+
+            if (!s_MutedPlayers.TryGetValue(code, out HashSet<string> muted)) return;
+
+            // Not muted — no-op.
+            if (!muted.Remove(playerName)) return;
+
+            LastUnmutedPlayer = playerName;
+            OnPlayerUnmuted?.Invoke(playerName);
+        }
+
+        /// <summary>
+        /// Returns true if <paramref name="playerName"/> is currently muted in
+        /// <paramref name="roomCode"/>.
+        /// </summary>
+        public bool IsMuted(string roomCode, string playerName)
+        {
+            if (string.IsNullOrEmpty(playerName)) return false;
+            string code = Normalise(roomCode);
+            return s_MutedPlayers.TryGetValue(code, out HashSet<string> muted)
+                   && muted.Contains(playerName);
         }
 
         /// <summary>

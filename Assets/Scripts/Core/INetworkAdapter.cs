@@ -131,6 +131,36 @@ namespace BattleRobots.Core
         /// </summary>
         void KickPlayer(string roomCode, string playerName);
 
+        /// <summary>
+        /// Silence <paramref name="playerName"/> in the room identified by
+        /// <paramref name="roomCode"/>. Only the room host should call this method.
+        ///
+        /// Muted players may still send messages (they appear on their own screen),
+        /// but the adapter must suppress delivery to all other players.
+        ///
+        /// On success the adapter must invoke <see cref="OnPlayerMuted"/> with the
+        /// muted player's display name so UIs (e.g. a muted-player indicator) can react.
+        ///
+        /// No-op (no callbacks fired) if the room does not exist or the player is
+        /// already muted.
+        /// Adapters that do not support mute may leave this as a no-op.
+        /// </summary>
+        void MutePlayer(string roomCode, string playerName);
+
+        /// <summary>
+        /// Restore chat delivery for a previously-muted <paramref name="playerName"/>
+        /// in the room identified by <paramref name="roomCode"/>.
+        /// Only the room host should call this method.
+        ///
+        /// On success the adapter must invoke <see cref="OnPlayerUnmuted"/> with the
+        /// player's display name.
+        ///
+        /// No-op (no callbacks fired) if the room does not exist or the player is
+        /// not currently muted.
+        /// Adapters that do not support mute may leave this as a no-op.
+        /// </summary>
+        void UnmutePlayer(string roomCode, string playerName);
+
         // ── Callbacks (set by NetworkEventBridge before calling Connect) ──────
 
         /// <summary>Invoked by the adapter when the connection to the backend succeeds.</summary>
@@ -205,6 +235,27 @@ namespace BattleRobots.Core
         /// (null callback is acceptable; callers must guard against null).
         /// </summary>
         Action<string> OnPlayerKicked { get; set; }
+
+        /// <summary>
+        /// Invoked by the adapter after a <see cref="MutePlayer"/> call succeeds.
+        /// Payload is the display name of the player whose chat has been silenced.
+        ///
+        /// The muted player's own client receives this callback so it can show
+        /// a "You are muted" indicator without revealing the mute to all peers.
+        ///
+        /// Adapters that do not support mute may leave this unimplemented
+        /// (null callback is acceptable; callers must guard against null).
+        /// </summary>
+        Action<string> OnPlayerMuted { get; set; }
+
+        /// <summary>
+        /// Invoked by the adapter after an <see cref="UnmutePlayer"/> call succeeds.
+        /// Payload is the display name of the player whose chat has been restored.
+        ///
+        /// Adapters that do not support mute may leave this unimplemented
+        /// (null callback is acceptable; callers must guard against null).
+        /// </summary>
+        Action<string> OnPlayerUnmuted { get; set; }
 
         // ── Diagnostics ───────────────────────────────────────────────────────
 
