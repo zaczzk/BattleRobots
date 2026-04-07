@@ -199,5 +199,29 @@ namespace BattleRobots.Core
         /// <see cref="PlayerProfileSO.LoadFromData"/>.
         /// </summary>
         public PlayerProfileData playerProfile = new PlayerProfileData();
+
+        /// <summary>
+        /// Persisted friend and block lists.
+        /// Populated by <see cref="FriendListSO.BuildData"/> and consumed by
+        /// <see cref="FriendListSO.LoadFromData"/>.
+        /// </summary>
+        public FriendListData friendList = new FriendListData();
+    }
+
+    // ── Friend / block list ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Persisted friend and block list data.
+    /// Two separate lists allow a player to be blocked without ever being friended.
+    /// Invariant: a name can appear in at most one list (friends XOR blocked).
+    /// </summary>
+    [Serializable]
+    public sealed class FriendListData
+    {
+        /// <summary>Display names of players the local player has added as friends.</summary>
+        public List<string> friendNames = new List<string>();
+
+        /// <summary>Display names of players the local player has blocked.</summary>
+        public List<string> blockedNames = new List<string>();
     }
 }

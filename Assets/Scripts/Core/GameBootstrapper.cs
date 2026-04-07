@@ -24,6 +24,10 @@ namespace BattleRobots.Core
         [Tooltip("PlayerProfileSO — restored from save file on startup; career stats updated on match save.")]
         [SerializeField] private PlayerProfileSO _playerProfile;
 
+        [Header("Social")]
+        [Tooltip("FriendListSO — restored from save file on startup; mutations auto-persist.")]
+        [SerializeField] private FriendListSO _friendList;
+
         [Header("Events")]
         [SerializeField] private VoidGameEvent _onGameBootstrapped;
 
@@ -57,6 +61,9 @@ namespace BattleRobots.Core
 
             if (_playerProfile != null)
                 _playerProfile.LoadFromData(save.playerProfile);
+
+            if (_friendList != null)
+                _friendList.LoadFromData(save.friendList);
         }
 
         /// <summary>
