@@ -28,7 +28,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | M3 | Combat Arena + Damage System | Sprint 3 | Pending |
 | M4 | Economy & Shop UI | Sprint 4 | In Progress |
 | M5 | Match Loop + Win/Loss Flow | Sprint 5 | Pending |
-| M6 | Polish, VFX, Audio | Sprint 6 | Pending |
+| M6 | Polish, VFX, Audio | Sprint 6 | In Progress |
 
 ---
 
@@ -47,7 +47,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T009 | ShopUI — part browser, buy button, wallet display | 55 | **Done** | UI reads wallet SO; buy fires deduct |
 | T010 | MatchManager — round timer, win condition | 55 | **Done** | Correct winner determined; MatchRecord written |
 | T011 | MainMenu + LoadingScreen UI | 40 | **Done** | Scene transitions work; no GC in Update |
-| T012 | VFX: impact sparks, destruction explosion | 30 | **In Progress** | Pooled particles; zero alloc |
+| T012 | VFX: impact sparks, destruction explosion | 30 | **Done** | Pooled particles; zero alloc |
 
 ---
 
@@ -55,7 +55,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| T012 — VFX: impact sparks, destruction explosion | PM Agent | 2026-04-08 | Next: PooledParticleSystem MB (zero-alloc pool), ImpactVFXHandler (listens DamageGameEvent channel), DestructionVFXHandler (listens VoidGameEvent death channel) |
+| — | — | — | All active-backlog tasks complete. Awaiting new backlog items or Editor-session wiring pass. |
 
 ---
 
@@ -74,6 +74,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T010 — MatchManager | 2026-04-07 | Round timer in Update (no allocs), death/expiry win conditions, MatchRecord written via SaveSystem, wallet rewarded via PlayerWallet SO, _onMatchEnded VoidGameEvent raised. |
 | T009 — ShopUI | 2026-04-08 | PartDefinition SO (partId, category, cost, thumbnail), ShopCatalog SO (IReadOnlyList of PartDefinitions, duplicate-id validation), ShopManager MB in BattleRobots.UI (BuyPart → Deduct → VoidGameEvent). No Physics refs. |
 | T011 — MainMenu + LoadingScreen UI | 2026-04-08 | SceneLoader static helper (LoadSceneAsync, progress remap 0-0.9→0-1, IsDone/IsLoading), MainMenuController MB (PlayGame/OpenShop/QuitGame → SceneLoader + VoidGameEvent), LoadingScreenController MB (Update reads cached float, zero alloc, self-deactivates on IsDone). |
+| T012 — VFX: impact sparks, destruction explosion | 2026-04-08 | DamageInfo.hitPoint added; GameEvent<T> + VoidGameEvent extended with RegisterCallback/UnregisterCallback (Action-based, backwards-compatible). ParticlePool MB (BattleRobots.Core): pre-warmed Stack, fixed struct array, Update swap-remove, zero alloc. ImpactVFXHandler MB (BattleRobots.VFX): subscribes DamageGameEvent, spawns sparks at hitPoint. DestructionVFXHandler MB (BattleRobots.VFX): subscribes VoidGameEvent death channel, spawns explosion at transform.position. |
 
 ---
 
@@ -85,22 +86,22 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-06 | PM Agent | Session 2: T005 RobotDefinition SO (PartSlot, PartCategory, ValidateSlots, Editor drawer). T006 HingeJointAB (RevoluteJoint, SetTargetVelocity, ApplyTorque, no Rigidbody). T007 DamageSystem (DamageInfo struct, DamageGameEvent channel, DamageGameEventListener, HealthSO with FloatGameEvent/VoidGameEvent channels, DamageReceiver bridging events to HealthSO). M1 fully complete; M2 core Physics in place. |
 | 2026-04-07 | PM Agent | Session 3: T008 Arena scaffold (ArenaConfig SO, SpawnPointMarker MB with Gizmos, ArenaManager MB). T010 MatchManager (round timer, death/expiry win conditions, MatchRecord persistence, wallet rewards, VoidGameEvent channels). M3 core loop complete in C#; scene asset wiring deferred to Editor session. |
 | 2026-04-08 | PM Agent | Session 4: T009 ShopUI — PartDefinition SO, ShopCatalog SO, ShopManager MB (BattleRobots.UI, BuyPart → Deduct → VoidGameEvent, no Physics refs). T011 MainMenu+LoadingScreen — SceneLoader static helper (async load, progress remap), MainMenuController MB (Play/Shop/Quit → SceneLoader + VoidGameEvent), LoadingScreenController MB (zero-alloc Update, self-deactivates on IsDone). M4 Economy+Shop and M5 Menu C# layers complete; scene wiring deferred to Editor session. |
+| 2026-04-08 | PM Agent | Session 5: T012 VFX — DamageInfo.hitPoint field added; RegisterCallback/UnregisterCallback added to GameEvent<T> and VoidGameEvent; ParticlePool MB (Core, pre-warmed Stack, zero-alloc Update timer); ImpactVFXHandler + DestructionVFXHandler (BattleRobots.VFX). All active backlog complete. M6 In Progress. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T009 (PartDefinition, ShopCatalog, ShopManager), T011 (SceneLoader, MainMenuController, LoadingScreenController)  
-**Next action:** T012 — VFX: impact sparks, destruction explosion. C# deliverables (no Editor needed):
-  - `ParticlePool.cs` (BattleRobots.Core) — generic pooled-particle helper; pre-warms N instances at Awake; Play(Vector3 pos, Quaternion rot) grabs from pool and auto-returns via coroutine-free lifetime timer; zero allocs in hot path
-  - `ImpactVFXHandler.cs` (BattleRobots.UI or new VFX namespace) — listens to DamageGameEvent channel; on event calls ParticlePool to spawn impact sparks at hit position from DamageInfo
-  - `DestructionVFXHandler.cs` — listens to VoidGameEvent death channel (from HealthSO._onDeath); spawns explosion particle at transform position
+**Last completed:** T012 (ParticlePool, ImpactVFXHandler, DestructionVFXHandler) — all active backlog items are now **Done**.  
+**Next action:** Editor-session wiring pass, then new backlog items for remaining M6 (Audio, polish VFX) and M2/M3 gameplay loop refinement.
 
-**Blockers:** None for C# work. Particle prefab assignment deferred to Editor session.  
-**Architecture notes:**
-- ParticlePool must live in BattleRobots.Core (shared) so both Physics and UI can reference it without violating the UI→Physics ban
-- ImpactVFXHandler must NOT reference BattleRobots.Physics directly; it receives position from DamageInfo (a Core struct), which is safe
-- DestructionVFXHandler receives the death signal via VoidGameEvent SO channel (already defined in HealthSO)
-- Pool auto-return: use `ParticleSystem.main.duration + startLifetime` to schedule return; cache the float at Awake, not per-play
-- DamageInfo struct (Core) already has `hitPoint` Vector3 — use this as spawn position in ImpactVFXHandler
-- Scene wiring (Editor session): ShopManager assign ShopCatalog + PlayerWallet SOs; each buy button onClick → ShopManager.BuyPart(partDef); PlayerWallet._onBalanceChanged → IntGameEventListener → wallet label Text
+**Pending Editor wiring (deferred to Editor sessions):**
+- **Arena scene**: assign ArenaConfig SO to ArenaManager; place SpawnPointMarker GameObjects at spawn locations
+- **ShopUI scene**: ShopManager ← ShopCatalog SO + PlayerWallet SO; buy buttons onClick → ShopManager.BuyPart(partDef); IntGameEventListener → wallet Text
+- **VFX**: create spark and explosion ParticleSystem prefabs; assign to ParticlePool instances; place ImpactVFXHandler/DestructionVFXHandler in Arena scene; assign DamageGameEvent and per-robot HealthSO._onDeath VoidGameEvent channels
+
+**Architecture notes for next agent:**
+- `GameEvent<T>` and `VoidGameEvent` now support both `RegisterListener(MonoBehaviour)` and `RegisterCallback(Action)` — backwards-compatible; existing listeners unchanged
+- `DamageInfo.hitPoint` (Vector3) added; callers that omit it default to Vector3.zero (no breaking change)
+- `ParticlePool` Update uses swap-remove on `ActiveEntry[]` — zero alloc; pool never resizes after Awake
+- `BattleRobots.VFX` namespace established at `Assets/Scripts/VFX/`; safe to reference Core, must not reference Physics or UI

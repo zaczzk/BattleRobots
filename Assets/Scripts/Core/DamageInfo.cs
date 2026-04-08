@@ -21,12 +21,19 @@ namespace BattleRobots.Core
         /// </summary>
         public string sourceId;
 
-        public DamageInfo(float amount, string sourceId = "")
+        /// <summary>
+        /// World-space point where the hit occurred. Used by VFX handlers to spawn
+        /// impact particles at the correct location. Defaults to Vector3.zero.
+        /// </summary>
+        public Vector3 hitPoint;
+
+        public DamageInfo(float amount, string sourceId = "", Vector3 hitPoint = default(Vector3))
         {
             this.amount   = amount;
             this.sourceId = sourceId ?? string.Empty;
+            this.hitPoint = hitPoint;
         }
 
-        public override string ToString() => $"DamageInfo(amount={amount:F1}, source='{sourceId}')";
+        public override string ToString() => $"DamageInfo(amount={amount:F1}, source='{sourceId}', hitPoint={hitPoint})";
     }
 }
