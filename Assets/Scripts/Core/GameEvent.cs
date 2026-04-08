@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -13,13 +14,17 @@ namespace BattleRobots.Core
         // Transient listener list — not serialized, not an allocation in Update.
         private readonly List<GameEventListener<T>> _listeners = new List<GameEventListener<T>>();
 
+        // Delegate callbacks for code-side subscribers (e.g. VFX handlers) — avoids UnityEvent bridge.
+        private readonly List<Action<T>> _callbacks = new List<Action<T>>();
+
         public void Raise(T value)
         {
             // Iterate in reverse so listeners can safely unregister during callback.
             for (int i = _listeners.Count - 1; i >= 0; i--)
-            {
                 _listeners[i].OnEventRaised(value);
-            }
+
+            for (int i = _callbacks.Count - 1; i >= 0; i--)
+                _callbacks[i]?.Invoke(value);
         }
 
         public void RegisterListener(GameEventListener<T> listener)
@@ -31,6 +36,19 @@ namespace BattleRobots.Core
         public void UnregisterListener(GameEventListener<T> listener)
         {
             _listeners.Remove(listener);
+        }
+
+        /// <summary>Register an Action callback. Cache the delegate in Awake; call in OnEnable.</summary>
+        public void RegisterCallback(Action<T> callback)
+        {
+            if (!_callbacks.Contains(callback))
+                _callbacks.Add(callback);
+        }
+
+        /// <summary>Unregister an Action callback. Call in OnDisable.</summary>
+        public void UnregisterCallback(Action<T> callback)
+        {
+            _callbacks.Remove(callback);
         }
 
 #if UNITY_EDITOR
