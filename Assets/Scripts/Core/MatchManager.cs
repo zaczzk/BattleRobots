@@ -52,6 +52,17 @@ namespace BattleRobots.Core
                  "Leave null for unmodified match parameters.")]
         [SerializeField] private DifficultySO _difficulty;
 
+        [Header("Replay (optional)")]
+        [Tooltip("When assigned, MatchManager calls StartRecording at match start, " +
+                 "records a MatchStateSnapshot each Update, and calls StopRecording + " +
+                 "SaveReplay at match end. Leave null to disable replay capture.")]
+        [SerializeField] private ReplaySO _replaySO;
+
+        [Tooltip("Optional transforms for world-position tracking in replay snapshots. " +
+                 "Index 0 = player robot root, index 1 = opponent robot root. " +
+                 "Positions default to Vector3.zero when not assigned.")]
+        [SerializeField] private Transform[] _robotTransforms;
+
         [Header("Event Channels")]
         [Tooltip("Raised after every match ends (win, loss, or time-out draw).")]
         [SerializeField] private VoidGameEvent _onMatchEnd;
@@ -119,6 +130,9 @@ namespace BattleRobots.Core
             _elapsedSeconds = 0f;
             _matchActive    = true;
 
+            // Begin replay capture if a ReplaySO is wired up.
+            _replaySO?.StartRecording();
+
             // Cache effective time limit once so Update reads a plain float (no alloc).
             float rawLimit = ActiveArena.TimeLimitSeconds;
             _effectiveTimeLimitSeconds = (rawLimit > 0f && _difficulty != null)
@@ -149,6 +163,9 @@ namespace BattleRobots.Core
 
             // Advance timer — float add only, no allocation.
             _elapsedSeconds += Time.deltaTime;
+
+            // Capture replay snapshot — struct copy into ring buffer, zero alloc.
+            RecordSnapshot();
 
             // Win condition: check both HealthSOs directly (array index, no LINQ).
             bool playerAlive   = _robotHealthSOs[0].IsAlive;
@@ -223,11 +240,56 @@ namespace BattleRobots.Core
             saveData.matchHistory.Add(record);
             SaveSystem.Save(saveData);
 
+            // Stop replay capture and persist the replay file alongside the match record.
+            if (_replaySO != null)
+            {
+                _replaySO.StopRecording();
+                // StopRecording fires _onReplayReady only if there is at least one snapshot;
+                // build + save even if the buffer is empty so LoadReplay never throws.
+                ReplayData replayData = ReplayData.FromReplaySO(_replaySO, record);
+                SaveSystem.SaveReplay(replayData);
+
+                Debug.Log($"[MatchManager] Replay saved ({replayData.frames.Count} frames, " +
+                          $"timestamp='{record.timestamp}').");
+            }
+
             // Notify subscribers.
             _onMatchEnd?.Raise();
 
             Debug.Log($"[MatchManager] Match over. Result: {(playerWon ? "WIN" : "LOSS/DRAW")} · " +
                       $"Duration: {_elapsedSeconds:F1}s · Currency earned: {currencyEarned}.");
+        }
+
+        /// <summary>
+        /// Writes one <see cref="MatchStateSnapshot"/> to the ReplaySO ring buffer.
+        /// No-ops when <see cref="_replaySO"/> is null or not recording.
+        /// Zero heap allocation: only reads floats and Vector3 properties (value-type copies).
+        /// </summary>
+        private void RecordSnapshot()
+        {
+            if (_replaySO == null || !_replaySO.IsRecording) return;
+
+            float p1Hp = _robotHealthSOs[0].CurrentHp;
+            float p2Hp = _robotHealthSOs[1].CurrentHp;
+
+            // Robot positions — read from optional transform array; default to zero
+            // if transforms are not assigned so the snapshot is still useful for HP replay.
+            Vector3 p1Pos = (_robotTransforms != null && _robotTransforms.Length > 0
+                             && _robotTransforms[0] != null)
+                ? _robotTransforms[0].position
+                : Vector3.zero;
+
+            Vector3 p2Pos = (_robotTransforms != null && _robotTransforms.Length > 1
+                             && _robotTransforms[1] != null)
+                ? _robotTransforms[1].position
+                : Vector3.zero;
+
+            _replaySO.Record(new MatchStateSnapshot(
+                elapsedTime: _elapsedSeconds,
+                p1Hp:        p1Hp,
+                p2Hp:        p2Hp,
+                p1Pos:       p1Pos,
+                p2Pos:       p2Pos));
         }
 
         /// <summary>
