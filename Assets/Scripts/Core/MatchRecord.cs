@@ -206,6 +206,13 @@ namespace BattleRobots.Core
         /// <see cref="FriendListSO.LoadFromData"/>.
         /// </summary>
         public FriendListData friendList = new FriendListData();
+
+        /// <summary>
+        /// Persisted set of unlocked achievement IDs.
+        /// Populated by <see cref="AchievementProgressSO.BuildData"/> and consumed by
+        /// <see cref="AchievementProgressSO.LoadFromData"/>.
+        /// </summary>
+        public AchievementData achievements = new AchievementData();
     }
 
     // ── Friend / block list ───────────────────────────────────────────────────
@@ -223,5 +230,20 @@ namespace BattleRobots.Core
 
         /// <summary>Display names of players the local player has blocked.</summary>
         public List<string> blockedNames = new List<string>();
+    }
+
+    // ── Achievement persistence ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Persisted set of unlocked achievement IDs.
+    /// Serialized inside <see cref="SaveData.achievements"/>.
+    /// Duplicate or empty IDs are silently dropped during
+    /// <see cref="AchievementProgressSO.LoadFromData"/> hydration.
+    /// </summary>
+    [Serializable]
+    public sealed class AchievementData
+    {
+        /// <summary>IDs of every achievement the player has unlocked, in unlock order.</summary>
+        public List<string> unlockedIds = new List<string>();
     }
 }

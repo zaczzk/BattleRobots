@@ -28,6 +28,10 @@ namespace BattleRobots.Core
         [Tooltip("FriendListSO — restored from save file on startup; mutations auto-persist.")]
         [SerializeField] private FriendListSO _friendList;
 
+        [Header("Achievements")]
+        [Tooltip("AchievementProgressSO — loaded from save file on startup; checked after each match.")]
+        [SerializeField] private AchievementProgressSO _achievementProgress;
+
         [Header("Events")]
         [SerializeField] private VoidGameEvent _onGameBootstrapped;
 
@@ -64,6 +68,9 @@ namespace BattleRobots.Core
 
             if (_friendList != null)
                 _friendList.LoadFromData(save.friendList);
+
+            if (_achievementProgress != null)
+                _achievementProgress.LoadFromData(save.achievements);
         }
 
         /// <summary>
@@ -85,6 +92,14 @@ namespace BattleRobots.Core
             {
                 _playerProfile.UpdateFromMatchRecord(record);
                 save.playerProfile = _playerProfile.BuildData();
+            }
+
+            // Achievement check must come after profile update so career stats
+            // already reflect the completed match when conditions are evaluated.
+            if (_achievementProgress != null)
+            {
+                _achievementProgress.CheckAndUnlock(record, _playerProfile);
+                save.achievements = _achievementProgress.BuildData();
             }
 
             SaveSystem.Save(save);
