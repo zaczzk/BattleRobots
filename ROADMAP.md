@@ -23,11 +23,11 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | # | Milestone | Target | Status |
 |---|-----------|--------|--------|
-| M1 | Core Foundation (SO bus, wallet, save) | Sprint 1 | In Progress |
-| M2 | Robot Assembly & ArticulationBody Joints | Sprint 2 | Pending |
-| M3 | Combat Arena + Damage System | Sprint 3 | Pending |
-| M4 | Economy & Shop UI | Sprint 4 | In Progress |
-| M5 | Match Loop + Win/Loss Flow | Sprint 5 | Pending |
+| M1 | Core Foundation (SO bus, wallet, save) | Sprint 1 | **Done** |
+| M2 | Robot Assembly & ArticulationBody Joints | Sprint 2 | In Progress |
+| M3 | Combat Arena + Damage System | Sprint 3 | In Progress |
+| M4 | Economy & Shop UI | Sprint 4 | **Done** |
+| M5 | Match Loop + Win/Loss Flow | Sprint 5 | In Progress |
 | M6 | Polish, VFX, Audio | Sprint 6 | In Progress |
 
 ---
@@ -36,10 +36,10 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | ID | Task | RICE | Status | DoD |
 |----|------|------|--------|-----|
-| T001 | SO Event Channel system (GameEvent<T>, Listener) | 90 | **In Progress** | Compiles; no Update allocs; unit-testable |
-| T002 | PlayerWallet ScriptableObject | 85 | Pending | SO mutates via AddFunds/Deduct; fires event |
-| T003 | MatchRecord data class + JSON shape | 85 | Pending | Serializable; round-trips clean |
-| T004 | XOR SaveSystem (save/load MatchRecord) | 80 | Pending | Encrypts file on disk; loads back intact |
+| T001 | SO Event Channel system (GameEvent<T>, Listener) | 90 | **Done** | Compiles; no Update allocs; unit-testable |
+| T002 | PlayerWallet ScriptableObject | 85 | **Done** | SO mutates via AddFunds/Deduct; fires event |
+| T003 | MatchRecord data class + JSON shape | 85 | **Done** | Serializable; round-trips clean |
+| T004 | XOR SaveSystem (save/load MatchRecord) | 80 | **Done** | Encrypts file on disk; loads back intact |
 | T005 | RobotDefinition SO (part slots, base stats) | 75 | **Done** | Compiles; slots validated in Editor |
 | T006 | ArticulationBody joint wrapper (HingeJointAB) | 75 | **Done** | Drive applies torque; no Rigidbody |
 | T007 | DamageSystem — HealthSO + DamageEvent channel | 70 | **Done** | Damage reduces health SO; death event fires |
@@ -48,6 +48,10 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T010 | MatchManager — round timer, win condition | 55 | **Done** | Correct winner determined; MatchRecord written |
 | T011 | MainMenu + LoadingScreen UI | 40 | **Done** | Scene transitions work; no GC in Update |
 | T012 | VFX: impact sparks, destruction explosion | 30 | **Done** | Pooled particles; zero alloc |
+| T014 | RobotLocomotionController — tank drive via ArticulationBody | 80 | **Done** | Player input + AI SetInputs; zero alloc FixedUpdate |
+| T015 | RobotAIController — FSM (Idle/Chase/Attack) | 70 | **Done** | State machine compiles; fires DamageGameEvent; no direct Physics coupling |
+| T016 | CameraRig — smooth follow-cam | 60 | **Done** | Zero alloc LateUpdate; SnapToTarget on scene load |
+| T013 | AudioEvent SO + AudioManager (pooled AudioSources) | 65 | **Done** | Round-robin pool; RegisterCallback pattern; zero alloc after Awake |
 
 ---
 
@@ -73,8 +77,12 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T008 — Arena scene scaffold | 2026-04-07 | ArenaConfig SO (ground/wall dims, SpawnPointData list), SpawnPointMarker MB (Gizmo), ArenaManager MB (HandleMatchStarted positions robots). Scene assets deferred to Editor session. |
 | T010 — MatchManager | 2026-04-07 | Round timer in Update (no allocs), death/expiry win conditions, MatchRecord written via SaveSystem, wallet rewarded via PlayerWallet SO, _onMatchEnded VoidGameEvent raised. |
 | T009 — ShopUI | 2026-04-08 | PartDefinition SO (partId, category, cost, thumbnail), ShopCatalog SO (IReadOnlyList of PartDefinitions, duplicate-id validation), ShopManager MB in BattleRobots.UI (BuyPart → Deduct → VoidGameEvent). No Physics refs. |
-| T011 — MainMenu + LoadingScreen UI | 2026-04-08 | SceneLoader static helper (LoadSceneAsync, progress remap 0-0.9→0-1, IsDone/IsLoading), MainMenuController MB (PlayGame/OpenShop/QuitGame → SceneLoader + VoidGameEvent), LoadingScreenController MB (Update reads cached float, zero alloc, self-deactivates on IsDone). |
+| T011 — MainMenu + LoadingScreen UI | 2026-04-08 | SceneLoader static helper (LoadSceneAsync, progress remap 0-0.9→0-1, IsDone/IsLoading), MainMenuController MB (Play/Shop/Quit → SceneLoader + VoidGameEvent), LoadingScreenController MB (zero-alloc Update, self-deactivates on IsDone). |
 | T012 — VFX: impact sparks, destruction explosion | 2026-04-08 | DamageInfo.hitPoint added; GameEvent<T> + VoidGameEvent extended with RegisterCallback/UnregisterCallback (Action-based, backwards-compatible). ParticlePool MB (BattleRobots.Core): pre-warmed Stack, fixed struct array, Update swap-remove, zero alloc. ImpactVFXHandler MB (BattleRobots.VFX): subscribes DamageGameEvent, spawns sparks at hitPoint. DestructionVFXHandler MB (BattleRobots.VFX): subscribes VoidGameEvent death channel, spawns explosion at transform.position. |
+| T014 — RobotLocomotionController | 2026-04-08 | Tank-style ArticulationBody locomotion. _isPlayerControlled reads Input.GetAxis; AI/network pushes via SetInputs(move, turn). Sets linearVelocity + angularVelocity on root body. Halt() zeros all motion. Zero alloc FixedUpdate. |
+| T015 — RobotAIController | 2026-04-08 | FSM (Idle/Chase/Attack). Detection/attack ranges; SteerToward() proportional steering; FireAttack() raises DamageGameEvent with cached _robotId string. SetTarget() + Disable() public API. Zero alloc FixedUpdate. |
+| T016 — CameraRig | 2026-04-08 | Smooth-follow via Vector3.SmoothDamp on position and forward direction. SnapToTarget() for scene-load snap. SetTarget() for spectator mode. Zero alloc LateUpdate. BattleRobots.Core namespace. |
+| T013 — AudioEvent SO + AudioManager | 2026-04-08 | AudioEvent SO: clip array, volume, pitch range, Raise()/RegisterCallback pattern. AudioManager MB: fixed AudioSource[] pool (Awake), round-robin AcquireSource() with steal fallback, OnEnable/OnDisable subscription. Zero alloc after Awake. |
 
 ---
 
@@ -87,21 +95,27 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-07 | PM Agent | Session 3: T008 Arena scaffold (ArenaConfig SO, SpawnPointMarker MB with Gizmos, ArenaManager MB). T010 MatchManager (round timer, death/expiry win conditions, MatchRecord persistence, wallet rewards, VoidGameEvent channels). M3 core loop complete in C#; scene asset wiring deferred to Editor session. |
 | 2026-04-08 | PM Agent | Session 4: T009 ShopUI — PartDefinition SO, ShopCatalog SO, ShopManager MB (BattleRobots.UI, BuyPart → Deduct → VoidGameEvent, no Physics refs). T011 MainMenu+LoadingScreen — SceneLoader static helper (async load, progress remap), MainMenuController MB (Play/Shop/Quit → SceneLoader + VoidGameEvent), LoadingScreenController MB (zero-alloc Update, self-deactivates on IsDone). M4 Economy+Shop and M5 Menu C# layers complete; scene wiring deferred to Editor session. |
 | 2026-04-08 | PM Agent | Session 5: T012 VFX — DamageInfo.hitPoint field added; RegisterCallback/UnregisterCallback added to GameEvent<T> and VoidGameEvent; ParticlePool MB (Core, pre-warmed Stack, zero-alloc Update timer); ImpactVFXHandler + DestructionVFXHandler (BattleRobots.VFX). All active backlog complete. M6 In Progress. |
+| 2026-04-08 | PM Agent | Session 6: T014 RobotLocomotionController (ArticulationBody tank drive, player + AI inputs, Halt). T015 RobotAIController (FSM Idle/Chase/Attack, SteerToward, FireAttack via DamageGameEvent). T016 CameraRig (SmoothDamp follow + look, SnapToTarget, BattleRobots.Core). T013 AudioEvent SO + AudioManager (clip array, pitch/volume range, round-robin AudioSource pool). All 16 backlog tasks Done. M2/M3/M6 further advanced. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T012 (ParticlePool, ImpactVFXHandler, DestructionVFXHandler) — all active backlog items are now **Done**.  
-**Next action:** Editor-session wiring pass, then new backlog items for remaining M6 (Audio, polish VFX) and M2/M3 gameplay loop refinement.
+**Last completed:** T013/T014/T015/T016 — all 16 active-backlog items are now **Done**.
+
+**Next action:** Editor-session wiring pass (see below), then new backlog items for:
+- Robot part assembly at runtime (T017 — RobotAssembler instantiates PartDefinition prefabs into slot transforms)
+- Match flow integration test (T018 — verify MatchManager → ArenaManager → Locomotion → AI → DamageSystem full loop)
+- Additional M6 polish (death camera shake, win/loss jingle via AudioEvent)
 
 **Pending Editor wiring (deferred to Editor sessions):**
-- **Arena scene**: assign ArenaConfig SO to ArenaManager; place SpawnPointMarker GameObjects at spawn locations
+- **Arena scene**: assign ArenaConfig SO to ArenaManager; place SpawnPointMarker GameObjects at spawn locations; add RobotLocomotionController (player) and RobotAIController (enemy) to robot root GameObjects; place CameraRig on Main Camera and assign player robot target; assign AudioManager in scene and wire AudioEvents to DamageEvent/DeathEvent channels
 - **ShopUI scene**: ShopManager ← ShopCatalog SO + PlayerWallet SO; buy buttons onClick → ShopManager.BuyPart(partDef); IntGameEventListener → wallet Text
 - **VFX**: create spark and explosion ParticleSystem prefabs; assign to ParticlePool instances; place ImpactVFXHandler/DestructionVFXHandler in Arena scene; assign DamageGameEvent and per-robot HealthSO._onDeath VoidGameEvent channels
 
 **Architecture notes for next agent:**
-- `GameEvent<T>` and `VoidGameEvent` now support both `RegisterListener(MonoBehaviour)` and `RegisterCallback(Action)` — backwards-compatible; existing listeners unchanged
-- `DamageInfo.hitPoint` (Vector3) added; callers that omit it default to Vector3.zero (no breaking change)
-- `ParticlePool` Update uses swap-remove on `ActiveEntry[]` — zero alloc; pool never resizes after Awake
-- `BattleRobots.VFX` namespace established at `Assets/Scripts/VFX/`; safe to reference Core, must not reference Physics or UI
+- `RobotLocomotionController` sets `ArticulationBody.linearVelocity` and `.angularVelocity` on the root body — requires Unity 2022.3+; root body must be the articulation chain root
+- `RobotAIController` depends on `RobotLocomotionController` on the same robot; SetTarget() should be called by MatchManager/ArenaManager at match start
+- `CameraRig` is in `BattleRobots.Core`; call `SnapToTarget()` from scene loading code (e.g., LoadingScreenController or ArenaManager.HandleMatchStarted) to avoid lerp-in artefact
+- `AudioEvent` SO uses the same RegisterCallback/UnregisterCallback pattern as GameEvent<T>; `AudioManager.OnEnable/OnDisable` handles subscription lifecycle automatically
+- `AIState` enum lives in `BattleRobots.Physics` namespace (same file as RobotAIController)
