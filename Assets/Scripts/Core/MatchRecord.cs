@@ -323,4 +323,115 @@ namespace BattleRobots.Core
         /// </summary>
         public bool rewardClaimed = false;
     }
+
+    // ── Replay export ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Single serializable replay frame — a subset of <see cref="MatchStateSnapshot"/>
+    /// fields flattened to avoid Unity-type dependencies in this POCO file.
+    ///
+    /// <c>Vector3</c> is broken into component floats so the record is serializable
+    /// without a <c>using UnityEngine</c> import and survives non-Unity serialization
+    /// paths (e.g. unit tests that use System.Text.Json instead of JsonUtility).
+    /// </summary>
+    [Serializable]
+    public sealed class ReplayFrame
+    {
+        /// <summary>Elapsed match time in seconds at the moment this frame was captured.</summary>
+        public float elapsedTime;
+
+        /// <summary>Player 1 hit-points.</summary>
+        public float p1Hp;
+
+        /// <summary>Player 2 hit-points.</summary>
+        public float p2Hp;
+
+        /// <summary>Player 1 world-space X position.</summary>
+        public float p1X;
+        /// <summary>Player 1 world-space Y position.</summary>
+        public float p1Y;
+        /// <summary>Player 1 world-space Z position.</summary>
+        public float p1Z;
+
+        /// <summary>Player 2 world-space X position.</summary>
+        public float p2X;
+        /// <summary>Player 2 world-space Y position.</summary>
+        public float p2Y;
+        /// <summary>Player 2 world-space Z position.</summary>
+        public float p2Z;
+    }
+
+    /// <summary>
+    /// Full replay export for a single match.
+    /// Stored in a separate XOR-encrypted file (not inside the main save file)
+    /// to keep save-file size bounded regardless of match length.
+    ///
+    /// Lifecycle:
+    ///   1. After a match ends, call <see cref="ReplayData.FromReplaySO"/> to build this object.
+    ///   2. Pass it to <see cref="SaveSystem.SaveReplay"/> to persist it.
+    ///   3. Use <see cref="SaveSystem.LoadReplay"/> to retrieve it later for the replay viewer.
+    ///
+    /// File naming: <c>replay_{sanitizedTimestamp}.sav</c> — the timestamp
+    /// matches <see cref="MatchRecord.timestamp"/> so replays are linkable to records.
+    /// </summary>
+    [Serializable]
+    public sealed class ReplayData
+    {
+        /// <summary>
+        /// UTC ISO-8601 timestamp copied from the corresponding <see cref="MatchRecord.timestamp"/>.
+        /// Used as the unique replay identifier and to derive the save-file name.
+        /// </summary>
+        public string matchTimestamp;
+
+        /// <summary>Zero-based arena index the match was played in.</summary>
+        public int arenaIndex;
+
+        /// <summary>
+        /// Ordered replay frames, oldest first.
+        /// Populated from <see cref="ReplaySO"/> snapshot data.
+        /// </summary>
+        public List<ReplayFrame> frames = new List<ReplayFrame>();
+
+        /// <summary>
+        /// Builds a <see cref="ReplayData"/> from a <see cref="ReplaySO"/> ring buffer
+        /// and the associated <see cref="MatchRecord"/>.
+        ///
+        /// Copies all snapshots out of the ring buffer in oldest-first order.
+        /// The <paramref name="replay"/> must not be null; it may be empty (returns
+        /// a ReplayData with no frames).
+        /// </summary>
+        public static ReplayData FromReplaySO(ReplaySO replay, MatchRecord record)
+        {
+            if (replay == null)
+                throw new ArgumentNullException(nameof(replay));
+
+            var data = new ReplayData
+            {
+                matchTimestamp = record?.timestamp ?? string.Empty,
+                arenaIndex     = record?.arenaIndex ?? 0,
+            };
+
+            int count = replay.SnapshotCount;
+            data.frames.Capacity = count;
+
+            for (int i = 0; i < count; i++)
+            {
+                MatchStateSnapshot snap = replay.GetSnapshot(i);
+                data.frames.Add(new ReplayFrame
+                {
+                    elapsedTime = snap.elapsedTime,
+                    p1Hp        = snap.p1Hp,
+                    p2Hp        = snap.p2Hp,
+                    p1X         = snap.p1Pos.x,
+                    p1Y         = snap.p1Pos.y,
+                    p1Z         = snap.p1Pos.z,
+                    p2X         = snap.p2Pos.x,
+                    p2Y         = snap.p2Pos.y,
+                    p2Z         = snap.p2Pos.z,
+                });
+            }
+
+            return data;
+        }
+    }
 }
