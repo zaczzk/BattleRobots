@@ -213,6 +213,13 @@ namespace BattleRobots.Core
         /// <see cref="AchievementProgressSO.LoadFromData"/>.
         /// </summary>
         public AchievementData achievements = new AchievementData();
+
+        /// <summary>
+        /// Persisted daily-challenge state (current UTC date, progress, reward-claimed flag).
+        /// Populated by <see cref="DailyChallengeProgressSO.BuildData"/> and consumed by
+        /// <see cref="DailyChallengeProgressSO.RefreshForToday"/>.
+        /// </summary>
+        public DailyChallengeData dailyChallenge = new DailyChallengeData();
     }
 
     // ── Friend / block list ───────────────────────────────────────────────────
@@ -245,5 +252,41 @@ namespace BattleRobots.Core
     {
         /// <summary>IDs of every achievement the player has unlocked, in unlock order.</summary>
         public List<string> unlockedIds = new List<string>();
+    }
+
+    // ── Daily challenge persistence ────────────────────────────────────────────
+
+    /// <summary>
+    /// Persisted state for the current day's challenge.
+    /// Serialized inside <see cref="SaveData.dailyChallenge"/>.
+    ///
+    /// Fields are intentionally flat (no nested lists) for JsonUtility compatibility.
+    /// </summary>
+    [Serializable]
+    public sealed class DailyChallengeData
+    {
+        /// <summary>
+        /// UTC date string ("YYYY-MM-DD") for which this data was last written.
+        /// An empty string signals that no challenge has been started yet.
+        /// </summary>
+        public string lastDateUtc = string.Empty;
+
+        /// <summary>
+        /// <see cref="DailyChallengeDefinitionSO.ChallengeId"/> of the active challenge
+        /// for <see cref="lastDateUtc"/>. Empty means no challenge was selected.
+        /// </summary>
+        public string challengeId = string.Empty;
+
+        /// <summary>
+        /// Raw accumulated progress units toward the challenge target.
+        /// Reset to 0 when a new day is detected.
+        /// </summary>
+        public float progress = 0f;
+
+        /// <summary>
+        /// True once the player has claimed the completion reward for this challenge.
+        /// Prevents double-crediting across sessions on the same UTC day.
+        /// </summary>
+        public bool rewardClaimed = false;
     }
 }

@@ -32,6 +32,11 @@ namespace BattleRobots.Core
         [Tooltip("AchievementProgressSO — loaded from save file on startup; checked after each match.")]
         [SerializeField] private AchievementProgressSO _achievementProgress;
 
+        [Header("Daily Challenge")]
+        [Tooltip("DailyChallengeProgressSO — refreshed on startup to select today's challenge; " +
+                 "updated after each match via RecordMatch.")]
+        [SerializeField] private DailyChallengeProgressSO _dailyChallenge;
+
         [Header("Events")]
         [SerializeField] private VoidGameEvent _onGameBootstrapped;
 
@@ -71,6 +76,9 @@ namespace BattleRobots.Core
 
             if (_achievementProgress != null)
                 _achievementProgress.LoadFromData(save.achievements);
+
+            if (_dailyChallenge != null)
+                _dailyChallenge.RefreshForToday(save.dailyChallenge);
         }
 
         /// <summary>
@@ -100,6 +108,13 @@ namespace BattleRobots.Core
             {
                 _achievementProgress.CheckAndUnlock(record, _playerProfile);
                 save.achievements = _achievementProgress.BuildData();
+            }
+
+            // Daily challenge: record match progress and persist updated state.
+            if (_dailyChallenge != null)
+            {
+                _dailyChallenge.RecordMatch(record);
+                save.dailyChallenge = _dailyChallenge.BuildData();
             }
 
             SaveSystem.Save(save);
