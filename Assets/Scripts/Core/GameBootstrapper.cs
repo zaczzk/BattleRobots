@@ -37,6 +37,11 @@ namespace BattleRobots.Core
                  "updated after each match via RecordMatch.")]
         [SerializeField] private DailyChallengeProgressSO _dailyChallenge;
 
+        [Header("Seasonal Event")]
+        [Tooltip("SeasonalEventProgressSO — loaded from save file on startup; score updated after each match. " +
+                 "Swap the assigned SeasonalEventDefinitionSO asset each season to trigger auto-reset.")]
+        [SerializeField] private SeasonalEventProgressSO _seasonalEvent;
+
         [Header("Events")]
         [SerializeField] private VoidGameEvent _onGameBootstrapped;
 
@@ -79,6 +84,9 @@ namespace BattleRobots.Core
 
             if (_dailyChallenge != null)
                 _dailyChallenge.RefreshForToday(save.dailyChallenge);
+
+            if (_seasonalEvent != null)
+                _seasonalEvent.LoadFromData(save.seasonalEvent);
         }
 
         /// <summary>
@@ -115,6 +123,13 @@ namespace BattleRobots.Core
             {
                 _dailyChallenge.RecordMatch(record);
                 save.dailyChallenge = _dailyChallenge.BuildData();
+            }
+
+            // Seasonal event: accumulate score and persist updated state.
+            if (_seasonalEvent != null)
+            {
+                _seasonalEvent.RecordMatch(record);
+                save.seasonalEvent = _seasonalEvent.BuildData();
             }
 
             SaveSystem.Save(save);

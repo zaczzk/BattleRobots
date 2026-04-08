@@ -220,6 +220,40 @@ namespace BattleRobots.Core
         /// <see cref="DailyChallengeProgressSO.RefreshForToday"/>.
         /// </summary>
         public DailyChallengeData dailyChallenge = new DailyChallengeData();
+
+        /// <summary>
+        /// Persisted seasonal-event state (season ID, cumulative score, claimed tier indices).
+        /// Populated by <see cref="SeasonalEventProgressSO.BuildData"/> and consumed by
+        /// <see cref="SeasonalEventProgressSO.LoadFromData"/>.
+        /// </summary>
+        public SeasonalEventData seasonalEvent = new SeasonalEventData();
+    }
+
+    // ── Seasonal event persistence ────────────────────────────────────────────
+
+    /// <summary>
+    /// Persisted state for the player's current seasonal-event progress.
+    /// Season-ID mismatch in <see cref="SeasonalEventProgressSO.LoadFromData"/> triggers
+    /// a full reset so previous-season data never carries forward.
+    /// Serialized inside <see cref="SaveData.seasonalEvent"/>.
+    /// </summary>
+    [Serializable]
+    public sealed class SeasonalEventData
+    {
+        /// <summary>
+        /// <see cref="SeasonalEventDefinitionSO.EventId"/> of the season for which this
+        /// data was recorded. Empty string means no season has been started.
+        /// </summary>
+        public string seasonId = string.Empty;
+
+        /// <summary>Cumulative seasonal score accumulated across all matches this season.</summary>
+        public int cumulativeScore;
+
+        /// <summary>
+        /// Zero-based indices of tiers the player has already claimed rewards for.
+        /// Flat list because JsonUtility does not support HashSet.
+        /// </summary>
+        public List<int> claimedTierIndices = new List<int>();
     }
 
     // ── Friend / block list ───────────────────────────────────────────────────
