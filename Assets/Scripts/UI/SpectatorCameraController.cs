@@ -82,9 +82,30 @@ namespace BattleRobots.UI
         /// </summary>
         public Vector3 DesiredPosition { get; private set; }
 
+        // When true (default), Tick calls ReplayUI.AdvancePlayback — the controller manages its own
+        // playback. Set to false via DisableInternalPlaybackAdvance() when a ReplayController MB
+        // is present in the scene and will call AdvancePlayback itself, preventing double-advance.
+        private bool _advancePlayback = true;
+
         // ── Unity lifecycle ───────────────────────────────────────────────────
 
         private void Update() => Tick(Time.deltaTime);
+
+        // ── External driver API ───────────────────────────────────────────────
+
+        /// <summary>
+        /// Called by <see cref="ReplayController"/> during Awake to signal that an external
+        /// owner will drive <see cref="ReplayUI.AdvancePlayback"/> each frame.
+        /// After this call, <see cref="Tick"/> skips Step 1 (playback advancement) and only
+        /// computes the desired camera position — preventing double-advance.
+        ///
+        /// Existing scenes that have no <see cref="ReplayController"/> do not call this method
+        /// and retain the default single-owner behaviour (backwards-compatible).
+        /// </summary>
+        public void DisableInternalPlaybackAdvance()
+        {
+            _advancePlayback = false;
+        }
 
         // ── Public API ────────────────────────────────────────────────────────
 
@@ -104,8 +125,8 @@ namespace BattleRobots.UI
         {
             if (_replayUI == null) return;
 
-            // Step 1: drive playback
-            if (_replayUI.IsPlaying)
+            // Step 1: drive playback — skipped when an external ReplayController owns this.
+            if (_advancePlayback && _replayUI.IsPlaying)
                 _replayUI.AdvancePlayback(deltaTime);
 
             // Step 2: compute desired camera position from the snapshot
