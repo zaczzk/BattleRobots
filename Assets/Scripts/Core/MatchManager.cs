@@ -59,6 +59,13 @@ namespace BattleRobots.Core
         [Tooltip("Raised every frame while match is running. Payload = seconds remaining.")]
         [SerializeField] private FloatGameEvent _onTimerUpdated;
 
+        [Header("Audio")]
+        [Tooltip("AudioEvent SO played when the player wins the match.")]
+        [SerializeField] private AudioEvent _onWinJingle;
+
+        [Tooltip("AudioEvent SO played when the player loses the match.")]
+        [SerializeField] private AudioEvent _onLossJingle;
+
         // ── Runtime state ─────────────────────────────────────────────────────
 
         /// <summary>True while a round is active.</summary>
@@ -174,6 +181,10 @@ namespace BattleRobots.Core
 
             // Signal other systems
             _onMatchEnded?.Raise();
+
+            // Audio jingle
+            if (playerWon) _onWinJingle?.Raise();
+            else           _onLossJingle?.Raise();
 
             Debug.Log($"[MatchManager] Match ended. PlayerWon={playerWon}, " +
                       $"Duration={elapsed:F1}s, Reward={reward}, Wallet={walletSnapshot}.");

@@ -39,6 +39,13 @@ namespace BattleRobots.Core
         [Header("Presentation")]
         [SerializeField] private Sprite _thumbnail;
 
+        // ── Prefab ────────────────────────────────────────────────────────────
+
+        [Header("Prefab")]
+        [Tooltip("Optional GameObject prefab instantiated at the robot's slot attachment point "
+                 "by RobotAssembler during match setup. Leave null for stat-only parts.")]
+        [SerializeField] private GameObject _prefab;
+
         // ── Public API ────────────────────────────────────────────────────────
 
         public string       PartId      => _partId;
@@ -47,6 +54,7 @@ namespace BattleRobots.Core
         public string       Description => _description;
         public int          Cost        => _cost;
         public Sprite       Thumbnail   => _thumbnail;
+        public GameObject   Prefab      => _prefab;
 
         // ── Editor validation ─────────────────────────────────────────────────
 

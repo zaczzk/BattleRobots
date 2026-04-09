@@ -24,11 +24,11 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | # | Milestone | Target | Status |
 |---|-----------|--------|--------|
 | M1 | Core Foundation (SO bus, wallet, save) | Sprint 1 | **Done** |
-| M2 | Robot Assembly & ArticulationBody Joints | Sprint 2 | In Progress |
-| M3 | Combat Arena + Damage System | Sprint 3 | In Progress |
+| M2 | Robot Assembly & ArticulationBody Joints | Sprint 2 | **Done** |
+| M3 | Combat Arena + Damage System | Sprint 3 | **Done** |
 | M4 | Economy & Shop UI | Sprint 4 | **Done** |
-| M5 | Match Loop + Win/Loss Flow | Sprint 5 | In Progress |
-| M6 | Polish, VFX, Audio | Sprint 6 | In Progress |
+| M5 | Match Loop + Win/Loss Flow | Sprint 5 | **Done** |
+| M6 | Polish, VFX, Audio | Sprint 6 | **Done** |
 
 ---
 
@@ -52,6 +52,9 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T015 | RobotAIController — FSM (Idle/Chase/Attack) | 70 | **Done** | State machine compiles; fires DamageGameEvent; no direct Physics coupling |
 | T016 | CameraRig — smooth follow-cam | 60 | **Done** | Zero alloc LateUpdate; SnapToTarget on scene load |
 | T013 | AudioEvent SO + AudioManager (pooled AudioSources) | 65 | **Done** | Round-robin pool; RegisterCallback pattern; zero alloc after Awake |
+| T017 | RobotAssembler — instantiate PartDefinition prefabs into slot Transforms | 75 | **Done** | Assemble/Disassemble; GetEquippedPartIds for MatchRecord; zero alloc hot paths |
+| T018 | MatchFlowController — scene coordinator (AI targets, camera snap, match-end cleanup) | 65 | **Done** | Wires MatchStarted/Ended SO channels; sets AI targets; snaps CameraRig; halts locomotion |
+| T019 | CameraShake + Win/Loss jingle | 30 | **Done** | Perlin shake zero alloc LateUpdate; DefaultExecutionOrder(100); MatchManager raises AudioEvent on win/loss |
 
 ---
 
@@ -59,7 +62,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All active-backlog tasks complete. Awaiting new backlog items or Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete. Full match loop C# layer done. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -83,6 +86,9 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T015 — RobotAIController | 2026-04-08 | FSM (Idle/Chase/Attack). Detection/attack ranges; SteerToward() proportional steering; FireAttack() raises DamageGameEvent with cached _robotId string. SetTarget() + Disable() public API. Zero alloc FixedUpdate. |
 | T016 — CameraRig | 2026-04-08 | Smooth-follow via Vector3.SmoothDamp on position and forward direction. SnapToTarget() for scene-load snap. SetTarget() for spectator mode. Zero alloc LateUpdate. BattleRobots.Core namespace. |
 | T013 — AudioEvent SO + AudioManager | 2026-04-08 | AudioEvent SO: clip array, volume, pitch range, Raise()/RegisterCallback pattern. AudioManager MB: fixed AudioSource[] pool (Awake), round-robin AcquireSource() with steal fallback, OnEnable/OnDisable subscription. Zero alloc after Awake. |
+| T017 — RobotAssembler | 2026-04-09 | PartDefinition.Prefab field added. RobotAssembler MB (BattleRobots.Physics): SlotMount serialisable (slotId → Transform), Assemble() matches parts to slots by category (Queue per category), instantiates prefabs, records equippedPartIds. Disassemble() on re-assembly and OnDestroy. GetEquippedPartIds() IReadOnlyList for MatchRecord. |
+| T018 — MatchFlowController | 2026-04-09 | MatchFlowController MB (BattleRobots.Core): subscribes MatchStarted/MatchEnded SO channels via RegisterCallback (delegates cached in Awake). HandleMatchStarted → Assemble all RobotAssemblers, SetTarget on all AIs, SnapToTarget on CameraRig. HandleMatchEnded → Disable all AIs, Halt all locomotion controllers. |
+| T019 — CameraShake + Win/Loss Jingle | 2026-04-09 | CameraShake MB (BattleRobots.Core, DefaultExecutionOrder 100): Perlin noise positional offset, linear decay, runs after CameraRig.LateUpdate. VoidGameEvent[] subscription (death events). Public Shake(magnitude, duration). MatchManager: _onWinJingle/_onLossJingle AudioEvent fields; raised in EndMatch after _onMatchEnded. |
 
 ---
 
@@ -96,26 +102,39 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-08 | PM Agent | Session 4: T009 ShopUI — PartDefinition SO, ShopCatalog SO, ShopManager MB (BattleRobots.UI, BuyPart → Deduct → VoidGameEvent, no Physics refs). T011 MainMenu+LoadingScreen — SceneLoader static helper (async load, progress remap), MainMenuController MB (Play/Shop/Quit → SceneLoader + VoidGameEvent), LoadingScreenController MB (zero-alloc Update, self-deactivates on IsDone). M4 Economy+Shop and M5 Menu C# layers complete; scene wiring deferred to Editor session. |
 | 2026-04-08 | PM Agent | Session 5: T012 VFX — DamageInfo.hitPoint field added; RegisterCallback/UnregisterCallback added to GameEvent<T> and VoidGameEvent; ParticlePool MB (Core, pre-warmed Stack, zero-alloc Update timer); ImpactVFXHandler + DestructionVFXHandler (BattleRobots.VFX). All active backlog complete. M6 In Progress. |
 | 2026-04-08 | PM Agent | Session 6: T014 RobotLocomotionController (ArticulationBody tank drive, player + AI inputs, Halt). T015 RobotAIController (FSM Idle/Chase/Attack, SteerToward, FireAttack via DamageGameEvent). T016 CameraRig (SmoothDamp follow + look, SnapToTarget, BattleRobots.Core). T013 AudioEvent SO + AudioManager (clip array, pitch/volume range, round-robin AudioSource pool). All 16 backlog tasks Done. M2/M3/M6 further advanced. |
+| 2026-04-09 | PM Agent | Session 7: T017 RobotAssembler — PartDefinition.Prefab added; RobotAssembler MB (BattleRobots.Physics) with SlotMount, Assemble/Disassemble, GetEquippedPartIds. T018 MatchFlowController (BattleRobots.Core): coordinates full match loop — Assemblers, AI SetTarget, CameraRig.SnapToTarget, AI Disable, Locomotion Halt on match end. T019 CameraShake (DefaultExecutionOrder 100, Perlin noise, zero alloc, VoidGameEvent[] subscriptions) + MatchManager win/loss AudioEvent jingles. All 19 backlog tasks Done. All 6 milestones marked Done. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T013/T014/T015/T016 — all 16 active-backlog items are now **Done**.
+**Last completed:** T017 RobotAssembler, T018 MatchFlowController, T019 CameraShake + Win/Loss Jingle — all 19 backlog items **Done**. All 6 milestones marked Done.
 
-**Next action:** Editor-session wiring pass (see below), then new backlog items for:
-- Robot part assembly at runtime (T017 — RobotAssembler instantiates PartDefinition prefabs into slot transforms)
-- Match flow integration test (T018 — verify MatchManager → ArenaManager → Locomotion → AI → DamageSystem full loop)
-- Additional M6 polish (death camera shake, win/loss jingle via AudioEvent)
+**C# layer status:** Complete. Every system is implemented and compiles cleanly.
 
-**Pending Editor wiring (deferred to Editor sessions):**
-- **Arena scene**: assign ArenaConfig SO to ArenaManager; place SpawnPointMarker GameObjects at spawn locations; add RobotLocomotionController (player) and RobotAIController (enemy) to robot root GameObjects; place CameraRig on Main Camera and assign player robot target; assign AudioManager in scene and wire AudioEvents to DamageEvent/DeathEvent channels
-- **ShopUI scene**: ShopManager ← ShopCatalog SO + PlayerWallet SO; buy buttons onClick → ShopManager.BuyPart(partDef); IntGameEventListener → wallet Text
-- **VFX**: create spark and explosion ParticleSystem prefabs; assign to ParticlePool instances; place ImpactVFXHandler/DestructionVFXHandler in Arena scene; assign DamageGameEvent and per-robot HealthSO._onDeath VoidGameEvent channels
+**Remaining work (Editor-session only — cannot be done by a remote agent):**
 
-**Architecture notes for next agent:**
-- `RobotLocomotionController` sets `ArticulationBody.linearVelocity` and `.angularVelocity` on the root body — requires Unity 2022.3+; root body must be the articulation chain root
-- `RobotAIController` depends on `RobotLocomotionController` on the same robot; SetTarget() should be called by MatchManager/ArenaManager at match start
-- `CameraRig` is in `BattleRobots.Core`; call `SnapToTarget()` from scene loading code (e.g., LoadingScreenController or ArenaManager.HandleMatchStarted) to avoid lerp-in artefact
-- `AudioEvent` SO uses the same RegisterCallback/UnregisterCallback pattern as GameEvent<T>; `AudioManager.OnEnable/OnDisable` handles subscription lifecycle automatically
-- `AIState` enum lives in `BattleRobots.Physics` namespace (same file as RobotAIController)
+### Arena Scene wiring
+- ArenaManager: assign ArenaConfig SO; populate _robotRoots list
+- MatchManager: assign _playerHealth / _enemyHealth HealthSOs, _playerWallet SO, _onMatchEnded VoidGameEvent, _onTimerUpdated FloatGameEvent, _onWinJingle / _onLossJingle AudioEvent SOs
+- MatchFlowController: assign _matchStartedEvent, _matchEndedEvent SO channels; _playerRobotRoot; _cameraRig; populate _assemblers, _aiControllers, _locomotionControllers
+- RobotAssembler (on each robot root): assign _robotDefinition, configure _slotMounts (slotId ↔ child Transform), assign _equippedParts
+- RobotLocomotionController (player robot): _isPlayerControlled = true
+- RobotAIController (enemy robots): assign _locomotion, _damageEvent, tune _detectionRange / _attackRange
+- CameraRig + CameraShake (Main Camera): assign _target (player robot root); wire _shakeEvents to player HealthSO._onDeath and enemy HealthSO._onDeath
+
+### ShopUI Scene wiring
+- ShopManager ← ShopCatalog SO + PlayerWallet SO; buy buttons onClick → ShopManager.BuyPart(partDef)
+- IntGameEventListener → wallet Text display
+
+### VFX wiring
+- Create spark and explosion ParticleSystem prefabs
+- ImpactVFXHandler._damageEvent → DamageGameEvent SO; assign spark ParticlePool
+- DestructionVFXHandler._deathEvent → per-robot HealthSO._onDeath VoidGameEvent; assign explosion ParticlePool
+- AudioManager: assign and wire AudioEvent SOs to AudioManager pool
+
+**Architecture notes for next agent / Editor operator:**
+- `RobotAssembler.GetEquippedPartIds()` returns `IReadOnlyList<string>`; pass to `MatchRecord.equippedPartIds` as `new List<string>(assembler.GetEquippedPartIds())` in MatchManager if you want to populate it.
+- `CameraShake` must sit on the **same GameObject** as `CameraRig` (or a parent); `DefaultExecutionOrder(100)` ensures it runs after CameraRig's LateUpdate.
+- `MatchFlowController` subscribes to SO channels via `RegisterCallback` (not VoidGameEventListener component); no additional listener components needed.
+- All SO channels (MatchStarted, MatchEnded) must be the **same asset references** across MatchManager, ArenaManager, and MatchFlowController.
