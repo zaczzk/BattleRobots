@@ -55,6 +55,10 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T017 | RobotAssembler — instantiate PartDefinition prefabs into slot Transforms | 75 | **Done** | Assemble/Disassemble; GetEquippedPartIds for MatchRecord; zero alloc hot paths |
 | T018 | MatchFlowController — scene coordinator (AI targets, camera snap, match-end cleanup) | 65 | **Done** | Wires MatchStarted/Ended SO channels; sets AI targets; snaps CameraRig; halts locomotion |
 | T019 | CameraShake + Win/Loss jingle | 30 | **Done** | Perlin shake zero alloc LateUpdate; DefaultExecutionOrder(100); MatchManager raises AudioEvent on win/loss |
+| T020 | CombatHUDController — timer + health bars during battle | 75 | **Done** | Subscribes FloatGameEvents; timer dedup (≤1 alloc/s); sliders + labels; show/hide on match start/end |
+| T021 | PauseManager + PauseMenuController — Escape key pause | 65 | **Done** | Time.timeScale 0/1; _onPaused/_onResumed channels; Resume/QuitToMenu buttons; auto-resume on match end |
+| T022 | MatchResultSO + PostMatchController — results screen | 60 | **Done** | Blackboard SO written before MatchEnded fires; outcome/duration/earned/balance Text; PlayAgain/MainMenu buttons |
+| T023 | MatchManager: populate MatchRecord.equippedPartIds + write MatchResultSO | 45 | **Done** | _playerAssembler field; GetEquippedPartIds() copied to record; MatchResultSO.Write() called before MatchEnded |
 
 ---
 
@@ -62,7 +66,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete. Full match loop C# layer done. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T023). Full match loop + HUD + Pause + Results C# layer done. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -89,6 +93,10 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T017 — RobotAssembler | 2026-04-09 | PartDefinition.Prefab field added. RobotAssembler MB (BattleRobots.Physics): SlotMount serialisable (slotId → Transform), Assemble() matches parts to slots by category (Queue per category), instantiates prefabs, records equippedPartIds. Disassemble() on re-assembly and OnDestroy. GetEquippedPartIds() IReadOnlyList for MatchRecord. |
 | T018 — MatchFlowController | 2026-04-09 | MatchFlowController MB (BattleRobots.Core): subscribes MatchStarted/MatchEnded SO channels via RegisterCallback (delegates cached in Awake). HandleMatchStarted → Assemble all RobotAssemblers, SetTarget on all AIs, SnapToTarget on CameraRig. HandleMatchEnded → Disable all AIs, Halt all locomotion controllers. |
 | T019 — CameraShake + Win/Loss Jingle | 2026-04-09 | CameraShake MB (BattleRobots.Core, DefaultExecutionOrder 100): Perlin noise positional offset, linear decay, runs after CameraRig.LateUpdate. VoidGameEvent[] subscription (death events). Public Shake(magnitude, duration). MatchManager: _onWinJingle/_onLossJingle AudioEvent fields; raised in EndMatch after _onMatchEnded. |
+| T020 — CombatHUDController | 2026-04-09 | CombatHUDController MB (BattleRobots.UI): subscribes _onMatchStarted/Ended VoidGameEvents to show/hide _hudRoot. Timer display (int-second dedup, ≤1 string alloc/s). Player + enemy health sliders and optional integer labels via FloatGameEvent channels from HealthSO. All delegates cached in Awake; no Update. |
+| T021 — PauseManager + PauseMenuController | 2026-04-09 | PauseManager MB (BattleRobots.Core): tracks match-running state via SO channels; Escape key detection in Update (gated by _matchRunning); Time.timeScale 0/1; _onPaused/_onResumed VoidGameEvent channels; auto-resume on MatchEnded/OnDisable. PauseMenuController MB (BattleRobots.UI): shows/hides _pausePanel on SO events; Resume + QuitToMenu buttons; restores timeScale before scene load. |
+| T022 — MatchResultSO + PostMatchController | 2026-04-09 | MatchResultSO (BattleRobots.Core, CreateAssetMenu): blackboard written by MatchManager before MatchEnded fires; PlayerWon/DurationSeconds/CurrencyEarned/NewWalletBalance. PostMatchController MB (BattleRobots.UI): subscribes MatchEnded; shows outcome/duration/earned/balance Text; PlayAgain + MainMenu buttons via SceneLoader. |
+| T023 — MatchRecord equippedPartIds + MatchResultSO wiring | 2026-04-09 | MatchManager patched: added _playerAssembler RobotAssembler field (Core may ref Physics); EndMatch() copies GetEquippedPartIds() into MatchRecord; _matchResult MatchResultSO field; Write() called before _onMatchEnded.Raise() so PostMatchController reads correct data. |
 
 ---
 
@@ -103,12 +111,13 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-08 | PM Agent | Session 5: T012 VFX — DamageInfo.hitPoint field added; RegisterCallback/UnregisterCallback added to GameEvent<T> and VoidGameEvent; ParticlePool MB (Core, pre-warmed Stack, zero-alloc Update timer); ImpactVFXHandler + DestructionVFXHandler (BattleRobots.VFX). All active backlog complete. M6 In Progress. |
 | 2026-04-08 | PM Agent | Session 6: T014 RobotLocomotionController (ArticulationBody tank drive, player + AI inputs, Halt). T015 RobotAIController (FSM Idle/Chase/Attack, SteerToward, FireAttack via DamageGameEvent). T016 CameraRig (SmoothDamp follow + look, SnapToTarget, BattleRobots.Core). T013 AudioEvent SO + AudioManager (clip array, pitch/volume range, round-robin AudioSource pool). All 16 backlog tasks Done. M2/M3/M6 further advanced. |
 | 2026-04-09 | PM Agent | Session 7: T017 RobotAssembler — PartDefinition.Prefab added; RobotAssembler MB (BattleRobots.Physics) with SlotMount, Assemble/Disassemble, GetEquippedPartIds. T018 MatchFlowController (BattleRobots.Core): coordinates full match loop — Assemblers, AI SetTarget, CameraRig.SnapToTarget, AI Disable, Locomotion Halt on match end. T019 CameraShake (DefaultExecutionOrder 100, Perlin noise, zero alloc, VoidGameEvent[] subscriptions) + MatchManager win/loss AudioEvent jingles. All 19 backlog tasks Done. All 6 milestones marked Done. |
+| 2026-04-09 | PM Agent | Session 8: T020 CombatHUDController (timer MM:SS + player/enemy health sliders+labels, show/hide on match start/end, all delegates cached, int-second timer dedup). T021 PauseManager (Escape key, Time.timeScale, auto-resume) + PauseMenuController (panel show/hide, Resume/QuitToMenu buttons). T022 MatchResultSO blackboard SO + PostMatchController (outcome/duration/earned/balance text, PlayAgain/MainMenu buttons). T023 MatchManager patched: RobotAssembler equippedPartIds + MatchResultSO write before MatchEnded. Total tasks Done: T001–T023. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T017 RobotAssembler, T018 MatchFlowController, T019 CameraShake + Win/Loss Jingle — all 19 backlog items **Done**. All 6 milestones marked Done.
+**Last completed:** T020 CombatHUDController, T021 PauseManager + PauseMenuController, T022 MatchResultSO + PostMatchController, T023 MatchManager equippedPartIds + MatchResultSO — all 23 backlog items **Done**.
 
 **C# layer status:** Complete. Every system is implemented and compiles cleanly.
 
@@ -116,12 +125,16 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 ### Arena Scene wiring
 - ArenaManager: assign ArenaConfig SO; populate _robotRoots list
-- MatchManager: assign _playerHealth / _enemyHealth HealthSOs, _playerWallet SO, _onMatchEnded VoidGameEvent, _onTimerUpdated FloatGameEvent, _onWinJingle / _onLossJingle AudioEvent SOs
+- MatchManager: assign _playerHealth / _enemyHealth HealthSOs, _playerWallet SO, _onMatchEnded VoidGameEvent, _onTimerUpdated FloatGameEvent, _onWinJingle / _onLossJingle AudioEvent SOs, **_matchResult MatchResultSO**, **_playerAssembler RobotAssembler**
 - MatchFlowController: assign _matchStartedEvent, _matchEndedEvent SO channels; _playerRobotRoot; _cameraRig; populate _assemblers, _aiControllers, _locomotionControllers
 - RobotAssembler (on each robot root): assign _robotDefinition, configure _slotMounts (slotId ↔ child Transform), assign _equippedParts
 - RobotLocomotionController (player robot): _isPlayerControlled = true
 - RobotAIController (enemy robots): assign _locomotion, _damageEvent, tune _detectionRange / _attackRange
 - CameraRig + CameraShake (Main Camera): assign _target (player robot root); wire _shakeEvents to player HealthSO._onDeath and enemy HealthSO._onDeath
+- **PauseManager**: assign _onMatchStarted, _onMatchEnded, _onPaused, _onResumed VoidGameEvent SOs
+- **PauseMenuController**: assign _pausePanel, _pauseManager, _onPaused, _onResumed; wire Resume + QuitToMenu buttons
+- **CombatHUDController**: assign _hudRoot, _timerText, _playerHealthSlider, _enemyHealthSlider, _playerHealth SO, _enemyHealth SO; wire _onMatchStarted, _onMatchEnded, _onTimerUpdated FloatGameEvent, _onPlayerHealthChanged / _onEnemyHealthChanged (HealthSO._onHealthChanged FloatGameEvent SOs)
+- **PostMatchController**: assign _matchResult MatchResultSO, _resultPanel, text fields; assign _onMatchEnded; wire PlayAgain + MainMenu buttons; set _arenaSceneName / _mainMenuSceneName
 
 ### ShopUI Scene wiring
 - ShopManager ← ShopCatalog SO + PlayerWallet SO; buy buttons onClick → ShopManager.BuyPart(partDef)
@@ -134,7 +147,11 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 - AudioManager: assign and wire AudioEvent SOs to AudioManager pool
 
 **Architecture notes for next agent / Editor operator:**
-- `RobotAssembler.GetEquippedPartIds()` returns `IReadOnlyList<string>`; pass to `MatchRecord.equippedPartIds` as `new List<string>(assembler.GetEquippedPartIds())` in MatchManager if you want to populate it.
+- `MatchManager._matchResult` must be assigned the same **MatchResultSO** asset that `PostMatchController._matchResult` references — they share the same blackboard.
+- `MatchManager._playerAssembler` is the `RobotAssembler` on the player robot root. Enemy assemblers do not need to be wired here.
+- `CombatHUDController._onPlayerHealthChanged` = `PlayerHealthSO._onHealthChanged` FloatGameEvent asset. Same pattern for enemy.
+- `CombatHUDController._onTimerUpdated` = same asset as `MatchManager._onTimerUpdated`.
+- `PauseManager` must appear in the scene to handle `Time.timeScale`. Wire its output channels to `PauseMenuController`.
 - `CameraShake` must sit on the **same GameObject** as `CameraRig` (or a parent); `DefaultExecutionOrder(100)` ensures it runs after CameraRig's LateUpdate.
 - `MatchFlowController` subscribes to SO channels via `RegisterCallback` (not VoidGameEventListener component); no additional listener components needed.
-- All SO channels (MatchStarted, MatchEnded) must be the **same asset references** across MatchManager, ArenaManager, and MatchFlowController.
+- All SO channels (MatchStarted, MatchEnded) must be the **same asset references** across MatchManager, ArenaManager, MatchFlowController, PauseManager, CombatHUDController, and PostMatchController.

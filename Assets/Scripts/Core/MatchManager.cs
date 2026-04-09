@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BattleRobots.Physics;
 using UnityEngine;
 
 namespace BattleRobots.Core
@@ -58,6 +59,15 @@ namespace BattleRobots.Core
 
         [Tooltip("Raised every frame while match is running. Payload = seconds remaining.")]
         [SerializeField] private FloatGameEvent _onTimerUpdated;
+
+        [Header("Match Result")]
+        [Tooltip("Blackboard SO written with match outcome just before _onMatchEnded fires. " +
+                 "Read by PostMatchController to populate the results screen.")]
+        [SerializeField] private MatchResultSO _matchResult;
+
+        [Tooltip("RobotAssembler on the player's robot root. " +
+                 "Its equipped part IDs are recorded in the MatchRecord.")]
+        [SerializeField] private RobotAssembler _playerAssembler;
 
         [Header("Audio")]
         [Tooltip("AudioEvent SO played when the player wins the match.")]
@@ -160,6 +170,11 @@ namespace BattleRobots.Core
 
             int walletSnapshot = _playerWallet != null ? _playerWallet.Balance : 0;
 
+            // Collect equipped part IDs from the player's assembler (if assigned).
+            var partIds = _playerAssembler != null
+                ? new List<string>(_playerAssembler.GetEquippedPartIds())
+                : new List<string>();
+
             // Build and persist match record
             var record = new MatchRecord
             {
@@ -170,7 +185,7 @@ namespace BattleRobots.Core
                 damageTaken     = damageTaken,
                 currencyEarned  = reward,
                 walletSnapshot  = walletSnapshot,
-                equippedPartIds = new List<string>(), // populated by RobotAssembly in M2+
+                equippedPartIds = partIds,
             };
 
             // Append to save file — load, mutate, save
@@ -178,6 +193,10 @@ namespace BattleRobots.Core
             saveData.walletBalance = walletSnapshot;
             saveData.matchHistory.Add(record);
             SaveSystem.Save(saveData);
+
+            // Write blackboard SO before raising MatchEnded so PostMatchController
+            // reads correct data when its callback fires.
+            _matchResult?.Write(playerWon, elapsed, reward, walletSnapshot);
 
             // Signal other systems
             _onMatchEnded?.Raise();
