@@ -27,6 +27,12 @@ namespace BattleRobots.Physics
     {
         // ── Inspector ─────────────────────────────────────────────────────────
 
+        [Header("Difficulty Override")]
+        [Tooltip("Optional SO preset (e.g. Easy / Normal / Hard). When assigned, all Detection, " +
+                 "Attack, and Steering inspector fields below are overridden at Awake time. " +
+                 "Leave null to use the per-component inspector values directly.")]
+        [SerializeField] private BotDifficultyConfig _difficultyConfig;
+
         [Header("References")]
         [Tooltip("Locomotion controller on this robot's root. Required.")]
         [SerializeField] private RobotLocomotionController _locomotion;
@@ -69,6 +75,21 @@ namespace BattleRobots.Physics
         {
             // Cache name once so FixedUpdate never allocates a string.
             _robotId = name;
+
+            // Apply difficulty preset — overrides inspector tuning if assigned.
+            // All assignments are simple field writes; no heap allocation.
+            if (_difficultyConfig != null)
+            {
+                _detectionRange  = _difficultyConfig.DetectionRange;
+                _attackRange     = _difficultyConfig.AttackRange;
+                _attackDamage    = _difficultyConfig.AttackDamage;
+                _attackCooldown  = _difficultyConfig.AttackCooldown;
+                _facingThreshold = _difficultyConfig.FacingThreshold;
+
+                // Locomotion speed: _locomotion is serialised so it's valid at Awake time
+                // as long as it's assigned via Inspector (same-scene reference).
+                _locomotion?.SetSpeedMultiplier(_difficultyConfig.MoveSpeedMultiplier);
+            }
         }
 
         private void FixedUpdate()

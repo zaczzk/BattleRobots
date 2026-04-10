@@ -37,6 +37,10 @@ namespace BattleRobots.Physics
                  "Set false for AI / network controlled robots.")]
         [SerializeField] private bool _isPlayerControlled = true;
 
+        // ── Speed multiplier (set once at match start by BotDifficultyConfig) ────
+        // Stored separately so _moveSpeed/_turnSpeed inspector values are preserved.
+        private float _speedMultiplier = 1f;
+
         // ── Public input state ─────────────────────────────────────────────────
         // Range −1..1.  Written by AI/network; read in FixedUpdate.
         // No properties — public fields are intentional to keep FixedUpdate allocation-free.
@@ -76,10 +80,10 @@ namespace BattleRobots.Physics
         private void ApplyLocomotion(float move, float turn)
         {
             // Linear velocity along local-forward — value-type vector ops, no alloc.
-            _rootBody.linearVelocity = transform.forward * (move * _moveSpeed);
+            _rootBody.linearVelocity = transform.forward * (move * _moveSpeed * _speedMultiplier);
 
             // Angular velocity around world-up; convert deg/s → rad/s.
-            float turnRad = turn * (_turnSpeed * Mathf.Deg2Rad);
+            float turnRad = turn * (_turnSpeed * _speedMultiplier * Mathf.Deg2Rad);
             _rootBody.angularVelocity = new Vector3(0f, turnRad, 0f);
         }
 
@@ -106,6 +110,18 @@ namespace BattleRobots.Physics
             _rootBody.angularVelocity = Vector3.zero;
             MoveInput = 0f;
             TurnInput = 0f;
+        }
+
+        /// <summary>
+        /// Applies a one-time speed multiplier from a <c>BotDifficultyConfig</c> SO.
+        /// Stores the value separately so the inspector's base speeds are preserved;
+        /// calling this method multiple times sets (not compounds) the multiplier.
+        /// Allocation-free — pure field write.
+        /// </summary>
+        /// <param name="multiplier">Values &lt; 0.01 are clamped to 0.01 to prevent zeroing motion.</param>
+        public void SetSpeedMultiplier(float multiplier)
+        {
+            _speedMultiplier = Mathf.Max(0.01f, multiplier);
         }
 
         /// <summary>Expose speed for UI / debug without referencing ArticulationBody directly.</summary>

@@ -61,6 +61,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T023 | MatchManager: populate MatchRecord.equippedPartIds + write MatchResultSO | 45 | **Done** | _playerAssembler field; GetEquippedPartIds() copied to record; MatchResultSO.Write() called before MatchEnded |
 | T024 | MatchStarter — raises MatchStarted VoidGameEvent on Start() | 85 | **Done** | Single SO field; optional _startDelay (default 0.1s) for AB physics settle; OnValidate warning |
 | T025 | SceneWiringValidator EditorWindow — scans scene for null SO refs | 70 | **Done** | Tools▶BattleRobots menu; SerializedObject iterator; groups by type; ping+select; copy report |
+| T026 | EditMode Unit Tests — SaveSystem, MatchRecord, PlayerWallet, HealthSO, VoidGameEvent, DamageInfo | 85 | **Done** | 6 test files, 42 test cases; asmdef + test-framework package added to manifest; all systems testable without scene |
+| T027 | BotDifficultyConfig SO + RobotAIController integration | 65 | **Done** | SO in BattleRobots.Core with 6 tuning properties; RobotAIController applies preset in Awake; RobotLocomotionController.SetSpeedMultiplier stores multiplier separately (idempotent, zero alloc) |
 
 ---
 
@@ -68,7 +70,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T025). Full match loop + HUD + Pause + Results C# layer done. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T027). Full match loop + HUD + Pause + Results C# layer done. Test suite added. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -101,6 +103,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T023 — MatchRecord equippedPartIds + MatchResultSO wiring | 2026-04-09 | MatchManager patched: added _playerAssembler RobotAssembler field (Core may ref Physics); EndMatch() copies GetEquippedPartIds() into MatchRecord; _matchResult MatchResultSO field; Write() called before _onMatchEnded.Raise() so PostMatchController reads correct data. |
 | T024 — MatchStarter | 2026-04-10 | MatchStarter MB (BattleRobots.Core): raises _matchStartedEvent VoidGameEvent in Start() after optional _startDelay (default 0.1s). Fixes architectural gap: nothing previously raised MatchStarted. OnValidate error if SO unassigned. |
 | T025 — SceneWiringValidator EditorWindow | 2026-04-10 | SceneWiringValidator (BattleRobots.Editor): EditorWindow opened via Tools▶BattleRobots▶Scene Wiring Validator. Scans all BattleRobots MBs via SerializedObject iterator; lists null Object refs grouped by type; ping/select button per row; copy-report-to-clipboard. Directly unblocks Editor wiring pass. |
+| T026 — EditMode Unit Tests | 2026-04-10 | com.unity.test-framework 1.1.33 added to manifest. BattleRobots.Tests.EditMode asmdef (Editor-only, overrideReferences false). 6 test files: SaveSystemTests (8 tests, XOR round-trip + edge cases), MatchRecordTests (7 tests, JSON round-trip + SaveData), PlayerWalletTests (10 tests, AddFunds/Deduct/Reset), HealthSOTests (13 tests, ApplyDamage/Heal/IsDead), VoidGameEventTests (10 tests, register/unregister/safe-iteration), DamageInfoTests (8 tests, struct semantics). Total 42 test cases. |
+| T027 — BotDifficultyConfig SO | 2026-04-10 | BotDifficultyConfig SO (BattleRobots.Core, CreateAssetMenu): 6 read-only properties (DetectionRange, AttackRange, AttackDamage, AttackCooldown, FacingThreshold, MoveSpeedMultiplier). RobotAIController: optional _difficultyConfig field; copies all tuning properties in Awake; calls _locomotion.SetSpeedMultiplier(). RobotLocomotionController: private _speedMultiplier field; SetSpeedMultiplier() stores (not multiplies) value; ApplyLocomotion() applies multiplier to both linear and angular velocity. Inspector base speeds preserved. |
 
 ---
 
@@ -117,20 +121,32 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-09 | PM Agent | Session 7: T017 RobotAssembler — PartDefinition.Prefab added; RobotAssembler MB (BattleRobots.Physics) with SlotMount, Assemble/Disassemble, GetEquippedPartIds. T018 MatchFlowController (BattleRobots.Core): coordinates full match loop — Assemblers, AI SetTarget, CameraRig.SnapToTarget, AI Disable, Locomotion Halt on match end. T019 CameraShake (DefaultExecutionOrder 100, Perlin noise, zero alloc, VoidGameEvent[] subscriptions) + MatchManager win/loss AudioEvent jingles. All 19 backlog tasks Done. All 6 milestones marked Done. |
 | 2026-04-09 | PM Agent | Session 8: T020 CombatHUDController (timer MM:SS + player/enemy health sliders+labels, show/hide on match start/end, all delegates cached, int-second timer dedup). T021 PauseManager (Escape key, Time.timeScale, auto-resume) + PauseMenuController (panel show/hide, Resume/QuitToMenu buttons). T022 MatchResultSO blackboard SO + PostMatchController (outcome/duration/earned/balance text, PlayAgain/MainMenu buttons). T023 MatchManager patched: RobotAssembler equippedPartIds + MatchResultSO write before MatchEnded. Total tasks Done: T001–T023. |
 | 2026-04-10 | PM Agent | Session 9: Discovered architectural gap — no component raised the MatchStarted VoidGameEvent (all systems subscribed but nothing fired it). T024 MatchStarter MB: raises _matchStartedEvent in Start() with optional _startDelay (0.1s default). T025 SceneWiringValidator EditorWindow: Tools▶BattleRobots menu, scans all BattleRobots MBs for null SO refs, groups by type, ping/select per row, copy report. Total tasks Done: T001–T025. |
+| 2026-04-10 | PM Agent | Session 10: T026 EditMode Unit Tests — added com.unity.test-framework 1.1.33 to manifest; Editor-only asmdef; 42 test cases across 6 files (SaveSystem, MatchRecord, PlayerWallet, HealthSO, VoidGameEvent, DamageInfo). T027 BotDifficultyConfig SO — immutable Core SO with 6 tuning properties; RobotAIController applies preset in Awake (all field writes, no alloc); RobotLocomotionController.SetSpeedMultiplier() stores multiplier separately (idempotent). Total tasks Done: T001–T027. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T024 MatchStarter (fixes missing MatchStarted trigger), T025 SceneWiringValidator EditorWindow — all 25 backlog items **Done**.
+**Last completed:** T026 EditMode Unit Tests (42 tests across 6 files), T027 BotDifficultyConfig SO + RobotAIController/LocomotionController integration — all 27 backlog items **Done**.
 
-**C# layer status:** Complete. Every system is implemented and compiles cleanly.
+**C# layer status:** Complete. Every system is implemented and compiles cleanly. Test suite covers core persistence and event systems.
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
 ### Recommended first step: run SceneWiringValidator
 Open the Arena scene → Tools ▶ BattleRobots ▶ Scene Wiring Validator → Scan Scene.
 The tool will list every null SO reference across all BattleRobots components and let you click-to-select each one. Use the list below as your authoritative wiring guide.
+
+### Running the test suite
+Open the project in Unity → Window ▶ General ▶ Test Runner → EditMode tab → Run All.
+All 42 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+
+### BotDifficultyConfig wiring (new — optional)
+- Create SO assets: Assets ▶ Create ▶ BattleRobots ▶ AI ▶ BotDifficultyConfig (Easy / Normal / Hard presets).
+- Assign the desired SO to `RobotAIController._difficultyConfig` on enemy robots in the Arena scene.
+- Leave null to use per-component inspector values directly (backwards-compatible).
+- Suggested Easy preset: detectionRange 8, attackRange 2, attackDamage 5, cooldown 2.0, speed 0.7.
+- Suggested Hard preset: detectionRange 22, attackRange 4, attackDamage 18, cooldown 0.5, speed 1.5.
 
 ### Arena Scene wiring
 - **MatchStarter** *(new — add to GameManager GO)*: assign `_matchStartedEvent` (MatchStarted VoidGameEvent SO). Set `_startDelay = 0.1` to let AB settle.
