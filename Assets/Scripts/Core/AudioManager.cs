@@ -30,6 +30,11 @@ namespace BattleRobots.Core
                  "Add one entry per distinct game sound.")]
         [SerializeField] private AudioEvent[] _events;
 
+        [Header("Settings")]
+        [Tooltip("Optional GameSettingsSO. When assigned, SFX volume is scaled by " +
+                 "EffectiveSfxVolume on every play call. Leave null for full volume.")]
+        [SerializeField] private GameSettingsSO _settings;
+
         // ── Private pool (fixed array — no alloc after Awake) ─────────────────
         private AudioSource[] _sources;
         private int           _nextIndex;
@@ -89,8 +94,9 @@ namespace BattleRobots.Core
             if (clip == null) return;
 
             AudioSource src = AcquireSource();
-            src.clip   = clip;
-            src.volume = Mathf.Clamp01(volume);
+            src.clip  = clip;
+            float effectiveVolume = _settings != null ? _settings.EffectiveSfxVolume : 1f;
+            src.volume = Mathf.Clamp01(volume * effectiveVolume);
             src.pitch  = pitch;
             src.Play();
         }

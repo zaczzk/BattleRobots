@@ -4,6 +4,28 @@ using System.Collections.Generic;
 namespace BattleRobots.Core
 {
     /// <summary>
+    /// Serializable snapshot of audio volume settings for persistence.
+    /// Stored inside <see cref="SaveData.settingsSnapshot"/> and round-trips cleanly
+    /// through JsonUtility / XOR SaveSystem.
+    ///
+    /// Default values are all 1.0 (full volume) so that saves that predate this field
+    /// load at full volume rather than silent.
+    /// </summary>
+    [Serializable]
+    public sealed class SettingsSnapshot
+    {
+        /// <summary>Master volume multiplier in [0, 1]. Default 1.0.</summary>
+        public float masterVolume = 1f;
+
+        /// <summary>SFX channel volume multiplier in [0, 1]. Default 1.0.</summary>
+        public float sfxVolume = 1f;
+
+        /// <summary>Music channel volume multiplier in [0, 1]. Default 1.0.</summary>
+        public float musicVolume = 1f;
+    }
+
+
+    /// <summary>
     /// Serializable data class written to disk at the end of every match.
     /// Intentionally a plain POCO — no Unity types — so it round-trips cleanly
     /// through JsonUtility / XOR SaveSystem.
@@ -60,5 +82,13 @@ namespace BattleRobots.Core
         /// even when deserialising saves that predate this field.
         /// </summary>
         public List<string> unlockedPartIds = new List<string>();
+
+        /// <summary>
+        /// Audio volume preferences written by <see cref="BattleRobots.UI.SettingsController"/>
+        /// when the settings panel closes; restored by <see cref="GameBootstrapper"/> on startup.
+        /// Initialised to a new instance (all volumes 1.0) so saves predating this field
+        /// load at full volume.
+        /// </summary>
+        public SettingsSnapshot settingsSnapshot = new SettingsSnapshot();
     }
 }
