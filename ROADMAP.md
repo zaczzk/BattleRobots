@@ -73,6 +73,10 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T035 | FloatGameEvent EditMode tests | 70 | **Done** | 13 tests: raise/no-callbacks, payload delivery (positive/zero/negative), multi-subscriber, partial-unregister, duplicate guard, safe self-unregister during iteration. Covers the float event type used by HealthSO._onHealthChanged and CombatHUDController timer. |
 | T036 | BotDifficultyConfig EditMode tests | 65 | **Done** | 8 tests: all-six-properties smoke test, DetectionRange/AttackRange/AttackDamage positive, AttackCooldown≥0.1, FacingThreshold≥1, MoveSpeedMultiplier in [0.1,3], AttackRange≤DetectionRange relational constraint. Completes SO test coverage. |
 | T037 | DamageGameEvent EditMode tests | 65 | **Done** | 13 tests: raise/no-callbacks, payload fields (amount/sourceId/hitPoint), zero-amount delivery, empty sourceId, multi-subscriber, unregister, unknown-unregister no-throw, duplicate guard, safe self-unregister. Covers the critical damage pipeline event type. Total tests: 149 across 15 files. |
+| T038 | RobotDefinition EditMode tests | 65 | **Done** | 13 tests: fresh-instance defaults (name/MaxHitPoints/MoveSpeed/TorqueMultiplier/Slots); ValidateSlots failure paths (empty list, null slot, empty slotId, whitespace slotId, duplicate slotId with error text assertion); ValidateSlots passing paths (single slot, two unique slots). Private _slots injected via reflection. |
+| T039 | AudioEvent EditMode tests | 60 | **Done** | 14 tests: Volume/PitchMin/PitchMax default ranges, PitchMax≥PitchMin relational check, PickClip→null with no clips, Raise/no-callback no-throw, RegisterCallback invocation, self-as-payload delivery, multi-subscriber, Raise-every-time, Unregister removes callback, Unregister-unknown no-throw, partial-unregister, duplicate guard, safe self-unregister during iteration. |
+| T040 | MatchHistoryController + MatchHistoryRowController | 70 | **Done** | MatchHistoryRowController MB (BattleRobots.UI): Setup(MatchRecord) populates _outcomeText (WIN/LOSS), _durationText (MM:SS), _rewardText (+N), _dateText (locale date from ISO-8601). MatchHistoryController MB (BattleRobots.UI): PopulateHistory() destroys old rows, loads SaveData from SaveSystem, instantiates one _rowPrefab per record most-recent-first up to _maxDisplayCount; subscribes _onMatchEnded VoidGameEvent in OnEnable to auto-refresh; cached delegate; zero alloc after Awake. |
+| T041 | ArenaConfig + SpawnPointData EditMode tests | 55 | **Done** | 10 tests: GroundWidth/Depth/WallHeight/WallThickness positive, SpawnPoints not-null and empty, ArenaIndex zero, SpawnPointData defaults (label "Spawn", position Vector3.zero, eulerAngles Vector3.zero). Total tests: 186 across 18 files. |
 
 ---
 
@@ -80,7 +84,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T037). Test suite: 149 tests across 15 files. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T041). Test suite: 186 tests across 18 files. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -121,6 +125,10 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T035 — FloatGameEvent tests | 2026-04-10 | 13 EditMode tests: Raise/no-callbacks no-throw, callback invocation, payload delivery (positive/zero/negative/multi-call), multi-subscriber, partial unregister, duplicate guard, safe self-unregister during iteration. FloatGameEvent (GameEvent<float>) is used by HealthSO._onHealthChanged and CombatHUDController timer channel. |
 | T036 — BotDifficultyConfig tests | 2026-04-10 | 8 EditMode tests: all-six-properties smoke test, DetectionRange/AttackRange positive, AttackDamage non-negative, AttackCooldown≥0.1, FacingThreshold≥1, MoveSpeedMultiplier in [0.1,3], AttackRange≤DetectionRange relational constraint. Completes SO test coverage — BotDifficultyConfig was the only SO without dedicated tests. |
 | T037 — DamageGameEvent tests | 2026-04-10 | 13 EditMode tests: Raise/no-callbacks no-throw, callback invocation, correct amount/sourceId/hitPoint delivery, zero-amount, empty sourceId, multi-subscriber, unregister, unknown-unregister no-throw, duplicate guard, safe self-unregister. DamageGameEvent (GameEvent<DamageInfo>) is the backbone of the damage pipeline. Total tests: 149 across 15 files. |
+| T038 — RobotDefinition tests | 2026-04-10 | 13 EditMode tests: fresh-instance property defaults, ValidateSlots() failure paths (empty/null/empty-id/whitespace-id/duplicate), passing paths (single + two unique). Private _slots injected via reflection. |
+| T039 — AudioEvent tests | 2026-04-10 | 14 EditMode tests: Volume/PitchMin/PitchMax defaults, PitchMax≥PitchMin relational, PickClip→null, Raise/invoke/payload/multi/every-time, Unregister, partial-unregister, duplicate guard, safe self-unregister. AudioEvent is the backbone of AudioManager. |
+| T040 — MatchHistoryController + MatchHistoryRowController | 2026-04-10 | New UI feature (BattleRobots.UI): MatchHistoryRowController.Setup(MatchRecord) → outcome/duration/reward/date text; MatchHistoryController.PopulateHistory() loads SaveData, destroys old rows, spawns one row per record most-recent-first (capped by _maxDisplayCount); VoidGameEvent subscription for auto-refresh; cached delegate; zero alloc after Awake. |
+| T041 — ArenaConfig + SpawnPointData tests | 2026-04-10 | 10 EditMode tests: dimension properties positive, SpawnPoints not-null/empty, ArenaIndex zero, SpawnPointData default label/position/eulerAngles. Total tests: 186 across 18 files. |
 
 ---
 
@@ -143,14 +151,15 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-10 | PM Agent | Session 13: T031 Bug fix — GameBootstrapper first-launch wallet: `walletBalance > 0` guard was broken (Balance is 0 before Reset()), new players got 0 credits. Fix uses `isFirstLaunch` flag (all three SaveData fields == 0/empty); branches to Reset() vs LoadSnapshot(). T032 Test expansion — MatchResultSOTests (10), IntGameEventTests (13), ShopCatalogTests (9) added; 3 new test files. Total tests: 108 across 11 files. All 32 backlog items Done. |
 | 2026-04-10 | PM Agent | Session 14: T033 Critical compile-error fix — PostMatchController + PauseMenuController called SceneLoader.LoadSceneAsync() which does not exist; corrected to LoadScene(). T034 SceneRegistry SO (BattleRobots.Core): eliminates scene-name magic strings duplicated across 3 UI controllers; OnValidate warns on empty names; all 3 controllers updated to inject _sceneRegistry with null-safe fallback. 7 SceneRegistryTests added. Total tests: 115 across 12 files. Total tasks Done: T001–T034. |
 | 2026-04-10 | PM Agent | Session 15: T035 FloatGameEvent tests (13 tests) — closes coverage gap for GameEvent<float>, mirrors IntGameEventTests pattern. T036 BotDifficultyConfig tests (8 tests) — last SO without dedicated test coverage; verifies all 6 property constraints and relational AttackRange≤DetectionRange invariant. T037 DamageGameEvent tests (13 tests) — tests GameEvent<DamageInfo> struct payload delivery across all three fields plus safe iteration. Total tests: 149 across 15 files. Total tasks Done: T001–T037. |
+| 2026-04-10 | PM Agent | Session 16: T038 RobotDefinition tests (13 tests) — ValidateSlots() failure/passing paths via reflection; fresh-instance property defaults. T039 AudioEvent tests (14 tests) — RegisterCallback/Raise/PickClip/duplicate-guard/safe-iteration mirroring other event channel test files. T040 MatchHistoryController + MatchHistoryRowController — new BattleRobots.UI feature bridging SaveData.matchHistory to a scrollable match-record list; auto-refreshes on VoidGameEvent (MatchEnded); zero alloc after Awake. T041 ArenaConfig + SpawnPointData tests (10 tests) — dimension constraints, SpawnPoints list, ArenaIndex, SpawnPointData defaults. Total tests: 186 across 18 files. Total tasks Done: T001–T041. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T035 FloatGameEvent tests + T036 BotDifficultyConfig tests + T037 DamageGameEvent tests. **149 total tests across 15 files.** All 37 backlog items **Done**.
+**Last completed:** T038 RobotDefinition tests + T039 AudioEvent tests + T040 MatchHistoryController + T041 ArenaConfig tests. **186 total tests across 18 files.** All 41 backlog items **Done**.
 
-**C# layer status:** Complete and compiles clean. All event channel types (VoidGameEvent, IntGameEvent, FloatGameEvent, DamageGameEvent) now have dedicated EditMode test coverage. Every ScriptableObject in BattleRobots.Core has at least one test file.
+**C# layer status:** Complete and compiles clean. All event channel types (VoidGameEvent, IntGameEvent, FloatGameEvent, DamageGameEvent, AudioEvent) now have dedicated EditMode test coverage. Every ScriptableObject in BattleRobots.Core has at least one test file. RobotDefinition.ValidateSlots() covered via reflection-based injection.
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
@@ -221,6 +230,20 @@ All 149 tests should pass without scene setup (they use `ScriptableObject.Create
 ### ShopUI Scene wiring
 - ShopManager ← ShopCatalog SO + PlayerWallet SO; buy buttons onClick → ShopManager.BuyPart(partDef)
 - IntGameEventListener → wallet Text display
+
+### MatchHistoryController wiring (new — T040)
+- Create a "HistoryRow" prefab. Attach `MatchHistoryRowController` MB.
+  In the prefab Inspector assign optional Text refs:
+  `_outcomeText` ("WIN"/"LOSS"), `_durationText` (MM:SS), `_rewardText` (+200),
+  `_dateText` (e.g. "Apr 10, 2026").
+- On the panel that should show match history (Main Menu or Post-Match screen):
+  - Add `MatchHistoryController` MB.
+  - Assign `_rowPrefab` → the HistoryRow prefab above.
+  - Assign `_listContainer` → a ScrollRect Content Transform (VerticalLayoutGroup recommended).
+  - Set `_maxDisplayCount` (default 10).
+  - Optionally assign `_onMatchEnded` → same VoidGameEvent SO as MatchManager._onMatchEnded
+    so the list auto-refreshes after each match without a scene reload.
+- `PopulateHistory()` is also safe to call from a Button.onClick event.
 
 ### VFX wiring
 - Create spark and explosion ParticleSystem prefabs
