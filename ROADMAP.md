@@ -70,6 +70,9 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T032 | Test coverage expansion — MatchResultSO, IntGameEvent, ShopCatalog/PartDefinition | 75 | **Done** | MatchResultSOTests (10): Write() stores all 4 fields, zero values, overwrite semantics, fresh-instance defaults. IntGameEventTests (13): payload delivery, multi-subscriber, zero/negative payloads, unregister, duplicate guard, safe self-unregister during iteration. ShopCatalogTests (9): fresh-instance Parts not-null/empty/IReadOnlyList; PartDefinition default field contracts. Total tests: 108 across 11 files. |
 | T033 | Compile-error fix: SceneLoader.LoadSceneAsync → LoadScene | 100 | **Done** | PostMatchController + PauseMenuController called non-existent SceneLoader.LoadSceneAsync(); fixed to LoadScene() (method that actually exists). Would have prevented project from building. |
 | T034 | SceneRegistry SO — single source of truth for scene names | 85 | **Done** | SceneRegistry (BattleRobots.Core, CreateAssetMenu): three read-only string properties (MainMenuSceneName, ArenaSceneName, ShopSceneName); OnValidate warns on empty strings. MainMenuController/PostMatchController/PauseMenuController all updated to inject _sceneRegistry and fall back to hard-coded defaults if null (backwards-safe). 7 SceneRegistryTests added. Total tests: 115 across 12 files. |
+| T035 | FloatGameEvent EditMode tests | 70 | **Done** | 13 tests: raise/no-callbacks, payload delivery (positive/zero/negative), multi-subscriber, partial-unregister, duplicate guard, safe self-unregister during iteration. Covers the float event type used by HealthSO._onHealthChanged and CombatHUDController timer. |
+| T036 | BotDifficultyConfig EditMode tests | 65 | **Done** | 8 tests: all-six-properties smoke test, DetectionRange/AttackRange/AttackDamage positive, AttackCooldown≥0.1, FacingThreshold≥1, MoveSpeedMultiplier in [0.1,3], AttackRange≤DetectionRange relational constraint. Completes SO test coverage. |
+| T037 | DamageGameEvent EditMode tests | 65 | **Done** | 13 tests: raise/no-callbacks, payload fields (amount/sourceId/hitPoint), zero-amount delivery, empty sourceId, multi-subscriber, unregister, unknown-unregister no-throw, duplicate guard, safe self-unregister. Covers the critical damage pipeline event type. Total tests: 149 across 15 files. |
 
 ---
 
@@ -77,7 +80,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T034). Compile-error fix (T033) + SceneRegistry SO (T034). Test suite: 115 tests across 12 files. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T037). Test suite: 149 tests across 15 files. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -115,6 +118,9 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T028 — PlayerInventory SO | 2026-04-10 | PlayerInventory SO (BattleRobots.Core, CreateAssetMenu): runtime state via List<string>+HashSet mirror; UnlockPart (idempotent), HasPart (O(1)), LoadSnapshot, Reset; VoidGameEvent _onInventoryChanged. SaveData: unlockedPartIds List<string> (backwards-compatible initialiser). GameBootstrapper: _playerInventory field; LoadSnapshot called in LoadAndApplySaveData. ShopManager: _inventory PlayerInventory field; already-owned gate in BuyPart; UnlockPart+PersistPurchase on success; IsOwned() helper; PersistPurchase load-mutate-save preserves match history. 18 PlayerInventoryTests. Total tests: 60. |
 | T029 — ShopItemController + ShopCatalogView | 2026-04-10 | ShopItemController MB (BattleRobots.UI): Setup(PartDefinition, ShopManager) writes static UI (name/description/thumbnail); Refresh() updates dynamic state (cost label, buy-button.interactable, ownedBadge). ShopCatalogView MB: caches _refreshAllVoid/_refreshAllInt delegates in Awake; subscribes to _onInventoryChanged (VoidGameEvent) and _onBalanceChanged (IntGameEvent) SO channels; PopulateCatalog() destroys placeholder children then instantiates one _itemPrefab row per catalog entry; unregisters on OnDestroy. Zero alloc after Awake. |
 | T030 — StarterInventoryConfig SO | 2026-04-10 | StarterInventoryConfig SO (BattleRobots.Core, CreateAssetMenu): IReadOnlyList<string> StarterPartIds; OnValidate warns on nulls/duplicates. GameBootstrapper patched: _starterConfig field; ApplyStarterInventory() called when inventory.Count==0 and config has entries — unlocks all starters via UnlockPart() then persists to disk immediately; backwards-compatible (null config = no-op). using System.Collections.Generic added. 8 StarterInventoryConfigTests (FreshInstance, WithEntries, IsIReadOnlyList, EmptyConfig, TwoParts, Duplicates, NullEntry, GuardCondition, AfterReset). Total tests: 76. |
+| T035 — FloatGameEvent tests | 2026-04-10 | 13 EditMode tests: Raise/no-callbacks no-throw, callback invocation, payload delivery (positive/zero/negative/multi-call), multi-subscriber, partial unregister, duplicate guard, safe self-unregister during iteration. FloatGameEvent (GameEvent<float>) is used by HealthSO._onHealthChanged and CombatHUDController timer channel. |
+| T036 — BotDifficultyConfig tests | 2026-04-10 | 8 EditMode tests: all-six-properties smoke test, DetectionRange/AttackRange positive, AttackDamage non-negative, AttackCooldown≥0.1, FacingThreshold≥1, MoveSpeedMultiplier in [0.1,3], AttackRange≤DetectionRange relational constraint. Completes SO test coverage — BotDifficultyConfig was the only SO without dedicated tests. |
+| T037 — DamageGameEvent tests | 2026-04-10 | 13 EditMode tests: Raise/no-callbacks no-throw, callback invocation, correct amount/sourceId/hitPoint delivery, zero-amount, empty sourceId, multi-subscriber, unregister, unknown-unregister no-throw, duplicate guard, safe self-unregister. DamageGameEvent (GameEvent<DamageInfo>) is the backbone of the damage pipeline. Total tests: 149 across 15 files. |
 
 ---
 
@@ -136,14 +142,15 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-10 | PM Agent | Session 12: T029 ShopItemController + ShopCatalogView — bridges data layer to shop UI. ShopItemController (UI): Setup injects PartDefinition+ShopManager, Refresh updates owned badge/cost/button; ShopCatalogView (UI): subscribes to inventory+wallet SO channels, PopulateCatalog spawns one row per catalog entry, RefreshAll propagates on change; zero alloc after Awake. T030 StarterInventoryConfig SO — new player UX: immutable SO lists starter partIds; GameBootstrapper applies starters when inventory empty after load, persists immediately; backwards-compatible. 8 StarterInventoryConfigTests added. Total tests: 76. Total tasks Done: T001–T030. |
 | 2026-04-10 | PM Agent | Session 13: T031 Bug fix — GameBootstrapper first-launch wallet: `walletBalance > 0` guard was broken (Balance is 0 before Reset()), new players got 0 credits. Fix uses `isFirstLaunch` flag (all three SaveData fields == 0/empty); branches to Reset() vs LoadSnapshot(). T032 Test expansion — MatchResultSOTests (10), IntGameEventTests (13), ShopCatalogTests (9) added; 3 new test files. Total tests: 108 across 11 files. All 32 backlog items Done. |
 | 2026-04-10 | PM Agent | Session 14: T033 Critical compile-error fix — PostMatchController + PauseMenuController called SceneLoader.LoadSceneAsync() which does not exist; corrected to LoadScene(). T034 SceneRegistry SO (BattleRobots.Core): eliminates scene-name magic strings duplicated across 3 UI controllers; OnValidate warns on empty names; all 3 controllers updated to inject _sceneRegistry with null-safe fallback. 7 SceneRegistryTests added. Total tests: 115 across 12 files. Total tasks Done: T001–T034. |
+| 2026-04-10 | PM Agent | Session 15: T035 FloatGameEvent tests (13 tests) — closes coverage gap for GameEvent<float>, mirrors IntGameEventTests pattern. T036 BotDifficultyConfig tests (8 tests) — last SO without dedicated test coverage; verifies all 6 property constraints and relational AttackRange≤DetectionRange invariant. T037 DamageGameEvent tests (13 tests) — tests GameEvent<DamageInfo> struct payload delivery across all three fields plus safe iteration. Total tests: 149 across 15 files. Total tasks Done: T001–T037. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T033 compile-error fix (SceneLoader.LoadSceneAsync → LoadScene) + T034 SceneRegistry SO. **115 total tests across 12 files.** All 34 backlog items **Done**.
+**Last completed:** T035 FloatGameEvent tests + T036 BotDifficultyConfig tests + T037 DamageGameEvent tests. **149 total tests across 15 files.** All 37 backlog items **Done**.
 
-**C# layer status:** Complete and compiles clean. Compile errors in PostMatchController + PauseMenuController fixed. Scene name strings centralised into SceneRegistry SO.
+**C# layer status:** Complete and compiles clean. All event channel types (VoidGameEvent, IntGameEvent, FloatGameEvent, DamageGameEvent) now have dedicated EditMode test coverage. Every ScriptableObject in BattleRobots.Core has at least one test file.
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
@@ -153,7 +160,7 @@ The tool will list every null SO reference across all BattleRobots components an
 
 ### Running the test suite
 Open the project in Unity → Window ▶ General ▶ Test Runner → EditMode tab → Run All.
-All 115 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+All 149 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
 
 ### SceneRegistry wiring (new — T034)
 - Create SO asset: Assets ▶ Create ▶ BattleRobots ▶ Core ▶ SceneRegistry (one global instance).
