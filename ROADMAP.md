@@ -59,6 +59,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T021 | PauseManager + PauseMenuController — Escape key pause | 65 | **Done** | Time.timeScale 0/1; _onPaused/_onResumed channels; Resume/QuitToMenu buttons; auto-resume on match end |
 | T022 | MatchResultSO + PostMatchController — results screen | 60 | **Done** | Blackboard SO written before MatchEnded fires; outcome/duration/earned/balance Text; PlayAgain/MainMenu buttons |
 | T023 | MatchManager: populate MatchRecord.equippedPartIds + write MatchResultSO | 45 | **Done** | _playerAssembler field; GetEquippedPartIds() copied to record; MatchResultSO.Write() called before MatchEnded |
+| T024 | MatchStarter — raises MatchStarted VoidGameEvent on Start() | 85 | **Done** | Single SO field; optional _startDelay (default 0.1s) for AB physics settle; OnValidate warning |
+| T025 | SceneWiringValidator EditorWindow — scans scene for null SO refs | 70 | **Done** | Tools▶BattleRobots menu; SerializedObject iterator; groups by type; ping+select; copy report |
 
 ---
 
@@ -66,7 +68,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T023). Full match loop + HUD + Pause + Results C# layer done. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T025). Full match loop + HUD + Pause + Results C# layer done. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -97,6 +99,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T021 — PauseManager + PauseMenuController | 2026-04-09 | PauseManager MB (BattleRobots.Core): tracks match-running state via SO channels; Escape key detection in Update (gated by _matchRunning); Time.timeScale 0/1; _onPaused/_onResumed VoidGameEvent channels; auto-resume on MatchEnded/OnDisable. PauseMenuController MB (BattleRobots.UI): shows/hides _pausePanel on SO events; Resume + QuitToMenu buttons; restores timeScale before scene load. |
 | T022 — MatchResultSO + PostMatchController | 2026-04-09 | MatchResultSO (BattleRobots.Core, CreateAssetMenu): blackboard written by MatchManager before MatchEnded fires; PlayerWon/DurationSeconds/CurrencyEarned/NewWalletBalance. PostMatchController MB (BattleRobots.UI): subscribes MatchEnded; shows outcome/duration/earned/balance Text; PlayAgain + MainMenu buttons via SceneLoader. |
 | T023 — MatchRecord equippedPartIds + MatchResultSO wiring | 2026-04-09 | MatchManager patched: added _playerAssembler RobotAssembler field (Core may ref Physics); EndMatch() copies GetEquippedPartIds() into MatchRecord; _matchResult MatchResultSO field; Write() called before _onMatchEnded.Raise() so PostMatchController reads correct data. |
+| T024 — MatchStarter | 2026-04-10 | MatchStarter MB (BattleRobots.Core): raises _matchStartedEvent VoidGameEvent in Start() after optional _startDelay (default 0.1s). Fixes architectural gap: nothing previously raised MatchStarted. OnValidate error if SO unassigned. |
+| T025 — SceneWiringValidator EditorWindow | 2026-04-10 | SceneWiringValidator (BattleRobots.Editor): EditorWindow opened via Tools▶BattleRobots▶Scene Wiring Validator. Scans all BattleRobots MBs via SerializedObject iterator; lists null Object refs grouped by type; ping/select button per row; copy-report-to-clipboard. Directly unblocks Editor wiring pass. |
 
 ---
 
@@ -112,18 +116,24 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-08 | PM Agent | Session 6: T014 RobotLocomotionController (ArticulationBody tank drive, player + AI inputs, Halt). T015 RobotAIController (FSM Idle/Chase/Attack, SteerToward, FireAttack via DamageGameEvent). T016 CameraRig (SmoothDamp follow + look, SnapToTarget, BattleRobots.Core). T013 AudioEvent SO + AudioManager (clip array, pitch/volume range, round-robin AudioSource pool). All 16 backlog tasks Done. M2/M3/M6 further advanced. |
 | 2026-04-09 | PM Agent | Session 7: T017 RobotAssembler — PartDefinition.Prefab added; RobotAssembler MB (BattleRobots.Physics) with SlotMount, Assemble/Disassemble, GetEquippedPartIds. T018 MatchFlowController (BattleRobots.Core): coordinates full match loop — Assemblers, AI SetTarget, CameraRig.SnapToTarget, AI Disable, Locomotion Halt on match end. T019 CameraShake (DefaultExecutionOrder 100, Perlin noise, zero alloc, VoidGameEvent[] subscriptions) + MatchManager win/loss AudioEvent jingles. All 19 backlog tasks Done. All 6 milestones marked Done. |
 | 2026-04-09 | PM Agent | Session 8: T020 CombatHUDController (timer MM:SS + player/enemy health sliders+labels, show/hide on match start/end, all delegates cached, int-second timer dedup). T021 PauseManager (Escape key, Time.timeScale, auto-resume) + PauseMenuController (panel show/hide, Resume/QuitToMenu buttons). T022 MatchResultSO blackboard SO + PostMatchController (outcome/duration/earned/balance text, PlayAgain/MainMenu buttons). T023 MatchManager patched: RobotAssembler equippedPartIds + MatchResultSO write before MatchEnded. Total tasks Done: T001–T023. |
+| 2026-04-10 | PM Agent | Session 9: Discovered architectural gap — no component raised the MatchStarted VoidGameEvent (all systems subscribed but nothing fired it). T024 MatchStarter MB: raises _matchStartedEvent in Start() with optional _startDelay (0.1s default). T025 SceneWiringValidator EditorWindow: Tools▶BattleRobots menu, scans all BattleRobots MBs for null SO refs, groups by type, ping/select per row, copy report. Total tasks Done: T001–T025. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T020 CombatHUDController, T021 PauseManager + PauseMenuController, T022 MatchResultSO + PostMatchController, T023 MatchManager equippedPartIds + MatchResultSO — all 23 backlog items **Done**.
+**Last completed:** T024 MatchStarter (fixes missing MatchStarted trigger), T025 SceneWiringValidator EditorWindow — all 25 backlog items **Done**.
 
 **C# layer status:** Complete. Every system is implemented and compiles cleanly.
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
+### Recommended first step: run SceneWiringValidator
+Open the Arena scene → Tools ▶ BattleRobots ▶ Scene Wiring Validator → Scan Scene.
+The tool will list every null SO reference across all BattleRobots components and let you click-to-select each one. Use the list below as your authoritative wiring guide.
+
 ### Arena Scene wiring
+- **MatchStarter** *(new — add to GameManager GO)*: assign `_matchStartedEvent` (MatchStarted VoidGameEvent SO). Set `_startDelay = 0.1` to let AB settle.
 - ArenaManager: assign ArenaConfig SO; populate _robotRoots list
 - MatchManager: assign _playerHealth / _enemyHealth HealthSOs, _playerWallet SO, _onMatchEnded VoidGameEvent, _onTimerUpdated FloatGameEvent, _onWinJingle / _onLossJingle AudioEvent SOs, **_matchResult MatchResultSO**, **_playerAssembler RobotAssembler**
 - MatchFlowController: assign _matchStartedEvent, _matchEndedEvent SO channels; _playerRobotRoot; _cameraRig; populate _assemblers, _aiControllers, _locomotionControllers
@@ -147,6 +157,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 - AudioManager: assign and wire AudioEvent SOs to AudioManager pool
 
 **Architecture notes for next agent / Editor operator:**
+- `MatchStarter` is the ONLY component that raises MatchStarted. Place it in the Arena scene on a persistent GO; set `_startDelay = 0.1` (gives ArticulationBody one fixed-update to settle before locomotion begins).
 - `MatchManager._matchResult` must be assigned the same **MatchResultSO** asset that `PostMatchController._matchResult` references — they share the same blackboard.
 - `MatchManager._playerAssembler` is the `RobotAssembler` on the player robot root. Enemy assemblers do not need to be wired here.
 - `CombatHUDController._onPlayerHealthChanged` = `PlayerHealthSO._onHealthChanged` FloatGameEvent asset. Same pattern for enemy.
@@ -154,4 +165,4 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 - `PauseManager` must appear in the scene to handle `Time.timeScale`. Wire its output channels to `PauseMenuController`.
 - `CameraShake` must sit on the **same GameObject** as `CameraRig` (or a parent); `DefaultExecutionOrder(100)` ensures it runs after CameraRig's LateUpdate.
 - `MatchFlowController` subscribes to SO channels via `RegisterCallback` (not VoidGameEventListener component); no additional listener components needed.
-- All SO channels (MatchStarted, MatchEnded) must be the **same asset references** across MatchManager, ArenaManager, MatchFlowController, PauseManager, CombatHUDController, and PostMatchController.
+- All SO channels (MatchStarted, MatchEnded) must be the **same asset references** across MatchStarter, MatchManager, ArenaManager, MatchFlowController, PauseManager, CombatHUDController, and PostMatchController.
