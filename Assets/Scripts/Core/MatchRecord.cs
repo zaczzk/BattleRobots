@@ -111,5 +111,17 @@ namespace BattleRobots.Core
         /// Initialised to an empty list so saves predating this field load with no upgrades.
         /// </summary>
         public List<int> upgradePartTierValues = new List<int>();
+
+        /// <summary>
+        /// Number of consecutive wins at the time this save was written.
+        /// Initialised to 0 so saves predating this field start with no streak.
+        /// </summary>
+        public int currentWinStreak;
+
+        /// <summary>
+        /// All-time highest consecutive-win streak.
+        /// Initialised to 0 so saves predating this field start with no best streak.
+        /// </summary>
+        public int bestWinStreak;
     }
 }

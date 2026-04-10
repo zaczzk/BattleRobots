@@ -76,6 +76,14 @@ namespace BattleRobots.Core
                  "health-difference approximation. Reset() is called at HandleMatchStarted().")]
         [SerializeField] private MatchStatisticsSO _matchStatistics;
 
+        [Header("Win Streak (optional)")]
+        [Tooltip("SO that tracks the player's consecutive win streak. " +
+                 "RecordWin() / RecordLoss() called in EndMatch(); streak persisted to SaveData. " +
+                 "When assigned, the win reward is multiplied by StreakBonusCalculator " +
+                 "(+10 % per streak level, capped at +50 % for streak ≥ 5). " +
+                 "Leave null to skip streak tracking (backwards-compatible).")]
+        [SerializeField] private WinStreakSO _winStreak;
+
         [Header("Audio")]
         [Tooltip("AudioEvent SO played when the player wins the match.")]
         [SerializeField] private AudioEvent _onWinJingle;
@@ -168,7 +176,17 @@ namespace BattleRobots.Core
             _matchRunning = false;
 
             float elapsed = _roundDuration - Mathf.Max(0f, _timeRemaining);
-            int   reward  = playerWon ? _winReward : _lossConsolationReward;
+
+            // Update win streak before computing the bonus so the bonus uses the
+            // post-win streak value (e.g. streak was 2, RecordWin() → 3, bonus = +30 %).
+            if (playerWon) _winStreak?.RecordWin();
+            else           _winStreak?.RecordLoss();
+
+            // Apply streak bonus to win rewards only; consolation reward is never boosted.
+            int baseReward   = playerWon ? _winReward : _lossConsolationReward;
+            int totalReward  = (playerWon && _winStreak != null)
+                ? StreakBonusCalculator.ApplyToReward(baseReward, _winStreak.CurrentStreak)
+                : baseReward;
 
             // Prefer accumulated per-hit stats from MatchStatisticsSO when available;
             // fall back to the end-of-match health-difference approximation otherwise.
@@ -181,7 +199,7 @@ namespace BattleRobots.Core
 
             // Award currency
             if (_playerWallet != null)
-                _playerWallet.AddFunds(reward);
+                _playerWallet.AddFunds(totalReward);
 
             int walletSnapshot = _playerWallet != null ? _playerWallet.Balance : 0;
 
@@ -198,7 +216,7 @@ namespace BattleRobots.Core
                 durationSeconds = elapsed,
                 damageDone      = damageDone,
                 damageTaken     = damageTaken,
-                currencyEarned  = reward,
+                currencyEarned  = totalReward,
                 walletSnapshot  = walletSnapshot,
                 equippedPartIds = partIds,
             };
@@ -207,11 +225,19 @@ namespace BattleRobots.Core
             SaveData saveData = SaveSystem.Load();
             saveData.walletBalance = walletSnapshot;
             saveData.matchHistory.Add(record);
+
+            // Persist current streak values so they survive the next session.
+            if (_winStreak != null)
+            {
+                saveData.currentWinStreak = _winStreak.CurrentStreak;
+                saveData.bestWinStreak    = _winStreak.BestStreak;
+            }
+
             SaveSystem.Save(saveData);
 
             // Write blackboard SO before raising MatchEnded so PostMatchController
             // reads correct data when its callback fires.
-            _matchResult?.Write(playerWon, elapsed, reward, walletSnapshot, damageDone, damageTaken);
+            _matchResult?.Write(playerWon, elapsed, totalReward, walletSnapshot, damageDone, damageTaken);
 
             // Signal other systems
             _onMatchEnded?.Raise();
@@ -221,7 +247,8 @@ namespace BattleRobots.Core
             else           _onLossJingle?.Raise();
 
             Debug.Log($"[MatchManager] Match ended. PlayerWon={playerWon}, " +
-                      $"Duration={elapsed:F1}s, Reward={reward}, Wallet={walletSnapshot}.");
+                      $"Duration={elapsed:F1}s, Reward={totalReward}, Wallet={walletSnapshot}, " +
+                      $"Streak={_winStreak?.CurrentStreak ?? 0}.");
         }
 
         // ── Editor validation ─────────────────────────────────────────────────

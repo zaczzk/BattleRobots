@@ -28,6 +28,10 @@ namespace BattleRobots.Core
                  "Leave null to skip (backwards-compatible).")]
         [SerializeField] private PlayerPartUpgrades _playerPartUpgrades;
 
+        [Tooltip("Tracks the player's consecutive win streak. LoadSnapshot called on startup. " +
+                 "Leave null to skip (backwards-compatible).")]
+        [SerializeField] private WinStreakSO _winStreak;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -79,6 +83,10 @@ namespace BattleRobots.Core
             // Restore per-part upgrade tiers.
             // LoadSnapshot is safe with empty/null lists (old saves get no upgrades).
             _playerPartUpgrades?.LoadSnapshot(save.upgradePartIds, save.upgradePartTierValues);
+
+            // Restore win-streak counters.
+            // LoadSnapshot is bootstrapper-safe (no event fire); old saves default to 0.
+            _winStreak?.LoadSnapshot(save.currentWinStreak, save.bestWinStreak);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

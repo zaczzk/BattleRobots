@@ -102,6 +102,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T064 | RobotLocomotionControllerTests — SetInputs clamping, SetBaseSpeed, SetSpeedMultiplier, Halt | 55 | **Done** | 14 tests: SetInputs stores move/turn values; clamps move above 1; clamps move below -1; clamps turn above 1; clamps turn below -1; Halt zeros MoveInput; Halt zeros TurnInput; SetBaseSpeed stores value; clamps negative to 0.01; clamps zero to 0.01; called-twice last-wins; BaseSpeed without override returns inspector default (5); SetSpeedMultiplier stores value (via reflection); clamps negative to 0.01 (via reflection). Total tests: 562 across 43 files. |
 | T065 | LoadoutBuilderControllerTests — ConfirmLoadout guards, BuildCategoryOwnedParts, FindPartById, OnDestroy | 60 | **Done** | 14 tests: ConfirmLoadout null loadout no-throw; with loadout + no rows writes empty list to PlayerLoadout; persists empty list to disk (SaveSystem.Load().loadoutPartIds); RefreshAllSlots empty-rows no-throw; BuildCategoryOwnedParts null-catalog returns empty; null-inventory returns empty; owned part included under category; unowned part excluded; FindPartById null-catalog returns null; known ID returns PartDefinition; unknown ID returns null; OnDestroy unregisters RefreshAllSlots from VoidGameEvent (inactive-GO + counter-callback pattern verifies only test counter fires post-destruction). Total tests: 576 across 44 files. |
 | T066 | MatchStatisticsSO — per-match runtime damage stat accumulator | 75 | **Done** | MatchStatisticsSO (Core, CreateAssetMenu): TotalDamageDealt/TotalDamageTaken/HitCount/HitsReceived; RecordDamageDealt/RecordDamageTaken (float + DamageInfo overloads); DamageEfficiency [0,1] safe-division ratio; Reset(). MatchResultSO extended: DamageDone + DamageTaken properties; Write() optional damageDone/damageTaken params (backwards-compat default 0). MatchManager: optional _matchStatistics field; resets SO in HandleMatchStarted; EndMatch() prefers accumulated stats over health-diff approximation when SO assigned; passes damage values to Write(). PostMatchController: optional _damageDoneText + _damageTakenText Text fields wired in ShowResults(). 19 MatchStatisticsSOTests + 5 new MatchResultSOTests. Total tests: 600 across 45 files. |
+| T067 | WinStreakSO + StreakBonusCalculator — consecutive-win economy bonus | 70 | **Done** | WinStreakSO (Core, CreateAssetMenu): CurrentStreak/BestStreak; RecordWin() increments + updates best + fires VoidGameEvent; RecordLoss() resets current + fires event; LoadSnapshot (bootstrapper-safe, no event); Reset (silent). StreakBonusCalculator static class: GetBonusMultiplier(streak) = 1 + 0.1×min(streak,5) → range [1.0, 1.5]; ApplyToReward(baseReward, streak) rounds to int; null/negative-safe. SaveData: currentWinStreak + bestWinStreak fields (backwards-compat default 0). GameBootstrapper: _winStreak field + LoadSnapshot call. MatchManager: _winStreak field; RecordWin/RecordLoss in EndMatch; streak bonus applied to win reward only (loss consolation unchanged); streak persisted to SaveData. PostMatchController: optional _streakText + _winStreak fields; ShowResults displays "Win Streak: N!" on active streak else "Best Streak: N". WinStreakSOTests (15) + StreakBonusCalculatorTests (8). Total tests: 623 across 47 files. |
 
 ---
 
@@ -109,7 +110,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T066). Test suite: 600 tests across 45 files. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T067). Test suite: 623 tests across 47 files. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -179,6 +180,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T064 — RobotLocomotionControllerTests | 2026-04-10 | 14 tests: SetInputs store/5-clamp-cases; Halt zeros MoveInput+TurnInput; SetBaseSpeed store/clamp-negative/clamp-zero/idempotent/inspector-default; SetSpeedMultiplier store+clamp via reflection. Total tests: 562 across 43 files. |
 | T065 — LoadoutBuilderControllerTests | 2026-04-10 | 14 tests: ConfirmLoadout null guard + empty-rows path + disk persistence; RefreshAllSlots empty guard; BuildCategoryOwnedParts null-catalog/null-inventory/owned/unowned; FindPartById null-catalog/known/unknown; OnDestroy unregisters RefreshAllSlots (inactive-GO + counter-callback pattern). Total tests: 576 across 44 files. |
 | T066 — MatchStatisticsSO + MatchResultSO damage extension | 2026-04-10 | MatchStatisticsSO (Core): TotalDamageDealt/TotalDamageTaken/HitCount/HitsReceived; float + DamageInfo RecordDamage* overloads; DamageEfficiency ratio; Reset(). MatchResultSO.Write() extended with optional damageDone/damageTaken params (backwards-compat). MatchManager: optional _matchStatistics field; resets on match start; EndMatch reads from SO when assigned. PostMatchController: optional _damageDoneText/_damageTakenText. 19+5=24 new tests. Total tests: 600 across 45 files. |
+| T067 — WinStreakSO + StreakBonusCalculator | 2026-04-10 | WinStreakSO (Core, CreateAssetMenu): CurrentStreak/BestStreak; RecordWin (increment + best update + event); RecordLoss (reset current + event); LoadSnapshot (silent); Reset (silent). StreakBonusCalculator static class: GetBonusMultiplier → [1.0,1.5]; ApplyToReward rounds to int. SaveData: currentWinStreak + bestWinStreak (backwards-compat). GameBootstrapper patched. MatchManager patched (RecordWin/Loss in EndMatch; streak bonus on win reward only; streak persisted). PostMatchController patched (optional _streakText + _winStreak). WinStreakSOTests (15) + StreakBonusCalculatorTests (8). Total tests: 623 across 47 files. |
 
 ---
 
@@ -214,14 +216,15 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-10 | PM Agent | Session 26: T061 MatchFlowControllerTests (13 tests) — first dedicated tests for the core Arena scene coordinator. Covers HandleMatchStarted assembler routing (single/two assemblers IsAssembled; null entry skipped); AI targeting (player root set on each AI controller; null root skips; null AI in list skipped); CameraRig null safety; HandleMatchEnded AI state reset (pre-set Chase/Attack → Idle verified via CurrentState; null entry skipped); locomotion Halt (MoveInput/TurnInput zeroed after HandleMatchEnded call; ArticulationBody data-container confirmed no-throw in EditMode); MatchStarted SO channel subscription (inactive-GO pattern). T062 GameBootstrapperTests (9 tests) — closes the gap where RecordMatchAndSave and isFirstLaunch detection had zero test coverage. RecordMatchAndSave: null-guard, record appended, wallet balance persisted, snapshot field set, null-wallet fallback, multi-record accumulation. LoadAndApplySaveData (via reflection): all-zero save → Reset()→Balance==500; returning-player save → LoadSnapshot(350)→Balance==350. SaveSystem.Delete() prevents cross-test file pollution. Total tasks Done: T001–T062. Total tests: 530 across 41 files. |
 | 2026-04-10 | PM Agent | Session 27: T063 RobotAIControllerTests (18 tests) — closes the last major MB test gap (AI FSM had zero coverage). Tests: default Idle state and 1.0 DamageMultiplier; SetDamageMultiplier store/clamp-negative/clamp-zero/idempotent; SetTarget stores Transform via reflection; Disable transitions Chase and Attack → Idle, null locomotion no-throw, halts locomotion MoveInput/TurnInput; Awake copies DetectionRange from _difficultyConfig, leaves default when null, SelectedDifficultySO.Current overrides _difficultyConfig (all via inactive-GO pattern); FixedUpdate null-locomotion/null-target no-throws; four FSM transitions via real Transform positions + InvokePrivate(FixedUpdate). T064 RobotLocomotionControllerTests (14 tests) — closes locomotion controller test gap: SetInputs stores move/turn, 4 clamp-to-[-1,1] cases; Halt zeros both inputs; SetBaseSpeed store/clamp-negative/clamp-zero/idempotent/inspector-default(5); SetSpeedMultiplier store+clamp via reflection. T065 LoadoutBuilderControllerTests (14 tests) — closes LoadoutBuilderController test gap: ConfirmLoadout null-guard/empty-rows/disk-persistence; RefreshAllSlots empty guard; BuildCategoryOwnedParts null-catalog/null-inventory/owned-part-included/unowned-excluded; FindPartById null-catalog/known-ID/unknown-ID; OnDestroy unregisters RefreshAllSlots (inactive-GO + counter callback). Total tasks Done: T001–T065. Total tests: 576 across 44 files. |
 | 2026-04-10 | PM Agent | Session 28: T066 MatchStatisticsSO — closes the gap where damageDone/damageTaken in MatchRecord were approximated from end-of-match health differences rather than accumulated per-hit. New MatchStatisticsSO (Core, CreateAssetMenu): TotalDamageDealt/TotalDamageTaken/HitCount/HitsReceived properties; RecordDamageDealt(float)/RecordDamageTaken(float) guard zero+negative; DamageInfo overloads for direct DamageGameEventListener UnityEvent wiring; DamageEfficiency [0,1] ratio (safe division on no-hits); Reset(). MatchResultSO.Write() extended with optional damageDone/damageTaken params (default 0, backwards-compatible — all existing callers compile unchanged). MatchManager: optional _matchStatistics inspector field; resets SO in HandleMatchStarted(); EndMatch() prefers SO accumulated values over health-diff approximation when assigned; passes damage to Write(). PostMatchController: optional _damageDoneText + _damageTakenText Text fields; ShowResults() populates "Damage Dealt: N" / "Damage Taken: N" when assigned. Scene wiring via DamageGameEventListener — see Session Handoff. 19 MatchStatisticsSOTests (new file) + 5 new MatchResultSOTests. Total tasks Done: T001–T066. Total tests: 600 across 45 files. |
+| 2026-04-10 | PM Agent | Session 29: T067 WinStreakSO + StreakBonusCalculator — deepens the economy loop with a consecutive-win bonus. WinStreakSO (Core, CreateAssetMenu): CurrentStreak/BestStreak int properties; RecordWin() increments + updates best + fires VoidGameEvent; RecordLoss() resets current + fires event; BestStreak never decreases; LoadSnapshot(currentStreak, bestStreak) silent rehydration; Reset() silent clear. StreakBonusCalculator static class (Core): GetBonusMultiplier(streak) = 1.0 + 0.1×min(streak,5) → [1.0, 1.5]; ApplyToReward(baseReward, streak) → Mathf.RoundToInt; negative base returns 0; negative streak treated as 0. SaveData: currentWinStreak + bestWinStreak int fields (backwards-compat default 0). GameBootstrapper: optional _winStreak field + LoadSnapshot call (after upgrades). MatchManager: optional _winStreak field; RecordWin/RecordLoss called in EndMatch before reward computation; streak bonus applied to win reward only (consolation reward unchanged); streak persisted to SaveData. PostMatchController: optional _streakText + _winStreak fields; ShowResults() displays "Win Streak: N!" when active else "Best Streak: N". WinStreakSOTests (15 tests) + StreakBonusCalculatorTests (8 tests). Total tasks Done: T001–T067. Total tests: 623 across 47 files. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T066 (MatchStatisticsSO). **600 total tests across 45 files.** All 66 backlog items **Done**.
+**Last completed:** T067 (WinStreakSO + StreakBonusCalculator). **623 total tests across 47 files.** All 67 backlog items **Done**.
 
-**C# layer status:** Complete and compiles clean. All event channel types tested. Every ScriptableObject in BattleRobots.Core has at least one test file. Newest additions (Session 28): MatchStatisticsSO (T066 — per-match damage stat accumulator with float + DamageInfo overloads, DamageEfficiency ratio, 19 tests); MatchResultSO extended (DamageDone/DamageTaken optional Write() params, 5 new tests); MatchManager extended (optional _matchStatistics field, resets on start, prefers accumulated stats in EndMatch); PostMatchController extended (optional _damageDoneText/_damageTakenText Text fields).
+**C# layer status:** Complete and compiles clean. All event channel types tested. Every ScriptableObject in BattleRobots.Core has at least one test file. Newest additions (Session 29): WinStreakSO (T067 — consecutive-win tracker with RecordWin/RecordLoss/LoadSnapshot/Reset; VoidGameEvent channel; 15 tests); StreakBonusCalculator static class (GetBonusMultiplier [1.0,1.5]; ApplyToReward; 8 tests); SaveData extended (currentWinStreak + bestWinStreak fields, backwards-compat); GameBootstrapper + MatchManager + PostMatchController all patched (see Session 29 log).
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
@@ -231,9 +234,29 @@ The tool will list every null SO reference across all BattleRobots components an
 
 ### Running the test suite
 Open the project in Unity → Window ▶ General ▶ Test Runner → EditMode tab → Run All.
-All 600 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+All 623 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
 
-### MatchStatisticsSO wiring (new — T066) ← next priority
+### WinStreakSO wiring (new — T067) ← first priority
+This deepens the economy loop with a consecutive-win bonus and displays it on the post-match screen.
+
+1. Create SO asset via Assets ▶ Create ▶ BattleRobots ▶ Core ▶ WinStreakSO.
+   One global instance — assign `_onStreakChanged` VoidGameEvent if you want any system to react.
+
+2. Assign the WinStreakSO to:
+   - `GameBootstrapper._winStreak`
+   - `MatchManager._winStreak`
+   - `PostMatchController._winStreak` (optional)
+
+3. Optionally, add a `Text` UI element to the PostMatchController panel and assign it to
+   `PostMatchController._streakText`. ShowResults() will display:
+   - `"Win Streak: N!"` when the player is on an active streak (CurrentStreak > 0).
+   - `"Best Streak: N"` when the current streak is 0 (shows their all-time high).
+
+4. MatchManager will automatically apply the streak bonus to win rewards:
+   `reward = baseWinReward × (1.0 + 0.1 × min(streak, 5))` — capped at +50 %.
+   Loss consolation reward is never boosted.
+
+### MatchStatisticsSO wiring (T066)
 This adds accurate per-hit damage tracking to the post-match results screen.
 
 1. Create SO asset via Assets ▶ Create ▶ BattleRobots ▶ Core ▶ MatchStatisticsSO.

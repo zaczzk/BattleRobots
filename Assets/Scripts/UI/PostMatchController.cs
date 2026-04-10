@@ -67,6 +67,14 @@ namespace BattleRobots.UI
         [Tooltip("Optional: displays total damage taken by the player this match.")]
         [SerializeField] private Text _damageTakenText;
 
+        [Tooltip("Optional: displays the player's current consecutive win streak after the match.")]
+        [SerializeField] private Text _streakText;
+
+        [Header("Win Streak (optional)")]
+        [Tooltip("WinStreakSO read after match ends to display the current streak count. " +
+                 "Leave null to hide streak display.")]
+        [SerializeField] private WinStreakSO _winStreak;
+
         [Header("Event Channels — In")]
         [Tooltip("VoidGameEvent raised by MatchManager when the round ends.")]
         [SerializeField] private VoidGameEvent _onMatchEnded;
@@ -133,6 +141,15 @@ namespace BattleRobots.UI
 
             if (_damageTakenText != null)
                 _damageTakenText.text = string.Format("Damage Taken: {0:F0}", _matchResult.DamageTaken);
+
+            // Win streak (optional)
+            if (_streakText != null && _winStreak != null)
+            {
+                int streak = _winStreak.CurrentStreak;
+                _streakText.text = streak > 0
+                    ? string.Format("Win Streak: {0}!", streak)
+                    : string.Format("Best Streak: {0}", _winStreak.BestStreak);
+            }
 
             Debug.Log($"[PostMatchController] Results shown — " +
                       $"PlayerWon={_matchResult.PlayerWon}, " +
