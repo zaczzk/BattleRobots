@@ -38,9 +38,18 @@ namespace BattleRobots.Core
             SaveData save = SaveSystem.Load();
 
             if (_playerWallet != null)
-                _playerWallet.LoadSnapshot(save.walletBalance > 0
-                    ? save.walletBalance
-                    : _playerWallet.Balance); // keeps starting balance on first launch
+            {
+                // Distinguish a true first launch (all-default SaveData) from a returning
+                // player who legitimately spent all their money (balance == 0 but has history).
+                // Reset() applies the inspector _startingBalance; LoadSnapshot restores a
+                // persisted value including a valid 0.
+                bool isFirstLaunch = save.matchHistory.Count == 0 && save.walletBalance == 0
+                                  && save.unlockedPartIds.Count == 0;
+                if (isFirstLaunch)
+                    _playerWallet.Reset();
+                else
+                    _playerWallet.LoadSnapshot(save.walletBalance);
+            }
 
             // Rehydrate owned-part list from persisted snapshot.
             // Safe when save.unlockedPartIds is null (old saves) or empty (new game).

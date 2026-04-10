@@ -66,6 +66,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T028 | PlayerInventory SO — part ownership tracking + persistence | 75 | **Done** | PlayerInventory SO (BattleRobots.Core): UnlockPart/HasPart/LoadSnapshot/Reset; HashSet mirror for O(1) lookup; VoidGameEvent _onInventoryChanged. SaveData.unlockedPartIds added (backwards-compatible). GameBootstrapper rehydrates inventory on startup. ShopManager: already-owned gate, UnlockPart after purchase, PersistPurchase (load→mutate→save, preserves match history). IsOwned() public API for shop UI. 18 PlayerInventoryTests. |
 | T029 | ShopItemController + ShopCatalogView — shop UI row layer | 70 | **Done** | ShopItemController MB (BattleRobots.UI): drives one shop row (name/cost/description/thumbnail/buy-button/owned-badge); Setup() injects PartDefinition+ShopManager; Refresh() updates dynamic state (owned badge, button interactable, cost label). ShopCatalogView MB: subscribes _onInventoryChanged+_onBalanceChanged SO channels; PopulateCatalog() instantiates one prefab row per catalog entry in Awake; RefreshAll() propagates to all rows on state change; OnDestroy unregisters. Zero alloc after Awake; no Update. |
 | T030 | StarterInventoryConfig SO + GameBootstrapper starter-parts | 65 | **Done** | StarterInventoryConfig SO (BattleRobots.Core, CreateAssetMenu): immutable IReadOnlyList<string> of starter partIds; OnValidate warns on nulls/duplicates. GameBootstrapper: new _starterConfig field; after LoadSnapshot, if inventory.Count==0 and config has entries, ApplyStarterInventory() unlocks all starters and immediately persists to disk. Backwards-compatible (null config = skip). 8 StarterInventoryConfigTests added. Total tests: 76. |
+| T031 | GameBootstrapper first-launch wallet bug fix | 90 | **Done** | Bug: `walletBalance > 0` guard caused new players to start with 0 credits instead of 500 (_playerWallet.Balance is 0 before Reset() is ever called). Fix: `isFirstLaunch = matchHistory.Count==0 && walletBalance==0 && unlockedPartIds.Count==0`; branches to `Reset()` on true first launch, `LoadSnapshot(balance)` otherwise. Correctly handles returning player with legitimately empty wallet. |
+| T032 | Test coverage expansion — MatchResultSO, IntGameEvent, ShopCatalog/PartDefinition | 75 | **Done** | MatchResultSOTests (10): Write() stores all 4 fields, zero values, overwrite semantics, fresh-instance defaults. IntGameEventTests (13): payload delivery, multi-subscriber, zero/negative payloads, unregister, duplicate guard, safe self-unregister during iteration. ShopCatalogTests (9): fresh-instance Parts not-null/empty/IReadOnlyList; PartDefinition default field contracts. Total tests: 108 across 11 files. |
 
 ---
 
@@ -73,7 +75,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T030). Full match loop + HUD + Pause + Results C# layer done. Shop UI row layer (ShopItemController + ShopCatalogView) added. Starter-parts system added. Test suite (76 tests). Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T032). Bug fix: GameBootstrapper first-launch wallet. Test suite expanded to 108 tests across 11 files. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -130,14 +132,15 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-10 | PM Agent | Session 10: T026 EditMode Unit Tests — added com.unity.test-framework 1.1.33 to manifest; Editor-only asmdef; 42 test cases across 6 files (SaveSystem, MatchRecord, PlayerWallet, HealthSO, VoidGameEvent, DamageInfo). T027 BotDifficultyConfig SO — immutable Core SO with 6 tuning properties; RobotAIController applies preset in Awake (all field writes, no alloc); RobotLocomotionController.SetSpeedMultiplier() stores multiplier separately (idempotent). Total tasks Done: T001–T027. |
 | 2026-04-10 | PM Agent | Session 11: T028 PlayerInventory SO — closes the "unlock upgraded parts" loop missing from the economy. PlayerInventory SO (Core, HashSet+List for O(1) HasPart), SaveData.unlockedPartIds (backwards-compatible), GameBootstrapper rehydrates on startup, ShopManager already-owned gate + PersistPurchase (load→mutate→save preserves history), IsOwned() helper. 18 PlayerInventoryTests added. Total tests: 60. Total tasks Done: T001–T028. |
 | 2026-04-10 | PM Agent | Session 12: T029 ShopItemController + ShopCatalogView — bridges data layer to shop UI. ShopItemController (UI): Setup injects PartDefinition+ShopManager, Refresh updates owned badge/cost/button; ShopCatalogView (UI): subscribes to inventory+wallet SO channels, PopulateCatalog spawns one row per catalog entry, RefreshAll propagates on change; zero alloc after Awake. T030 StarterInventoryConfig SO — new player UX: immutable SO lists starter partIds; GameBootstrapper applies starters when inventory empty after load, persists immediately; backwards-compatible. 8 StarterInventoryConfigTests added. Total tests: 76. Total tasks Done: T001–T030. |
+| 2026-04-10 | PM Agent | Session 13: T031 Bug fix — GameBootstrapper first-launch wallet: `walletBalance > 0` guard was broken (Balance is 0 before Reset()), new players got 0 credits. Fix uses `isFirstLaunch` flag (all three SaveData fields == 0/empty); branches to Reset() vs LoadSnapshot(). T032 Test expansion — MatchResultSOTests (10), IntGameEventTests (13), ShopCatalogTests (9) added; 3 new test files. Total tests: 108 across 11 files. All 32 backlog items Done. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T030 StarterInventoryConfig SO + T029 ShopItemController/ShopCatalogView. 76 total tests across 8 files. All 30 backlog items **Done**.
+**Last completed:** T031 GameBootstrapper wallet bug fix + T032 test expansion (MatchResultSO, IntGameEvent, ShopCatalog/PartDefinition). **108 total tests across 11 files.** All 32 backlog items **Done**.
 
-**C# layer status:** Complete. Economy loop fully closed; shop UI row layer complete; new-player starter-parts UX added.
+**C# layer status:** Complete. Economy loop fully closed; shop UI row layer complete; new-player starter-parts UX added; first-launch wallet bug fixed.
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
