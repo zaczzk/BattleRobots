@@ -59,6 +59,20 @@ namespace BattleRobots.Core
                  "at match start. Order does not matter.")]
         [SerializeField] private List<RobotAssembler> _assemblers = new List<RobotAssembler>();
 
+        [Header("Player Loadout Override (optional)")]
+        [Tooltip("If set alongside _shopCatalog, the player's assembler restores the saved " +
+                 "loadout at match start instead of using its inspector-assigned parts.")]
+        [SerializeField] private PlayerLoadout _playerLoadout;
+
+        [Tooltip("Catalog used to resolve PlayerLoadout part IDs to PartDefinition objects. " +
+                 "Must be the same ShopCatalog SO referenced by the Shop scene.")]
+        [SerializeField] private ShopCatalog _shopCatalog;
+
+        [Tooltip("The RobotAssembler on the player robot root. " +
+                 "When _playerLoadout and _shopCatalog are both assigned, this assembler " +
+                 "calls AssembleFromCatalog() instead of Assemble() at match start.")]
+        [SerializeField] private RobotAssembler _playerAssembler;
+
         [Header("AI Controllers")]
         [Tooltip("All AI controllers in the scene. SetTarget(_playerRobotRoot) called at match start; " +
                  "Disable() called at match end.")]
@@ -105,11 +119,25 @@ namespace BattleRobots.Core
         private void HandleMatchStarted()
         {
             // 1. Assemble robot parts.
+            //    If a player loadout override is configured, the player assembler uses
+            //    AssembleFromCatalog() to restore the saved build; all others use Assemble().
+            bool useLoadout = _playerAssembler != null
+                              && _playerLoadout != null
+                              && _shopCatalog   != null;
+
             foreach (RobotAssembler assembler in _assemblers)
             {
-                if (assembler != null)
+                if (assembler == null) continue;
+
+                if (useLoadout && assembler == _playerAssembler)
+                    assembler.AssembleFromCatalog(_playerLoadout.EquippedPartIds, _shopCatalog);
+                else
                     assembler.Assemble();
             }
+
+            // Handle the player assembler if it was not included in _assemblers.
+            if (useLoadout && !_assemblers.Contains(_playerAssembler))
+                _playerAssembler.AssembleFromCatalog(_playerLoadout.EquippedPartIds, _shopCatalog);
 
             // 2. Assign player root as the AI target.
             if (_playerRobotRoot != null)

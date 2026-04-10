@@ -170,6 +170,53 @@ namespace BattleRobots.Physics
         /// </summary>
         public IReadOnlyList<PartDefinition> GetEquippedParts() => _assembledPartDefs;
 
+        /// <summary>
+        /// Resolves a list of part IDs against a <see cref="ShopCatalog"/>, replaces the
+        /// inspector-assigned <see cref="_equippedParts"/> list with the resolved
+        /// <see cref="PartDefinition"/>s, then calls <see cref="Assemble"/>.
+        ///
+        /// Use this overload to restore a saved <see cref="BattleRobots.Core.PlayerLoadout"/>
+        /// at match start (called by <see cref="BattleRobots.Core.MatchFlowController"/> when
+        /// loadout fields are assigned).
+        ///
+        /// IDs not found in the catalog are logged as warnings and skipped.
+        /// Falls back to parameterless <see cref="Assemble"/> if either argument is null.
+        /// All allocations are cold-path (called once per match).
+        /// </summary>
+        public void AssembleFromCatalog(IReadOnlyList<string> partIds, ShopCatalog catalog)
+        {
+            if (partIds == null || catalog == null)
+            {
+                Assemble();
+                return;
+            }
+
+            // Build partId → PartDefinition lookup from the catalog (cold path, O(n)).
+            var lookup = new Dictionary<string, PartDefinition>(catalog.Parts.Count, StringComparer.Ordinal);
+            foreach (PartDefinition def in catalog.Parts)
+            {
+                if (def != null && !lookup.ContainsKey(def.PartId))
+                    lookup[def.PartId] = def;
+            }
+
+            // Replace _equippedParts with the catalog-resolved list.
+            _equippedParts.Clear();
+            for (int i = 0; i < partIds.Count; i++)
+            {
+                string id = partIds[i];
+                if (string.IsNullOrWhiteSpace(id)) continue;
+
+                if (lookup.TryGetValue(id, out PartDefinition resolved))
+                    _equippedParts.Add(resolved);
+                else
+                    Debug.LogWarning(
+                        $"[RobotAssembler] PartId '{id}' not found in catalog '{catalog.name}'. " +
+                        $"Part skipped on '{name}'.", this);
+            }
+
+            Assemble();
+        }
+
         // ── Lifecycle ─────────────────────────────────────────────────────────
 
         private void OnDestroy() => Disassemble();

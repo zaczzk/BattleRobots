@@ -82,6 +82,9 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T044 | PlayerLoadout SO — equipped-part configuration persistence | 70 | **Done** | PlayerLoadout SO (BattleRobots.Core, CreateAssetMenu): List<string>+IReadOnlyList<string> EquippedPartIds; SetLoadout(IEnumerable) replaces loadout + fires VoidGameEvent; LoadSnapshot(List<string>) silent rehydration (bootstrapper-safe); Reset() clears + fires event; null/whitespace entries skipped. SaveData.loadoutPartIds List<string> added (backwards-compatible empty default). GameBootstrapper: _playerLoadout field; LoadSnapshot called after settings rehydration. PlayerLoadoutTests (19): fresh-instance, SetLoadout/LoadSnapshot/Reset paths, event-channel fire/no-fire, SaveData round-trip. Total tests: 261 across 22 files. |
 | T045 | CombatStatsApplicator MB — apply RobotCombatStats to runtime systems | 85 | **Done** | Closes the gap where RobotStatsAggregator existed but had no runtime caller. HealthSO.InitForMatch(float) + _runtimeMaxHealth override field; MaxHealth/Reset/Heal use property. DamageReceiver: _armorRating inspector field, SetArmorRating(int), ArmorRating prop, flat reduction in TakeDamage(float). RobotAIController: _damageMultiplier field, SetDamageMultiplier(float), DamageMultiplier prop, applied in FireAttack(). RobotLocomotionController: _runtimeMoveSpeed field, SetBaseSpeed(float), BaseSpeed prop, ApplyLocomotion uses EffectiveMoveSpeed. RobotAssembler: _assembledPartDefs List, GetEquippedParts() IReadOnlyList<PartDefinition>, wired in Assemble()/Disassemble(). New CombatStatsApplicator MB (BattleRobots.Physics, DefaultExecutionOrder 10): caches _onMatchStarted delegate; OnEnable/OnDisable subscribe/unsubscribe; ApplyStats() calls RobotStatsAggregator.Compute() then InitForMatch+Reset on HealthSO, SetBaseSpeed on locomotion, SetDamageMultiplier on AI, SetArmorRating on receiver. |
 | T046 | Test coverage: InitForMatch, DamageReceiver armor, CombatStatsApplicator | 65 | **Done** | HealthSOTests +7: InitForMatch overrides MaxHealth, Reset uses new cap, clamp-to-1 on zero/negative, HealCapsAtNewMax, CalledTwice-last-wins, DoesNotAffectCurrentHealthUntilReset. DamageReceiverArmorTests (13 new): SetArmorRating bounds (negative/above-100/zero/100/twice), TakeDamage zero-armor pass-through, armor-20 reduction, exact-block, exceed-block, full-block, DamageInfo armor path, DamageInfo zero-armor. CombatStatsApplicatorTests (11 new): null-robdef no-throw, null-health no-throw, all-optional-null no-throw, health-to-def-max, resets-health-to-full, armor-rating-zero, damage-mult-one, base-speed-five, event-fires-ApplyStats, event-unregistered-after-disable. Total tests: 292 across 24 files. |
+| T047 | RobotAssembler.AssembleFromCatalog() + MatchFlowController loadout bridge | 85 | **Done** | AssembleFromCatalog(IReadOnlyList<string>, ShopCatalog): builds partId→PartDef lookup (O(n) cold path), resolves IDs, warns-and-skips unknowns, falls back to Assemble() on null args. MatchFlowController: three optional fields (_playerLoadout, _shopCatalog, _playerAssembler); HandleMatchStarted() calls AssembleFromCatalog on the player assembler when all three are assigned; also handles player assembler not in _assemblers list. Closes the PlayerLoadout→RobotAssembler wiring gap stated in Session Handoff. |
+| T048 | LoadoutSlotController + LoadoutBuilderController — pre-match assembly UI | 70 | **Done** | LoadoutSlotController MB (BattleRobots.UI): Setup(category, ownedParts, currentPartId) — None sentinel index 0, prev/next cycle, GetSelectedPartDef(), RebuildCandidates() preserves selection, Refresh() updates all UI widgets. LoadoutBuilderController MB (BattleRobots.UI): instantiates one slot row per unique PartCategory from RobotDefinition.Slots; filters by PlayerInventory.HasPart; pre-selects from PlayerLoadout; RefreshAllSlots() on _onInventoryChanged (VoidGameEvent); ConfirmLoadout() → SetLoadout() + load→mutate→save persist; optional stats preview via RobotStatsAggregator.Compute(). Zero alloc after Awake; no Update; no Physics refs. |
+| T049 | RobotAssemblerLoadoutTests — 17 EditMode tests for AssembleFromCatalog | 65 | **Done** | Null-partIds/null-catalog fall back to Assemble() (DoesNotThrow + IsAssembled true); null-partIds uses inspector _equippedParts; valid-ID equips part (EquippedPartIds + GetEquippedParts correct); unknown-ID warns+skips; mixed known/unknown only equips known; empty list → 0 parts; whitespace entries skipped; duplicate IDs limited by slot count; called-twice reassembles clean; after-direct-Assemble replaces parts list. Total tests: 309 across 25 files. |
 
 ---
 
@@ -89,7 +92,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T046). Test suite: 292 tests across 24 files. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T049). Test suite: 309 tests across 25 files. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -139,6 +142,9 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T044 — PlayerLoadout SO | 2026-04-10 | PlayerLoadout SO (BattleRobots.Core, CreateAssetMenu): SetLoadout(IEnumerable<string>) replaces loadout + raises VoidGameEvent; LoadSnapshot(List<string>) silent rehydration (bootstrapper-safe, no event); Reset() clears + raises event; null/whitespace entries skipped in all mutators. SaveData.loadoutPartIds List<string> added (backwards-compat empty default). GameBootstrapper: _playerLoadout field; LoadSnapshot called after settings rehydration. 19 PlayerLoadoutTests: defaults, SetLoadout, LoadSnapshot, Reset paths, event fire/no-fire semantics, SaveData round-trip. Total tests: 261 across 22 files. |
 | T045 — CombatStatsApplicator MB | 2026-04-10 | 5 existing files patched (HealthSO InitForMatch, DamageReceiver armor, RobotAIController DamageMultiplier, RobotLocomotionController BaseSpeed, RobotAssembler GetEquippedParts). 1 new MB: CombatStatsApplicator (BattleRobots.Physics, DefaultExecutionOrder 10) — subscribes MatchStarted; calls RobotStatsAggregator.Compute(); pushes resolved stats to HealthSO/RobotLocomotionController/RobotAIController/DamageReceiver. ApplyStats() public for direct calls. Closes the T043 wiring gap. |
 | T046 — Tests: InitForMatch, DamageReceiver armor, CombatStatsApplicator | 2026-04-10 | +7 HealthSOTests (InitForMatch paths). DamageReceiverArmorTests (13 tests): SetArmorRating bounds, flat-reduction, full-block, DamageInfo path. CombatStatsApplicatorTests (11 tests): null-safety, health/armor/damage-mult/base-speed application, event subscribe/unsubscribe. Total tests: 292 across 24 files. |
+| T047 — RobotAssembler.AssembleFromCatalog() + MatchFlowController loadout bridge | 2026-04-10 | AssembleFromCatalog(partIds, catalog): O(n) lookup build, resolve IDs to PartDefinitions, warn-and-skip unknowns, null-fallback to Assemble(). MatchFlowController: _playerLoadout + _shopCatalog + _playerAssembler optional fields; HandleMatchStarted() routes player assembler through AssembleFromCatalog when all three assigned. Closes the PlayerLoadout→RobotAssembler wiring gap. |
+| T048 — LoadoutSlotController + LoadoutBuilderController | 2026-04-10 | LoadoutSlotController (BattleRobots.UI): category slot row with None sentinel, prev/next cycle, GetSelectedPartDef(), RebuildCandidates() on inventory change. LoadoutBuilderController (BattleRobots.UI): one row per unique PartCategory from RobotDefinition.Slots; owned-parts filter via PlayerInventory.HasPart; pre-selects from PlayerLoadout; ConfirmLoadout() persists via load→mutate→save; live stats preview via RobotStatsAggregator. No Physics refs. |
+| T049 — RobotAssemblerLoadoutTests | 2026-04-10 | 17 EditMode tests for AssembleFromCatalog: null safety, ID resolution, unknown-ID skip, whitespace skip, slot-count limit, re-assembly, fallback to inspector list. Total tests: 309 across 25 files. |
 
 ---
 
@@ -165,14 +171,15 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-10 | PM Agent | Session 17: T042 GameSettingsSO + SettingsController — closes the settings persistence gap. GameSettingsSO (Core): master/sfx/music volumes [0,1]; EffectiveSfxVolume/EffectiveMusicVolume computed props; SetX mutators raise VoidGameEvent; LoadSnapshot silent (bootstrapper-safe); TakeSnapshot; Reset. SettingsSnapshot [Serializable] class added to MatchRecord.cs; SaveData.settingsSnapshot field with default 1.0 (backwards-compat). GameBootstrapper: _gameSettings field; LoadSnapshot called after inventory rehydration. AudioManager: optional _settings; PlayClip scales volume by EffectiveSfxVolume. SettingsController (BattleRobots.UI): cached UnityAction delegates; OnEnable sync sliders (SetValueWithoutNotify); PersistSettings (Load→mutate→Save) on OnDisable. 26 GameSettingsSOTests. Total tests: 212 across 19 files. Total tasks Done: T001–T042. |
 | 2026-04-10 | PM Agent | Session 18: T043 PartStats+RobotCombatStats+RobotStatsAggregator — closes the gameplay-stats gap where PartDefinitions had no stat contribution. PartStats [Serializable] struct added to PartDefinition.cs (healthBonus, speedMultiplier, damageMultiplier, armorRating; PartStats.Default). RobotCombatStats readonly struct (IEquatable, ==). RobotStatsAggregator static class: null-safe Compute() with additive health, multiplicative speed+damage, clamped armor. 10 PartStatsTests + 20 RobotStatsAggregatorTests. T044 PlayerLoadout SO — closes the save-your-build gap. PlayerLoadout SO (Core): SetLoadout/LoadSnapshot/Reset; VoidGameEvent _onLoadoutChanged; bootstrapper-safe. SaveData.loadoutPartIds (backwards-compat). GameBootstrapper wired. 19 PlayerLoadoutTests. Total tests: 261 across 22 files. Total tasks Done: T001–T044. |
 | 2026-04-10 | PM Agent | Session 19: T045 CombatStatsApplicator MB — closes the wiring gap where RobotStatsAggregator.Compute() existed but was never called at runtime. Patched 5 existing files to add the necessary public APIs: HealthSO.InitForMatch() + _runtimeMaxHealth + MaxHealth property (Reset/Heal use property); DamageReceiver._armorRating + SetArmorRating(int) + ArmorRating prop + flat reduction in TakeDamage(); RobotAIController._damageMultiplier + SetDamageMultiplier(float) + DamageMultiplier prop + applied in FireAttack(); RobotLocomotionController._runtimeMoveSpeed + SetBaseSpeed(float) + BaseSpeed prop + EffectiveMoveSpeed in ApplyLocomotion; RobotAssembler._assembledPartDefs + GetEquippedParts() IReadOnlyList<PartDefinition>. New CombatStatsApplicator MB (DefaultExecutionOrder 10): caches delegate; subscribes/unsubscribes VoidGameEvent; ApplyStats() calls Compute() then InitForMatch+Reset/SetBaseSpeed/SetDamageMultiplier/SetArmorRating. T046 Tests: +7 HealthSOTests (InitForMatch), 13 DamageReceiverArmorTests, 11 CombatStatsApplicatorTests. Total tests: 292 across 24 files. Total tasks Done: T001–T046. |
+| 2026-04-10 | PM Agent | Session 20: T047 RobotAssembler.AssembleFromCatalog() — closes the PlayerLoadout→RobotAssembler wiring gap (Session Handoff said "pass EquippedPartIds to Assemble()" but no API existed). New method builds partId→PartDef lookup, resolves IDs, warns-and-skips unknowns, null-fallback to Assemble(). MatchFlowController patched with three optional fields (_playerLoadout, _shopCatalog, _playerAssembler); HandleMatchStarted routes player assembler through AssembleFromCatalog when all three assigned. T048 LoadoutSlotController + LoadoutBuilderController — complete pre-match assembly UI layer: slot rows with None/prev/next cycling; parent controller groups by PartCategory, filters by PlayerInventory.HasPart, pre-selects from PlayerLoadout, ConfirmLoadout() persists, live stats preview via RobotStatsAggregator. No Physics refs (BattleRobots.UI namespace). T049 RobotAssemblerLoadoutTests (17 tests): null safety, resolution, unknown-ID skip, whitespace, slot-count limit, re-assembly, fallback-to-inspector-list. Total tasks Done: T001–T049. Total tests: 309 across 25 files. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T046 (tests for T045 CombatStatsApplicator). **292 total tests across 24 files.** All 46 backlog items **Done**.
+**Last completed:** T049 (RobotAssemblerLoadoutTests). **309 total tests across 25 files.** All 49 backlog items **Done**.
 
-**C# layer status:** Complete and compiles clean. All event channel types tested. Every ScriptableObject in BattleRobots.Core has at least one test file. Newest additions: CombatStatsApplicator MB (bridges RobotStatsAggregator to runtime systems), armor rating on DamageReceiver, runtime max-health override on HealthSO.
+**C# layer status:** Complete and compiles clean. All event channel types tested. Every ScriptableObject in BattleRobots.Core has at least one test file. Newest additions (Session 20): AssembleFromCatalog on RobotAssembler (bridges PlayerLoadout string IDs to PartDefinition objects), MatchFlowController loadout-override fields, LoadoutSlotController + LoadoutBuilderController (complete pre-match assembly UI — wire in Editor).
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
@@ -182,7 +189,38 @@ The tool will list every null SO reference across all BattleRobots components an
 
 ### Running the test suite
 Open the project in Unity → Window ▶ General ▶ Test Runner → EditMode tab → Run All.
-All 292 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+All 309 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+
+### LoadoutBuilder wiring (new — T048) ← next priority after CombatStatsApplicator
+This is the pre-match assembly screen. Create a new scene or panel in the Main Menu / pre-arena flow:
+1. Create a "LoadoutSlot" prefab:
+   - Attach `LoadoutSlotController` MB.
+   - Assign optional UI refs: `_categoryLabel` (Text), `_partNameLabel` (Text),
+     `_partDescLabel` (Text), `_thumbnailImage` (Image), `_prevButton` (Button), `_nextButton` (Button).
+   - Wire `_prevButton.onClick → LoadoutSlotController.PreviousPart` (or leave for Awake auto-wire).
+   - Wire `_nextButton.onClick → LoadoutSlotController.NextPart`.
+2. On the loadout panel root, add `LoadoutBuilderController` MB and assign:
+   - `_playerInventory` → same PlayerInventory SO as GameBootstrapper.
+   - `_playerLoadout` → same PlayerLoadout SO as GameBootstrapper + MatchFlowController.
+   - `_shopCatalog` → same ShopCatalog SO as ShopManager.
+   - `_robotDefinition` → the player robot's RobotDefinition SO.
+   - `_onInventoryChanged` → same VoidGameEvent SO as PlayerInventory._onInventoryChanged.
+   - `_slotRowPrefab` → the LoadoutSlot prefab from step 1.
+   - `_slotContainer` → a ScrollRect Content Transform (VerticalLayoutGroup recommended).
+   - `_confirmButton` → a "Confirm Build" Button (or wire onClick → ConfirmLoadout() in Inspector).
+   - Optionally: `_healthText`, `_speedText`, `_damageText`, `_armorText` for live stats preview.
+3. `ConfirmLoadout()` writes to `PlayerLoadout` **and** persists to disk automatically.
+   Call it when the player presses "Enter Arena" or "Confirm Build".
+
+### MatchFlowController loadout bridge wiring (new — T047)
+In the Arena scene, open MatchFlowController and set the three optional loadout fields:
+- `_playerLoadout` → same PlayerLoadout SO used by LoadoutBuilderController.
+- `_shopCatalog` → same ShopCatalog SO.
+- `_playerAssembler` → the RobotAssembler on the **player** robot root.
+  (The player assembler may also appear in `_assemblers` — that is fine, the override check
+   routes it through `AssembleFromCatalog` instead of `Assemble`.)
+When all three are assigned, the player robot rebuilds its equipped parts from the saved
+loadout on every `MatchStarted` event. Enemy assemblers always use `Assemble()`.
 
 ### CombatStatsApplicator wiring (new — T045) ← highest priority
 Add `CombatStatsApplicator` MB to each robot root GameObject in the Arena scene.
