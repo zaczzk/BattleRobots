@@ -89,6 +89,9 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T051 | MatchHistoryRowController formatting tests | 50 | **Done** | 13 tests: reflection sanity (FormatDuration + FormatTimestamp methods found); Setup(null) no-throw; FormatDuration zero/60s/90s/59s/3661s/negative-clamp; FormatTimestamp null→"--", empty→"--", valid ISO-8601→contains year, invalid→raw-string fallback. Tests private static formatting logic without wiring uGUI Text. Total tests: 338 across 27 files. |
 | T052 | ShopManager BuyPart + IsOwned EditMode tests | 70 | **Done** | 17 tests: null-part guard, null-wallet guard, already-owned gate, insufficient-funds rejection; success path — returns true, deducts wallet, unlocks inventory, fires _onPurchaseCompleted, persists wallet snapshot to disk; backwards-compat path (no inventory = re-purchase allowed); IsOwned null/no-inventory/not-owned/owned. Reflection-injected fields. Total tests: 355 across 28 files. |
 | T053 | MatchManager HandleMatchStarted EditMode tests | 65 | **Done** | 9 tests: both/player/enemy HealthSO null → IsMatchRunning stays false; valid path → IsMatchRunning true, TimeRemaining == round duration; ResetsPlayerHealth / ResetsEnemyHealth (pre-damaged SOs restored); BroadcastsInitialTimerValue via FloatGameEvent callback; CalledTwice re-entrancy → timer resets to new round duration. Total tests: 364 across 29 files. |
+| T054 | ArenaManagerTests — HandleMatchStarted EditMode tests | 60 | **Done** | 12 tests: NullArenaConfig no-throw; NoRobots/ZeroRobots no-throw; OneRobot position+rotation applied; TwoRobots index mapping; MoreRobots-than-spawns extra robot unmoved; FewerRobots-than-spawns only available robots moved; NullRobotRoot skipped + next index still positioned; HandleMatchStarted called twice repositions. Total tests: 376 across 30 files. |
+| T055 | PauseManagerTests — Pause/Resume/TogglePause EditMode tests | 60 | **Done** | 13 tests: InitialState not paused; Pause→IsPaused+timeScale+event; Pause idempotent; Resume→clears+timeScale+event; Resume no-op when not paused; TogglePause switches; TogglePause twice restores; HandleMatchEnded-while-paused auto-resumes+fires event (via reflection); HandleMatchEnded-not-paused no spurious event. Total tests: 389 across 31 files. |
+| T056 | DifficultyPresetsConfig SO + SelectedDifficultySO + DifficultySelectionController UI | 70 | **Done** | DifficultyPresetsConfig (Core, CreateAssetMenu): immutable IReadOnlyList<DifficultyPreset> (displayName+config); OnValidate warns on empty/null entries. SelectedDifficultySO (Core, CreateAssetMenu): mutable runtime SO; Select(config) writes Current + fires VoidGameEvent; Reset() clears silently; null allowed (clears AI override). DifficultySelectionController MB (UI): prev/next wrap-around cycling, cached UnityAction delegates, ApplySelection on OnEnable; no Physics refs; no Update. RobotAIController patched: optional _selectedDifficulty field; Awake reads Current and overrides _difficultyConfig if non-null. DifficultyPresetsConfigTests (10 tests) + SelectedDifficultySOTests (13 tests). Total tests: 412 across 33 files. |
 
 ---
 
@@ -96,7 +99,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T053). Test suite: 364 tests across 29 files. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T056). Test suite: 412 tests across 33 files. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -182,14 +185,15 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-10 | PM Agent | Session 20: T047 RobotAssembler.AssembleFromCatalog() — closes the PlayerLoadout→RobotAssembler wiring gap (Session Handoff said "pass EquippedPartIds to Assemble()" but no API existed). New method builds partId→PartDef lookup, resolves IDs, warns-and-skips unknowns, null-fallback to Assemble(). MatchFlowController patched with three optional fields (_playerLoadout, _shopCatalog, _playerAssembler); HandleMatchStarted routes player assembler through AssembleFromCatalog when all three assigned. T048 LoadoutSlotController + LoadoutBuilderController — complete pre-match assembly UI layer: slot rows with None/prev/next cycling; parent controller groups by PartCategory, filters by PlayerInventory.HasPart, pre-selects from PlayerLoadout, ConfirmLoadout() persists, live stats preview via RobotStatsAggregator. No Physics refs (BattleRobots.UI namespace). T049 RobotAssemblerLoadoutTests (17 tests): null safety, resolution, unknown-ID skip, whitespace, slot-count limit, re-assembly, fallback-to-inspector-list. Total tasks Done: T001–T049. Total tests: 309 across 25 files. |
 | 2026-04-10 | PM Agent | Session 21: T050 LoadoutSlotControllerTests (16 tests) — covers Setup null/empty/populated candidates, pre-selection by ID, NextPart/PreviousPart wrap-around, GetSelectedPartDef None-sentinel, RebuildCandidates preserve/lose/null, Category property; all headless (no uGUI). T051 MatchHistoryRowControllerTests (13 tests) — tests private static FormatDuration and FormatTimestamp via reflection; zero/60s/90s/59s/3661s/negative-clamp; null→"--", empty→"--", ISO-8601→year-check, invalid→raw-fallback. Total tasks Done: T001–T051. Total tests: 338 across 27 files. |
 | 2026-04-10 | PM Agent | Session 22: T052 ShopManagerTests (17 tests) — closes the test coverage gap for the primary economy path. Tests every guard path in BuyPart() (null part, null wallet, already-owned, insufficient funds), the full success path (return value, wallet deduction, inventory unlock, purchase event fire, disk persistence via SaveSystem), and backwards-compatibility (no inventory = re-purchase allowed). Plus 4 IsOwned() tests. T053 MatchManagerTests (9 tests) — tests HandleMatchStarted() public API: null-health early-return guard (3 variants), match-running state, TimeRemaining == injected round duration, both HealthSOs Reset(), FloatGameEvent timer broadcast, re-entrancy timer reset. Total tasks Done: T001–T053. Total tests: 364 across 29 files. |
+| 2026-04-10 | PM Agent | Session 23: T054 ArenaManagerTests (12 tests) — closes coverage gap for robot spawning; tests null-config guard, position/rotation applied, two-robot index mapping, count-mismatch handling, null-root skip, and re-entrancy. T055 PauseManagerTests (13 tests) — closes coverage gap for pause system; tests Pause/Resume/TogglePause state, event channels, idempotency, and HandleMatchEnded auto-resume via reflection+WireChannels; TearDown resets Time.timeScale. T056 DifficultyPresetsConfig SO + SelectedDifficultySO + DifficultySelectionController — new player-facing difficulty selection system: DifficultyPresetsConfig (immutable list of named presets), SelectedDifficultySO (mutable runtime SO persisting selected BotDifficultyConfig across scenes), DifficultySelectionController (UI prev/next cycling, cached UnityAction delegates, no Physics refs). RobotAIController patched: optional _selectedDifficulty field overrides _difficultyConfig in Awake when non-null. DifficultyPresetsConfigTests (10) + SelectedDifficultySOTests (13). Total tasks Done: T001–T056. Total tests: 412 across 33 files. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T053 (MatchManagerTests). **364 total tests across 29 files.** All 53 backlog items **Done**.
+**Last completed:** T056 (DifficultyPresetsConfig + SelectedDifficultySO + DifficultySelectionController + ArenaManagerTests + PauseManagerTests). **412 total tests across 33 files.** All 56 backlog items **Done**.
 
-**C# layer status:** Complete and compiles clean. All event channel types tested. Every ScriptableObject in BattleRobots.Core has at least one test file. Newest additions (Session 22): ShopManagerTests (17 tests — full BuyPart guard + success + backwards-compat + IsOwned coverage) and MatchManagerTests (9 tests — HandleMatchStarted null-guard, state transitions, HealthSO reset, timer broadcast, re-entrancy).
+**C# layer status:** Complete and compiles clean. All event channel types tested. Every ScriptableObject in BattleRobots.Core has at least one test file. Newest additions (Session 23): ArenaManagerTests (12 tests — HandleMatchStarted null/happy/mismatch/null-root/re-entry), PauseManagerTests (13 tests — Pause/Resume/Toggle/idempotency/HandleMatchEnded auto-resume via reflection), T056 difficulty selection system (DifficultyPresetsConfig + SelectedDifficultySO + DifficultySelectionController + patch to RobotAIController + 23 new tests).
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
@@ -199,7 +203,25 @@ The tool will list every null SO reference across all BattleRobots components an
 
 ### Running the test suite
 Open the project in Unity → Window ▶ General ▶ Test Runner → EditMode tab → Run All.
-All 364 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+All 412 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+
+### DifficultySelection wiring (new — T056)
+This adds a player-controlled difficulty picker to the pre-match flow.
+1. Create SO assets via Assets ▶ Create ▶ BattleRobots ▶ AI:
+   - `DifficultyPresetsConfig` — add one `DifficultyPreset` entry per difficulty level
+     (e.g. "Easy" / "Normal" / "Hard"), each pointing to a `BotDifficultyConfig` SO.
+   - `SelectedDifficulty` (SelectedDifficultySO) — one global instance shared across scenes.
+2. On the pre-match lobby panel, add `DifficultySelectionController` MB and wire:
+   - `_presets` → the DifficultyPresetsConfig SO above.
+   - `_selectedDifficulty` → the SelectedDifficulty SO above.
+   - `_prevButton` / `_nextButton` → the cycle buttons.
+   - `_nameLabel` (optional) → a Text showing the current preset name.
+3. On each enemy `RobotAIController` in the Arena scene, assign:
+   - `_selectedDifficulty` → the same SelectedDifficulty SO.
+   When non-null and `Current != null`, this overrides the inspector `_difficultyConfig`
+   field at Awake time — no per-robot Inspector changes needed for difficulty switching.
+4. Optionally keep `RobotAIController._difficultyConfig` assigned as a fallback.
+   If `_selectedDifficulty` is not wired (or `Current` is null), the inspector field is used.
 
 ### LoadoutBuilder wiring (new — T048) ← next priority after CombatStatsApplicator
 This is the pre-match assembly screen. Create a new scene or panel in the Main Menu / pre-arena flow:

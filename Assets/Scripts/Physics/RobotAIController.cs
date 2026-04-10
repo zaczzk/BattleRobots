@@ -33,6 +33,12 @@ namespace BattleRobots.Physics
                  "Leave null to use the per-component inspector values directly.")]
         [SerializeField] private BotDifficultyConfig _difficultyConfig;
 
+        [Tooltip("Optional mutable SO written by DifficultySelectionController in the pre-match UI. " +
+                 "When assigned and Current != null, its config takes precedence over " +
+                 "_difficultyConfig at Awake time, letting the player choose difficulty " +
+                 "without touching per-robot inspector values.")]
+        [SerializeField] private SelectedDifficultySO _selectedDifficulty;
+
         [Header("References")]
         [Tooltip("Locomotion controller on this robot's root. Required.")]
         [SerializeField] private RobotLocomotionController _locomotion;
@@ -76,6 +82,13 @@ namespace BattleRobots.Physics
         {
             // Cache name once so FixedUpdate never allocates a string.
             _robotId = name;
+
+            // Runtime difficulty override: SelectedDifficultySO is written by
+            // DifficultySelectionController in the pre-match UI and persists across
+            // scene loads.  When it carries a selection it takes precedence over the
+            // per-robot inspector _difficultyConfig field.
+            if (_selectedDifficulty?.Current != null)
+                _difficultyConfig = _selectedDifficulty.Current;
 
             // Apply difficulty preset — overrides inspector tuning if assigned.
             // All assignments are simple field writes; no heap allocation.
