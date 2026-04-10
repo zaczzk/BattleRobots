@@ -123,5 +123,19 @@ namespace BattleRobots.Core
         /// Initialised to 0 so saves predating this field start with no best streak.
         /// </summary>
         public int bestWinStreak;
+
+        /// <summary>
+        /// Total cumulative XP earned by the player.
+        /// Initialised to 0 so saves predating this field start with no XP.
+        /// <see cref="PlayerProgressionSO.LoadSnapshot"/> treats level 0 as level 1.
+        /// </summary>
+        public int playerTotalXP;
+
+        /// <summary>
+        /// Player's current level (1-based).
+        /// Initialised to 0; <see cref="PlayerProgressionSO.LoadSnapshot"/> clamps
+        /// any value &lt; 1 to level 1 — safe for saves predating this field.
+        /// </summary>
+        public int playerLevel;
     }
 }

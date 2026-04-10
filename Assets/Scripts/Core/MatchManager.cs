@@ -84,6 +84,13 @@ namespace BattleRobots.Core
                  "Leave null to skip streak tracking (backwards-compatible).")]
         [SerializeField] private WinStreakSO _winStreak;
 
+        [Header("Progression (optional)")]
+        [Tooltip("SO that tracks the player's accumulated XP and level. " +
+                 "XPRewardCalculator.CalculateMatchXP() is called in EndMatch() and the " +
+                 "result is passed to AddXP(). XP and level are persisted to SaveData. " +
+                 "Leave null to skip progression tracking (backwards-compatible).")]
+        [SerializeField] private PlayerProgressionSO _playerProgression;
+
         [Header("Audio")]
         [Tooltip("AudioEvent SO played when the player wins the match.")]
         [SerializeField] private AudioEvent _onWinJingle;
@@ -188,6 +195,14 @@ namespace BattleRobots.Core
                 ? StreakBonusCalculator.ApplyToReward(baseReward, _winStreak.CurrentStreak)
                 : baseReward;
 
+            // Award XP — uses post-match streak value (0 after a loss, incremented after a win).
+            if (_playerProgression != null)
+            {
+                int xpEarned = XPRewardCalculator.CalculateMatchXP(
+                    playerWon, elapsed, _winStreak?.CurrentStreak ?? 0);
+                _playerProgression.AddXP(xpEarned);
+            }
+
             // Prefer accumulated per-hit stats from MatchStatisticsSO when available;
             // fall back to the end-of-match health-difference approximation otherwise.
             float damageDone = _matchStatistics != null
@@ -233,6 +248,13 @@ namespace BattleRobots.Core
                 saveData.bestWinStreak    = _winStreak.BestStreak;
             }
 
+            // Persist XP and level so they survive the next session.
+            if (_playerProgression != null)
+            {
+                saveData.playerTotalXP = _playerProgression.TotalXP;
+                saveData.playerLevel   = _playerProgression.CurrentLevel;
+            }
+
             SaveSystem.Save(saveData);
 
             // Write blackboard SO before raising MatchEnded so PostMatchController
@@ -248,7 +270,9 @@ namespace BattleRobots.Core
 
             Debug.Log($"[MatchManager] Match ended. PlayerWon={playerWon}, " +
                       $"Duration={elapsed:F1}s, Reward={totalReward}, Wallet={walletSnapshot}, " +
-                      $"Streak={_winStreak?.CurrentStreak ?? 0}.");
+                      $"Streak={_winStreak?.CurrentStreak ?? 0}, " +
+                      $"Level={_playerProgression?.CurrentLevel ?? 1}, " +
+                      $"TotalXP={_playerProgression?.TotalXP ?? 0}.");
         }
 
         // ── Editor validation ─────────────────────────────────────────────────

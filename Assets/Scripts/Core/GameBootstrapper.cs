@@ -32,6 +32,11 @@ namespace BattleRobots.Core
                  "Leave null to skip (backwards-compatible).")]
         [SerializeField] private WinStreakSO _winStreak;
 
+        [Header("Progression")]
+        [Tooltip("Tracks the player's accumulated XP and level. LoadSnapshot called on startup. " +
+                 "Leave null to skip (backwards-compatible).")]
+        [SerializeField] private PlayerProgressionSO _playerProgression;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -87,6 +92,10 @@ namespace BattleRobots.Core
             // Restore win-streak counters.
             // LoadSnapshot is bootstrapper-safe (no event fire); old saves default to 0.
             _winStreak?.LoadSnapshot(save.currentWinStreak, save.bestWinStreak);
+
+            // Restore XP and level.
+            // LoadSnapshot clamps level 0 (old-save default) to level 1 automatically.
+            _playerProgression?.LoadSnapshot(save.playerTotalXP, save.playerLevel);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.
