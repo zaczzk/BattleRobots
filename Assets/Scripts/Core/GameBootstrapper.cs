@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace BattleRobots.Core
@@ -14,6 +15,10 @@ namespace BattleRobots.Core
 
         [Tooltip("Inventory SO rehydrated from SaveData.unlockedPartIds on startup.")]
         [SerializeField] private PlayerInventory _playerInventory;
+
+        [Tooltip("Parts given to a brand-new player (empty inventory after save load). " +
+                 "Leave null to skip starter distribution.")]
+        [SerializeField] private StarterInventoryConfig _starterConfig;
 
         [Header("Events")]
         [SerializeField] private VoidGameEvent _onGameBootstrapped;
@@ -40,6 +45,34 @@ namespace BattleRobots.Core
             // Rehydrate owned-part list from persisted snapshot.
             // Safe when save.unlockedPartIds is null (old saves) or empty (new game).
             _playerInventory?.LoadSnapshot(save.unlockedPartIds);
+
+            // On a brand-new save (inventory empty after load), unlock configured starter parts
+            // and immediately persist them so they survive the next session.
+            if (_playerInventory != null
+                && _starterConfig  != null
+                && _playerInventory.UnlockedPartIds.Count == 0
+                && _starterConfig.StarterPartIds.Count    >  0)
+            {
+                ApplyStarterInventory(save);
+            }
+        }
+
+        /// <summary>
+        /// Unlocks all starter parts in <c>_starterConfig</c> into <c>_playerInventory</c>
+        /// and persists the result.  Called only when the inventory is empty (new game).
+        /// </summary>
+        private void ApplyStarterInventory(SaveData save)
+        {
+            IReadOnlyList<string> starters = _starterConfig.StarterPartIds;
+            for (int i = 0; i < starters.Count; i++)
+                _playerInventory.UnlockPart(starters[i]);
+
+            // Persist starters so they survive the next session.
+            save.unlockedPartIds.Clear();
+            IReadOnlyList<string> owned = _playerInventory.UnlockedPartIds;
+            for (int i = 0; i < owned.Count; i++)
+                save.unlockedPartIds.Add(owned[i]);
+            SaveSystem.Save(save);
         }
 
         /// <summary>

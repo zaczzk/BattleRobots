@@ -64,6 +64,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T026 | EditMode Unit Tests — SaveSystem, MatchRecord, PlayerWallet, HealthSO, VoidGameEvent, DamageInfo | 85 | **Done** | 6 test files, 42 test cases; asmdef + test-framework package added to manifest; all systems testable without scene |
 | T027 | BotDifficultyConfig SO + RobotAIController integration | 65 | **Done** | SO in BattleRobots.Core with 6 tuning properties; RobotAIController applies preset in Awake; RobotLocomotionController.SetSpeedMultiplier stores multiplier separately (idempotent, zero alloc) |
 | T028 | PlayerInventory SO — part ownership tracking + persistence | 75 | **Done** | PlayerInventory SO (BattleRobots.Core): UnlockPart/HasPart/LoadSnapshot/Reset; HashSet mirror for O(1) lookup; VoidGameEvent _onInventoryChanged. SaveData.unlockedPartIds added (backwards-compatible). GameBootstrapper rehydrates inventory on startup. ShopManager: already-owned gate, UnlockPart after purchase, PersistPurchase (load→mutate→save, preserves match history). IsOwned() public API for shop UI. 18 PlayerInventoryTests. |
+| T029 | ShopItemController + ShopCatalogView — shop UI row layer | 70 | **Done** | ShopItemController MB (BattleRobots.UI): drives one shop row (name/cost/description/thumbnail/buy-button/owned-badge); Setup() injects PartDefinition+ShopManager; Refresh() updates dynamic state (owned badge, button interactable, cost label). ShopCatalogView MB: subscribes _onInventoryChanged+_onBalanceChanged SO channels; PopulateCatalog() instantiates one prefab row per catalog entry in Awake; RefreshAll() propagates to all rows on state change; OnDestroy unregisters. Zero alloc after Awake; no Update. |
+| T030 | StarterInventoryConfig SO + GameBootstrapper starter-parts | 65 | **Done** | StarterInventoryConfig SO (BattleRobots.Core, CreateAssetMenu): immutable IReadOnlyList<string> of starter partIds; OnValidate warns on nulls/duplicates. GameBootstrapper: new _starterConfig field; after LoadSnapshot, if inventory.Count==0 and config has entries, ApplyStarterInventory() unlocks all starters and immediately persists to disk. Backwards-compatible (null config = skip). 8 StarterInventoryConfigTests added. Total tests: 76. |
 
 ---
 
@@ -71,7 +73,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T028). Full match loop + HUD + Pause + Results C# layer done. Test suite (60 tests) added. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T030). Full match loop + HUD + Pause + Results C# layer done. Shop UI row layer (ShopItemController + ShopCatalogView) added. Starter-parts system added. Test suite (76 tests). Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -107,6 +109,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T026 — EditMode Unit Tests | 2026-04-10 | com.unity.test-framework 1.1.33 added to manifest. BattleRobots.Tests.EditMode asmdef (Editor-only, overrideReferences false). 6 test files: SaveSystemTests (8 tests, XOR round-trip + edge cases), MatchRecordTests (7 tests, JSON round-trip + SaveData), PlayerWalletTests (10 tests, AddFunds/Deduct/Reset), HealthSOTests (13 tests, ApplyDamage/Heal/IsDead), VoidGameEventTests (10 tests, register/unregister/safe-iteration), DamageInfoTests (8 tests, struct semantics). Total 42 test cases. |
 | T027 — BotDifficultyConfig SO | 2026-04-10 | BotDifficultyConfig SO (BattleRobots.Core, CreateAssetMenu): 6 read-only properties (DetectionRange, AttackRange, AttackDamage, AttackCooldown, FacingThreshold, MoveSpeedMultiplier). RobotAIController: optional _difficultyConfig field; copies all tuning properties in Awake; calls _locomotion.SetSpeedMultiplier(). RobotLocomotionController: private _speedMultiplier field; SetSpeedMultiplier() stores (not multiplies) value; ApplyLocomotion() applies multiplier to both linear and angular velocity. Inspector base speeds preserved. |
 | T028 — PlayerInventory SO | 2026-04-10 | PlayerInventory SO (BattleRobots.Core, CreateAssetMenu): runtime state via List<string>+HashSet mirror; UnlockPart (idempotent), HasPart (O(1)), LoadSnapshot, Reset; VoidGameEvent _onInventoryChanged. SaveData: unlockedPartIds List<string> (backwards-compatible initialiser). GameBootstrapper: _playerInventory field; LoadSnapshot called in LoadAndApplySaveData. ShopManager: _inventory PlayerInventory field; already-owned gate in BuyPart; UnlockPart+PersistPurchase on success; IsOwned() helper; PersistPurchase load-mutate-save preserves match history. 18 PlayerInventoryTests. Total tests: 60. |
+| T029 — ShopItemController + ShopCatalogView | 2026-04-10 | ShopItemController MB (BattleRobots.UI): Setup(PartDefinition, ShopManager) writes static UI (name/description/thumbnail); Refresh() updates dynamic state (cost label, buy-button.interactable, ownedBadge). ShopCatalogView MB: caches _refreshAllVoid/_refreshAllInt delegates in Awake; subscribes to _onInventoryChanged (VoidGameEvent) and _onBalanceChanged (IntGameEvent) SO channels; PopulateCatalog() destroys placeholder children then instantiates one _itemPrefab row per catalog entry; unregisters on OnDestroy. Zero alloc after Awake. |
+| T030 — StarterInventoryConfig SO | 2026-04-10 | StarterInventoryConfig SO (BattleRobots.Core, CreateAssetMenu): IReadOnlyList<string> StarterPartIds; OnValidate warns on nulls/duplicates. GameBootstrapper patched: _starterConfig field; ApplyStarterInventory() called when inventory.Count==0 and config has entries — unlocks all starters via UnlockPart() then persists to disk immediately; backwards-compatible (null config = no-op). using System.Collections.Generic added. 8 StarterInventoryConfigTests (FreshInstance, WithEntries, IsIReadOnlyList, EmptyConfig, TwoParts, Duplicates, NullEntry, GuardCondition, AfterReset). Total tests: 76. |
 
 ---
 
@@ -125,14 +129,15 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-10 | PM Agent | Session 9: Discovered architectural gap — no component raised the MatchStarted VoidGameEvent (all systems subscribed but nothing fired it). T024 MatchStarter MB: raises _matchStartedEvent in Start() with optional _startDelay (0.1s default). T025 SceneWiringValidator EditorWindow: Tools▶BattleRobots menu, scans all BattleRobots MBs for null SO refs, groups by type, ping/select per row, copy report. Total tasks Done: T001–T025. |
 | 2026-04-10 | PM Agent | Session 10: T026 EditMode Unit Tests — added com.unity.test-framework 1.1.33 to manifest; Editor-only asmdef; 42 test cases across 6 files (SaveSystem, MatchRecord, PlayerWallet, HealthSO, VoidGameEvent, DamageInfo). T027 BotDifficultyConfig SO — immutable Core SO with 6 tuning properties; RobotAIController applies preset in Awake (all field writes, no alloc); RobotLocomotionController.SetSpeedMultiplier() stores multiplier separately (idempotent). Total tasks Done: T001–T027. |
 | 2026-04-10 | PM Agent | Session 11: T028 PlayerInventory SO — closes the "unlock upgraded parts" loop missing from the economy. PlayerInventory SO (Core, HashSet+List for O(1) HasPart), SaveData.unlockedPartIds (backwards-compatible), GameBootstrapper rehydrates on startup, ShopManager already-owned gate + PersistPurchase (load→mutate→save preserves history), IsOwned() helper. 18 PlayerInventoryTests added. Total tests: 60. Total tasks Done: T001–T028. |
+| 2026-04-10 | PM Agent | Session 12: T029 ShopItemController + ShopCatalogView — bridges data layer to shop UI. ShopItemController (UI): Setup injects PartDefinition+ShopManager, Refresh updates owned badge/cost/button; ShopCatalogView (UI): subscribes to inventory+wallet SO channels, PopulateCatalog spawns one row per catalog entry, RefreshAll propagates on change; zero alloc after Awake. T030 StarterInventoryConfig SO — new player UX: immutable SO lists starter partIds; GameBootstrapper applies starters when inventory empty after load, persists immediately; backwards-compatible. 8 StarterInventoryConfigTests added. Total tests: 76. Total tasks Done: T001–T030. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T028 PlayerInventory SO — closes the "unlock upgraded parts" loop. 60 total tests across 7 files. All 28 backlog items **Done**.
+**Last completed:** T030 StarterInventoryConfig SO + T029 ShopItemController/ShopCatalogView. 76 total tests across 8 files. All 30 backlog items **Done**.
 
-**C# layer status:** Complete. Every system is implemented and compiles cleanly. Economy loop is fully closed: earn → spend → own → persist → restore.
+**C# layer status:** Complete. Economy loop fully closed; shop UI row layer complete; new-player starter-parts UX added.
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
@@ -142,14 +147,33 @@ The tool will list every null SO reference across all BattleRobots components an
 
 ### Running the test suite
 Open the project in Unity → Window ▶ General ▶ Test Runner → EditMode tab → Run All.
-All 60 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+All 76 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+
+### StarterInventoryConfig wiring (new — T030)
+- Create SO asset: Assets ▶ Create ▶ BattleRobots ▶ Economy ▶ StarterInventoryConfig.
+- Populate `_starterPartIds` with the IDs of parts new players should receive (must match PartDefinition.PartId exactly).
+- Assign the SO to `GameBootstrapper._starterConfig`.
+- On first launch (empty inventory), the bootstrapper unlocks and persists all starters automatically.
+- Leave `_starterConfig` null to skip starter distribution (backwards-compatible).
+
+### ShopCatalogView wiring (new — T029)
+- Create a shop-row prefab with `ShopItemController` MB attached. Assign UI refs in the prefab Inspector:
+  `_nameLabel` (Text), `_costLabel` (Text), `_descriptionLabel` (Text, optional),
+  `_thumbnail` (Image, optional), `_buyButton` (Button), `_ownedBadge` (GameObject, optional).
+- Wire `_buyButton.onClick → ShopItemController.OnBuyClicked` in the prefab Inspector.
+- On the shop panel GameObject, add `ShopCatalogView` MB and assign:
+  - `_shopManager` → the ShopManager in the scene
+  - `_itemPrefab` → the shop-row prefab above
+  - `_itemContainer` → the ScrollRect Content Transform (VerticalLayoutGroup recommended)
+  - `_onInventoryChanged` → same VoidGameEvent SO as PlayerInventory._onInventoryChanged
+  - `_onBalanceChanged` → same IntGameEvent SO as PlayerWallet._onBalanceChanged
+- ShopCatalogView will instantiate one row per PartDefinition in the ShopCatalog and keep all rows in sync automatically.
 
 ### PlayerInventory wiring (new — T028)
 - Create SO asset: Assets ▶ Create ▶ BattleRobots ▶ Economy ▶ PlayerInventory (one global instance).
 - Assign the **same** SO asset to `GameBootstrapper._playerInventory` AND `ShopManager._inventory`.
 - Create a VoidGameEvent SO ("InventoryChanged") and assign to `PlayerInventory._onInventoryChanged`.
-- Wire `InventoryChanged` → VoidGameEventListener → shop panel refresh method to grey-out owned parts.
-- `ShopManager.IsOwned(partDef)` can be called per-row to set interactable state on buy buttons.
+- Wire the same "InventoryChanged" SO to `ShopCatalogView._onInventoryChanged`.
 
 ### BotDifficultyConfig wiring (optional)
 - Create SO assets: Assets ▶ Create ▶ BattleRobots ▶ AI ▶ BotDifficultyConfig (Easy / Normal / Hard presets).
