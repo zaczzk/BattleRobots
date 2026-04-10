@@ -92,6 +92,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T054 | ArenaManagerTests — HandleMatchStarted EditMode tests | 60 | **Done** | 12 tests: NullArenaConfig no-throw; NoRobots/ZeroRobots no-throw; OneRobot position+rotation applied; TwoRobots index mapping; MoreRobots-than-spawns extra robot unmoved; FewerRobots-than-spawns only available robots moved; NullRobotRoot skipped + next index still positioned; HandleMatchStarted called twice repositions. Total tests: 376 across 30 files. |
 | T055 | PauseManagerTests — Pause/Resume/TogglePause EditMode tests | 60 | **Done** | 13 tests: InitialState not paused; Pause→IsPaused+timeScale+event; Pause idempotent; Resume→clears+timeScale+event; Resume no-op when not paused; TogglePause switches; TogglePause twice restores; HandleMatchEnded-while-paused auto-resumes+fires event (via reflection); HandleMatchEnded-not-paused no spurious event. Total tests: 389 across 31 files. |
 | T056 | DifficultyPresetsConfig SO + SelectedDifficultySO + DifficultySelectionController UI | 70 | **Done** | DifficultyPresetsConfig (Core, CreateAssetMenu): immutable IReadOnlyList<DifficultyPreset> (displayName+config); OnValidate warns on empty/null entries. SelectedDifficultySO (Core, CreateAssetMenu): mutable runtime SO; Select(config) writes Current + fires VoidGameEvent; Reset() clears silently; null allowed (clears AI override). DifficultySelectionController MB (UI): prev/next wrap-around cycling, cached UnityAction delegates, ApplySelection on OnEnable; no Physics refs; no Update. RobotAIController patched: optional _selectedDifficulty field; Awake reads Current and overrides _difficultyConfig if non-null. DifficultyPresetsConfigTests (10 tests) + SelectedDifficultySOTests (13 tests). Total tests: 412 across 33 files. |
+| T057 | PartUpgradeSystem — upgrade tiers for owned parts | 75 | **Done** | PartUpgradeConfig SO (Core, CreateAssetMenu): MaxTier/TierCosts/TierStatMultipliers; GetUpgradeCost(currentTier)/GetStatMultiplier(tier); OnValidate array-length + positive-value checks. PlayerPartUpgrades SO (Core, CreateAssetMenu): parallel List<string>/List<int> for JsonUtility compat; Dictionary mirror for O(1) GetTier; SetTier (clamps ≥0, fires VoidGameEvent); LoadSnapshot (bootstrapper-safe, no event); TakeSnapshot (copy for persistence); Reset (silent). SaveData: upgradePartIds + upgradePartTierValues lists added (backwards-compat empty defaults). GameBootstrapper: _playerPartUpgrades field + LoadSnapshot call. RobotStatsAggregator: upgrade-aware Compute overload — scales healthBonus+armorRating additively (×mult), scales speed/damage bonus-above-1 (1+(val-1)×mult) to prevent neutral-part compounding; falls back to base overload when upgrades/config null. UpgradeManager MB (UI): UpgradePart(part) guards (null part/wallet/upgrades/config, at max tier, insufficient funds), deducts wallet, SetTier, PersistUpgrade (Load→mutate→Save), fires VoidGameEvent; GetCurrentTier/GetNextUpgradeCost read-only accessors. UpgradeController MB (UI): Setup(part) + cached Refresh Action; subscribes _onUpgradesChanged on OnEnable; _tierLabel (★★☆/MAX), _costLabel (Cost: N/MAX), _upgradeButton interactable gating; FormatTierStars internal static (char[] alloc, not in Update). 4 test files: PartUpgradeConfigTests (13), PlayerPartUpgradesTests (21), UpgradeManagerTests (20), RobotStatsAggregatorUpgradeTests (13). Total tests: 479 across 37 files. |
 
 ---
 
@@ -99,7 +100,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T056). Test suite: 412 tests across 33 files. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T057). Test suite: 479 tests across 37 files. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -156,6 +157,10 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T051 — MatchHistoryRowController formatting tests | 2026-04-10 | 13 tests: reflection sanity for FormatDuration + FormatTimestamp; Setup(null) no-throw; FormatDuration zero/60s/90s/59s/3661s/negative-clamp; FormatTimestamp null→"--", empty→"--", valid ISO-8601→contains year, invalid→raw-string. Total tests: 338 across 27 files. |
 | T052 — ShopManager BuyPart + IsOwned EditMode tests | 2026-04-10 | 17 tests: null-part (return false + wallet unchanged), null-wallet, already-owned gate (return false + wallet unchanged), insufficient-funds (return false + wallet unchanged); success path: return true, deducts 100 from 500-wallet→400, UnlocksInInventory, fires _onPurchaseCompleted, PersistPurchase writes walletBalance=400 to disk; backwards-compat no-inventory allows re-purchase; IsOwned null/no-inventory/not-owned/owned. Reflection-injected ShopManager._wallet/_inventory/_onPurchaseCompleted. Total tests: 355 across 28 files. |
 | T053 — MatchManager HandleMatchStarted EditMode tests | 2026-04-10 | 9 tests: BothHealthsNull/PlayerHealthNull/EnemyHealthNull → IsMatchRunning stays false (early return guard); valid HealthSOs → SetsMatchRunningTrue, SetsTimeRemainingToRoundDuration (90f injection), ResetsPlayerHealth (pre-damage cleared), ResetsEnemyHealth (pre-damage cleared); BroadcastsInitialTimerValue via FloatGameEvent callback (verified 60f payload); CalledTwice re-entrancy (simulate partial timer, call again → TimeRemaining==new roundDuration 90f). Reflection-injected _playerHealth/_enemyHealth/_roundDuration/_onTimerUpdated/_timeRemaining. Total tests: 364 across 29 files. |
+| T054 — ArenaManagerTests | 2026-04-10 | 12 tests: HandleMatchStarted null/happy/mismatch/null-root/re-entry paths. Total tests: 376 across 30 files. |
+| T055 — PauseManagerTests | 2026-04-10 | 13 tests: Pause/Resume/Toggle/idempotency/HandleMatchEnded auto-resume. Total tests: 389 across 31 files. |
+| T056 — DifficultyPresetsConfig + SelectedDifficultySO + DifficultySelectionController | 2026-04-10 | Difficulty selection system: 3 SOs, 1 UI MB, RobotAIController patch, 23 tests. Total tests: 412 across 33 files. |
+| T057 — PartUpgradeSystem | 2026-04-10 | PartUpgradeConfig SO, PlayerPartUpgrades SO, UpgradeManager MB, UpgradeController MB. SaveData extended. RobotStatsAggregator upgrade overload. 67 tests across 4 files. Total tests: 479 across 37 files. |
 
 ---
 
@@ -186,14 +191,15 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-10 | PM Agent | Session 21: T050 LoadoutSlotControllerTests (16 tests) — covers Setup null/empty/populated candidates, pre-selection by ID, NextPart/PreviousPart wrap-around, GetSelectedPartDef None-sentinel, RebuildCandidates preserve/lose/null, Category property; all headless (no uGUI). T051 MatchHistoryRowControllerTests (13 tests) — tests private static FormatDuration and FormatTimestamp via reflection; zero/60s/90s/59s/3661s/negative-clamp; null→"--", empty→"--", ISO-8601→year-check, invalid→raw-fallback. Total tasks Done: T001–T051. Total tests: 338 across 27 files. |
 | 2026-04-10 | PM Agent | Session 22: T052 ShopManagerTests (17 tests) — closes the test coverage gap for the primary economy path. Tests every guard path in BuyPart() (null part, null wallet, already-owned, insufficient funds), the full success path (return value, wallet deduction, inventory unlock, purchase event fire, disk persistence via SaveSystem), and backwards-compatibility (no inventory = re-purchase allowed). Plus 4 IsOwned() tests. T053 MatchManagerTests (9 tests) — tests HandleMatchStarted() public API: null-health early-return guard (3 variants), match-running state, TimeRemaining == injected round duration, both HealthSOs Reset(), FloatGameEvent timer broadcast, re-entrancy timer reset. Total tasks Done: T001–T053. Total tests: 364 across 29 files. |
 | 2026-04-10 | PM Agent | Session 23: T054 ArenaManagerTests (12 tests) — closes coverage gap for robot spawning; tests null-config guard, position/rotation applied, two-robot index mapping, count-mismatch handling, null-root skip, and re-entrancy. T055 PauseManagerTests (13 tests) — closes coverage gap for pause system; tests Pause/Resume/TogglePause state, event channels, idempotency, and HandleMatchEnded auto-resume via reflection+WireChannels; TearDown resets Time.timeScale. T056 DifficultyPresetsConfig SO + SelectedDifficultySO + DifficultySelectionController — new player-facing difficulty selection system: DifficultyPresetsConfig (immutable list of named presets), SelectedDifficultySO (mutable runtime SO persisting selected BotDifficultyConfig across scenes), DifficultySelectionController (UI prev/next cycling, cached UnityAction delegates, no Physics refs). RobotAIController patched: optional _selectedDifficulty field overrides _difficultyConfig in Awake when non-null. DifficultyPresetsConfigTests (10) + SelectedDifficultySOTests (13). Total tasks Done: T001–T056. Total tests: 412 across 33 files. |
+| 2026-04-10 | PM Agent | Session 24: T057 PartUpgradeSystem — adds part upgrade tier progression to the economy loop. PartUpgradeConfig SO (Core): MaxTier/TierCosts[]/TierStatMultipliers[]; GetUpgradeCost(currentTier) returns -1 at max; GetStatMultiplier(tier) returns 1.0 out-of-range; OnValidate array-length + positive-value checks. PlayerPartUpgrades SO (Core): parallel List<string>/List<int> for JsonUtility compat; Dictionary mirror O(1) GetTier; SetTier (clamp≥0, fires VoidGameEvent); LoadSnapshot (bootstrapper-safe, no event); TakeSnapshot (copy); Reset (silent). SaveData: two new fields upgradePartIds + upgradePartTierValues (backwards-compat empty defaults). GameBootstrapper: _playerPartUpgrades field + LoadSnapshot call. RobotStatsAggregator: upgrade-aware Compute overload — scales healthBonus+armorRating additively (×mult), scales speed/damage bonus-above-1 (1+(val-1)×mult) preventing neutral-part compounding; null-upgrades/null-config falls back to base overload. UpgradeManager MB (UI): UpgradePart() guards (null part/wallet/upgrades/config, at-max-tier, insufficient-funds), deduct wallet, SetTier, PersistUpgrade (Load→mutate→Save), fire VoidGameEvent; GetCurrentTier/GetNextUpgradeCost read-only accessors. UpgradeController MB (UI): Setup(part) + cached Refresh Action; subscribes _onUpgradesChanged on OnEnable/OnDisable; _tierLabel (★★☆/MAX), _costLabel (Cost: N/MAX), _upgradeButton interactable gating; FormatTierStars internal static (char[] alloc, not in Update). 4 test files: PartUpgradeConfigTests (13), PlayerPartUpgradesTests (21), UpgradeManagerTests (20), RobotStatsAggregatorUpgradeTests (13). Total tasks Done: T001–T057. Total tests: 479 across 37 files. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T056 (DifficultyPresetsConfig + SelectedDifficultySO + DifficultySelectionController + ArenaManagerTests + PauseManagerTests). **412 total tests across 33 files.** All 56 backlog items **Done**.
+**Last completed:** T057 (PartUpgradeSystem). **479 total tests across 37 files.** All 57 backlog items **Done**.
 
-**C# layer status:** Complete and compiles clean. All event channel types tested. Every ScriptableObject in BattleRobots.Core has at least one test file. Newest additions (Session 23): ArenaManagerTests (12 tests — HandleMatchStarted null/happy/mismatch/null-root/re-entry), PauseManagerTests (13 tests — Pause/Resume/Toggle/idempotency/HandleMatchEnded auto-resume via reflection), T056 difficulty selection system (DifficultyPresetsConfig + SelectedDifficultySO + DifficultySelectionController + patch to RobotAIController + 23 new tests).
+**C# layer status:** Complete and compiles clean. All event channel types tested. Every ScriptableObject in BattleRobots.Core has at least one test file. Newest additions (Session 24): PartUpgradeConfig SO, PlayerPartUpgrades SO, UpgradeManager MB (UI), UpgradeController MB (UI), SaveData extended (upgradePartIds + upgradePartTierValues), GameBootstrapper extended (_playerPartUpgrades + LoadSnapshot), RobotStatsAggregator upgrade-aware overload (67 new tests across 4 files).
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
@@ -204,6 +210,42 @@ The tool will list every null SO reference across all BattleRobots components an
 ### Running the test suite
 Open the project in Unity → Window ▶ General ▶ Test Runner → EditMode tab → Run All.
 All 412 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+
+### PartUpgradeSystem wiring (new — T057) ← next priority
+This adds per-part upgrade tiers to the economy loop. Create the following SO assets and wire one upgrade panel per part row in the LoadoutBuilder or Shop scenes.
+
+1. Create SO assets via Assets ▶ Create ▶ BattleRobots ▶ Economy:
+   - `PartUpgradeConfig` — one global instance.
+     Set `_maxTier` (e.g. 3), `_tierCosts` length = maxTier (e.g. [100, 250, 500]),
+     `_tierStatMultipliers` length = maxTier+1 (e.g. [1.0, 1.1, 1.25, 1.5]).
+   - `PlayerPartUpgrades` — one global instance.
+     Assign a `VoidGameEvent` SO to `_onUpgradesChanged` ("UpgradesChanged").
+   - Assign `PlayerPartUpgrades` to `GameBootstrapper._playerPartUpgrades`.
+
+2. In the shop or loadout scene, add `UpgradeManager` MB to any persistent GameObject and wire:
+   - `_wallet` → same PlayerWallet SO as ShopManager.
+   - `_upgrades` → the PlayerPartUpgrades SO above.
+   - `_upgradeConfig` → the PartUpgradeConfig SO above.
+   - `_onUpgradeCompleted` → a VoidGameEvent SO ("UpgradeCompleted").
+
+3. For each upgradeable part row in the UI, add `UpgradeController` MB and wire:
+   - `_upgradeManager` → the UpgradeManager MB above.
+   - `_upgradeConfig` → same PartUpgradeConfig SO.
+   - `_onUpgradesChanged` → the UpgradesChanged VoidGameEvent SO.
+   - `_tierLabel` (optional Text) — shows "★★☆" style tier display or "MAX".
+   - `_costLabel` (optional Text) — shows "Cost: 250" or "MAX".
+   - `_upgradeButton` (optional Button) — calls UpgradePart on click; auto-wired in Awake.
+   - Call `Setup(partDefinition)` from the parent row controller to bind the part.
+
+4. Upgrade-aware stats preview in LoadoutBuilderController:
+   - Add `_playerPartUpgrades` (PlayerPartUpgrades) and `_upgradeConfig` (PartUpgradeConfig)
+     optional fields to `LoadoutBuilderController`.
+   - Pass them to the 4-arg `RobotStatsAggregator.Compute()` overload in the stats-preview
+     block inside `ConfirmLoadout()` (or wherever stats are displayed).
+   - If null, the base 2-arg overload is used automatically (backwards-compatible).
+
+5. SaveData backwards-compatibility: The two new fields (`upgradePartIds`, `upgradePartTierValues`)
+   are initialised to empty lists, so existing save files load cleanly with zero upgrade data.
 
 ### DifficultySelection wiring (new — T056)
 This adds a player-controlled difficulty picker to the pre-match flow.

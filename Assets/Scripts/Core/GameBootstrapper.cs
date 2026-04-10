@@ -24,6 +24,10 @@ namespace BattleRobots.Core
                  "Leave null to skip loadout rehydration.")]
         [SerializeField] private PlayerLoadout _playerLoadout;
 
+        [Tooltip("Tracks per-part upgrade tiers. LoadSnapshot called on startup. " +
+                 "Leave null to skip (backwards-compatible).")]
+        [SerializeField] private PlayerPartUpgrades _playerPartUpgrades;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -71,6 +75,10 @@ namespace BattleRobots.Core
             // Restore the player's saved part loadout.
             // LoadSnapshot is a no-op on null (old saves get an empty loadout).
             _playerLoadout?.LoadSnapshot(save.loadoutPartIds);
+
+            // Restore per-part upgrade tiers.
+            // LoadSnapshot is safe with empty/null lists (old saves get no upgrades).
+            _playerPartUpgrades?.LoadSnapshot(save.upgradePartIds, save.upgradePartTierValues);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

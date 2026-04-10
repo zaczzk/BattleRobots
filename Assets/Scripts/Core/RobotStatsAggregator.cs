@@ -85,5 +85,78 @@ namespace BattleRobots.Core
 
             return new RobotCombatStats(finalHealth, finalSpeed, totalDamageMult, clampedArmor);
         }
+
+        /// <summary>
+        /// Upgrade-aware overload: same aggregation as <see cref="Compute(RobotDefinition,
+        /// IEnumerable{PartDefinition})"/> but scales each part's bonus stats by the
+        /// tier multiplier from <paramref name="upgradeConfig"/> at the tier stored in
+        /// <paramref name="upgrades"/>.
+        ///
+        /// ── Upgrade scaling ──────────────────────────────────────────────────
+        ///   For a part at tier T with multiplier M = upgradeConfig.GetStatMultiplier(T):
+        ///     healthBonus      → scaled additively:  (int)(healthBonus × M)
+        ///     speedMultiplier  → bonus above 1.0:    1 + (speedMultiplier  - 1) × M
+        ///     damageMultiplier → bonus above 1.0:    1 + (damageMultiplier - 1) × M
+        ///     armorRating      → scaled additively:  (int)(armorRating × M)
+        ///
+        ///   A neutral part (speedMultiplier = 1.0, healthBonus = 0, …) is unaffected
+        ///   by any upgrade tier — only non-zero bonus stats are amplified.
+        ///
+        /// Falls back to the base overload when <paramref name="upgrades"/> or
+        /// <paramref name="upgradeConfig"/> is null.
+        /// </summary>
+        public static RobotCombatStats Compute(
+            RobotDefinition             robotDefinition,
+            IEnumerable<PartDefinition> equippedParts,
+            PlayerPartUpgrades          upgrades,
+            PartUpgradeConfig           upgradeConfig)
+        {
+            // Fall back gracefully when upgrade system is not configured.
+            if (upgrades == null || upgradeConfig == null)
+                return Compute(robotDefinition, equippedParts);
+
+            if (robotDefinition == null)
+            {
+#if UNITY_EDITOR
+                Debug.LogWarning("[RobotStatsAggregator] Compute (upgrade) called with null " +
+                                 "robotDefinition — returning zero stats.");
+#endif
+                return new RobotCombatStats(0f, 0f, 0f, 0);
+            }
+
+            float baseHealth = robotDefinition.MaxHitPoints;
+            float baseSpeed  = robotDefinition.MoveSpeed;
+
+            int   totalHealthBonus = 0;
+            float totalSpeedMult   = 1f;
+            float totalDamageMult  = 1f;
+            int   totalArmor       = 0;
+
+            if (equippedParts != null)
+            {
+                foreach (PartDefinition part in equippedParts)
+                {
+                    if (part == null) continue;
+
+                    PartStats s    = part.Stats;
+                    float     mult = upgradeConfig.GetStatMultiplier(upgrades.GetTier(part.PartId));
+
+                    // Health and armor scale additively (bonus × multiplier).
+                    totalHealthBonus += Mathf.RoundToInt(s.healthBonus * mult);
+                    totalArmor       += Mathf.RoundToInt(s.armorRating * mult);
+
+                    // Speed and damage: only the bonus-above-1.0 is amplified, preventing
+                    // exponential compounding on neutral (1.0) parts.
+                    totalSpeedMult  *= 1f + (s.speedMultiplier  - 1f) * mult;
+                    totalDamageMult *= 1f + (s.damageMultiplier - 1f) * mult;
+                }
+            }
+
+            float finalHealth  = baseHealth + totalHealthBonus;
+            float finalSpeed   = baseSpeed  * totalSpeedMult;
+            int   clampedArmor = Mathf.Clamp(totalArmor, 0, 100);
+
+            return new RobotCombatStats(finalHealth, finalSpeed, totalDamageMult, clampedArmor);
+        }
     }
 }

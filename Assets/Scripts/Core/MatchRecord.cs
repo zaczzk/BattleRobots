@@ -97,5 +97,19 @@ namespace BattleRobots.Core
         /// Initialised to an empty list so saves predating this field load with an empty loadout.
         /// </summary>
         public List<string> loadoutPartIds = new List<string>();
+
+        /// <summary>
+        /// Part IDs that have been upgraded at least once.
+        /// Parallel to <see cref="upgradePartTierValues"/> — indices must match.
+        /// Initialised to an empty list so saves predating this field load with no upgrades.
+        /// </summary>
+        public List<string> upgradePartIds = new List<string>();
+
+        /// <summary>
+        /// Upgrade tier values for each upgraded part.
+        /// Parallel to <see cref="upgradePartIds"/> — indices must match.
+        /// Initialised to an empty list so saves predating this field load with no upgrades.
+        /// </summary>
+        public List<int> upgradePartTierValues = new List<int>();
     }
 }
