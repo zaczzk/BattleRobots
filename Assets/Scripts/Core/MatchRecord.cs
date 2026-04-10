@@ -137,5 +137,24 @@ namespace BattleRobots.Core
         /// any value &lt; 1 to level 1 — safe for saves predating this field.
         /// </summary>
         public int playerLevel;
+
+        /// <summary>
+        /// Total matches played (win + loss) used by the achievement system.
+        /// Initialised to 0; backwards-compatible with saves predating this field.
+        /// </summary>
+        public int totalMatchesPlayed;
+
+        /// <summary>
+        /// Total matches won used by the achievement system.
+        /// Initialised to 0; backwards-compatible with saves predating this field.
+        /// </summary>
+        public int totalMatchesWon;
+
+        /// <summary>
+        /// Achievement IDs that have been unlocked by the player.
+        /// Initialised to an empty list so saves predating this field start
+        /// with no achievements unlocked.
+        /// </summary>
+        public List<string> unlockedAchievementIds = new List<string>();
     }
 }

@@ -37,6 +37,11 @@ namespace BattleRobots.Core
                  "Leave null to skip (backwards-compatible).")]
         [SerializeField] private PlayerProgressionSO _playerProgression;
 
+        [Header("Achievements (optional)")]
+        [Tooltip("Runtime SO for achievement unlock state and match counters. " +
+                 "LoadSnapshot called on startup. Leave null to skip (backwards-compatible).")]
+        [SerializeField] private PlayerAchievementsSO _playerAchievements;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -96,6 +101,11 @@ namespace BattleRobots.Core
             // Restore XP and level.
             // LoadSnapshot clamps level 0 (old-save default) to level 1 automatically.
             _playerProgression?.LoadSnapshot(save.playerTotalXP, save.playerLevel);
+
+            // Restore achievement unlock state and match-play counters.
+            // LoadSnapshot is bootstrapper-safe (no events); old saves default to 0/empty.
+            _playerAchievements?.LoadSnapshot(
+                save.totalMatchesPlayed, save.totalMatchesWon, save.unlockedAchievementIds);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.
