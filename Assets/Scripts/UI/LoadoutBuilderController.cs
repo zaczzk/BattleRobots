@@ -77,6 +77,18 @@ namespace BattleRobots.UI
         [Tooltip("When clicked, calls ConfirmLoadout(). May also be wired via Inspector button.")]
         [SerializeField] private Button _confirmButton;
 
+        // ── Inspector — Upgrade System ────────────────────────────────────────
+
+        [Header("Upgrade System (optional)")]
+        [Tooltip("When assigned, the stats preview uses the upgrade-aware " +
+                 "RobotStatsAggregator.Compute() overload so tier bonuses are reflected. " +
+                 "Assign the same PlayerPartUpgrades SO as UpgradeManager and GameBootstrapper.")]
+        [SerializeField] private PlayerPartUpgrades _playerPartUpgrades;
+
+        [Tooltip("When assigned together with _playerPartUpgrades, tier stat multipliers are " +
+                 "applied in the preview. Assign the same PartUpgradeConfig SO as UpgradeManager.")]
+        [SerializeField] private PartUpgradeConfig _upgradeConfig;
+
         // ── Inspector — Stats Preview ─────────────────────────────────────────
 
         [Header("Stats Preview (optional)")]
@@ -321,7 +333,12 @@ namespace BattleRobots.UI
                     selectedParts.Add(sel);
             }
 
-            RobotCombatStats stats = RobotStatsAggregator.Compute(_robotDefinition, selectedParts);
+            // Use upgrade-aware overload when both upgrade fields are assigned;
+            // falls back to the base 2-arg overload automatically when either is null.
+            RobotCombatStats stats = (_playerPartUpgrades != null && _upgradeConfig != null)
+                ? RobotStatsAggregator.Compute(_robotDefinition, selectedParts,
+                                               _playerPartUpgrades, _upgradeConfig)
+                : RobotStatsAggregator.Compute(_robotDefinition, selectedParts);
 
             if (_healthText != null)
                 _healthText.text = $"HP: {stats.TotalMaxHealth:F0}";
