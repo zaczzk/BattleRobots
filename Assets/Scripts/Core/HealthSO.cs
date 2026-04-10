@@ -33,8 +33,15 @@ namespace BattleRobots.Core
 
         // ── Runtime state ─────────────────────────────────────────────────────
 
-        /// <summary>Maximum health as configured in the SO asset.</summary>
-        public float MaxHealth => _maxHealth;
+        // Not serialised — set at runtime by InitForMatch(); resets to -1 on CreateInstance.
+        private float _runtimeMaxHealth = -1f;
+
+        /// <summary>
+        /// Effective maximum health for the current match.
+        /// Returns the runtime override (set by <see cref="InitForMatch"/>) when positive;
+        /// falls back to the SO-asset default (<see cref="_maxHealth"/>) otherwise.
+        /// </summary>
+        public float MaxHealth => _runtimeMaxHealth > 0f ? _runtimeMaxHealth : _maxHealth;
 
         /// <summary>Current health. Always in [0, MaxHealth].</summary>
         public float CurrentHealth { get; private set; }
@@ -45,12 +52,26 @@ namespace BattleRobots.Core
         // ── Mutators ──────────────────────────────────────────────────────────
 
         /// <summary>
+        /// Overrides the effective max health for this match without modifying the SO asset.
+        /// Must be called before <see cref="Reset()"/> so the new cap is applied immediately.
+        ///
+        /// Intended usage:
+        ///   <c>health.InitForMatch(combatStats.TotalMaxHealth); health.Reset();</c>
+        ///
+        /// Values below 1 are clamped to 1. Not persisted between play sessions.
+        /// </summary>
+        public void InitForMatch(float maxHealth)
+        {
+            _runtimeMaxHealth = Mathf.Max(1f, maxHealth);
+        }
+
+        /// <summary>
         /// Restores health to <see cref="MaxHealth"/> and fires _onHealthChanged.
         /// Call once per match/spawn before gameplay begins.
         /// </summary>
         public void Reset()
         {
-            CurrentHealth = _maxHealth;
+            CurrentHealth = MaxHealth;
             _onHealthChanged?.Raise(CurrentHealth);
         }
 
@@ -78,7 +99,7 @@ namespace BattleRobots.Core
         {
             if (IsDead || amount <= 0f) return;
 
-            CurrentHealth = Mathf.Min(_maxHealth, CurrentHealth + amount);
+            CurrentHealth = Mathf.Min(MaxHealth, CurrentHealth + amount);
             _onHealthChanged?.Raise(CurrentHealth);
         }
     }

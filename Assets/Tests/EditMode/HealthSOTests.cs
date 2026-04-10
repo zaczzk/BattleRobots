@@ -166,5 +166,63 @@ namespace BattleRobots.Tests
             _health.Heal(-10f);
             Assert.AreEqual(80f, _health.CurrentHealth, 0.001f);
         }
+
+        // ── InitForMatch ──────────────────────────────────────────────────────
+
+        [Test]
+        public void InitForMatch_OverridesMaxHealth()
+        {
+            _health.InitForMatch(150f);
+            Assert.AreEqual(150f, _health.MaxHealth, 0.001f);
+        }
+
+        [Test]
+        public void InitForMatch_ResetUsesOverriddenMaxHealth()
+        {
+            _health.InitForMatch(200f);
+            _health.Reset();
+            Assert.AreEqual(200f, _health.CurrentHealth, 0.001f);
+        }
+
+        [Test]
+        public void InitForMatch_ZeroValue_ClampsToOne()
+        {
+            _health.InitForMatch(0f);
+            Assert.GreaterOrEqual(_health.MaxHealth, 1f);
+        }
+
+        [Test]
+        public void InitForMatch_NegativeValue_ClampsToOne()
+        {
+            _health.InitForMatch(-100f);
+            Assert.GreaterOrEqual(_health.MaxHealth, 1f);
+        }
+
+        [Test]
+        public void InitForMatch_HealCapsAtNewMaxHealth()
+        {
+            _health.InitForMatch(150f);
+            _health.Reset();             // CurrentHealth = 150
+            _health.ApplyDamage(50f);   // CurrentHealth = 100
+            _health.Heal(9999f);        // should cap at 150, not 100 (old default)
+            Assert.AreEqual(150f, _health.CurrentHealth, 0.001f);
+        }
+
+        [Test]
+        public void InitForMatch_CalledTwice_LastValueWins()
+        {
+            _health.InitForMatch(300f);
+            _health.InitForMatch(80f);
+            Assert.AreEqual(80f, _health.MaxHealth, 0.001f);
+        }
+
+        [Test]
+        public void InitForMatch_DoesNotAffectCurrentHealthUntilReset()
+        {
+            // After SetUp, CurrentHealth == 100. Changing MaxHealth without Reset
+            // should not immediately change CurrentHealth.
+            _health.InitForMatch(200f);
+            Assert.AreEqual(100f, _health.CurrentHealth, 0.001f);
+        }
     }
 }

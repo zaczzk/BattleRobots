@@ -65,9 +65,10 @@ namespace BattleRobots.Physics
 
         // ── Private state (value types — zero alloc) ──────────────────────────
 
-        private AIState _state    = AIState.Idle;
-        private float   _cooldown = 0f;
-        private string  _robotId  = string.Empty;   // cached in Awake; used in DamageInfo
+        private AIState _state           = AIState.Idle;
+        private float   _cooldown        = 0f;
+        private string  _robotId         = string.Empty;   // cached in Awake; used in DamageInfo
+        private float   _damageMultiplier = 1f;             // set by CombatStatsApplicator
 
         // ── Lifecycle ─────────────────────────────────────────────────────────
 
@@ -171,7 +172,7 @@ namespace BattleRobots.Physics
         {
             if (_damageEvent == null) return;
 
-            var info = new DamageInfo(_attackDamage, _robotId, _target.position);
+            var info = new DamageInfo(_attackDamage * _damageMultiplier, _robotId, _target.position);
             _damageEvent.Raise(info);
         }
 
@@ -182,6 +183,22 @@ namespace BattleRobots.Physics
 
         /// <summary>Current FSM state — read-only, exposed for debug UI and Editor tools.</summary>
         public AIState CurrentState => _state;
+
+        /// <summary>
+        /// Current damage output multiplier from equipped parts.
+        /// Set by <c>CombatStatsApplicator</c> from <c>RobotCombatStats.EffectiveDamageMultiplier</c>.
+        /// </summary>
+        public float DamageMultiplier => _damageMultiplier;
+
+        /// <summary>
+        /// Applies the part-derived damage multiplier at match start.
+        /// Multiplied into <see cref="_attackDamage"/> each time the AI fires.
+        /// Values below 0.01 are clamped to 0.01. Allocation-free.
+        /// </summary>
+        public void SetDamageMultiplier(float multiplier)
+        {
+            _damageMultiplier = Mathf.Max(0.01f, multiplier);
+        }
 
         /// <summary>Force the AI into Idle and halt movement (e.g., when match ends).</summary>
         public void Disable()

@@ -37,9 +37,15 @@ namespace BattleRobots.Physics
                  "Set false for AI / network controlled robots.")]
         [SerializeField] private bool _isPlayerControlled = true;
 
-        // ── Speed multiplier (set once at match start by BotDifficultyConfig) ────
-        // Stored separately so _moveSpeed/_turnSpeed inspector values are preserved.
-        private float _speedMultiplier = 1f;
+        // ── Speed fields (set at match start; inspector values are preserved) ────
+        // _runtimeMoveSpeed: base-speed override from CombatStatsApplicator (-1 = use inspector).
+        // _speedMultiplier:  fractional modifier from BotDifficultyConfig (1 = no change).
+        private float _runtimeMoveSpeed = -1f;
+        private float _speedMultiplier  = 1f;
+
+        // ── Effective base speed (respects runtime override) ─────────────────
+        // Not a hot-path property — only referenced inside ApplyLocomotion (cold path).
+        private float EffectiveMoveSpeed => _runtimeMoveSpeed > 0f ? _runtimeMoveSpeed : _moveSpeed;
 
         // ── Public input state ─────────────────────────────────────────────────
         // Range −1..1.  Written by AI/network; read in FixedUpdate.
@@ -80,7 +86,7 @@ namespace BattleRobots.Physics
         private void ApplyLocomotion(float move, float turn)
         {
             // Linear velocity along local-forward — value-type vector ops, no alloc.
-            _rootBody.linearVelocity = transform.forward * (move * _moveSpeed * _speedMultiplier);
+            _rootBody.linearVelocity = transform.forward * (move * EffectiveMoveSpeed * _speedMultiplier);
 
             // Angular velocity around world-up; convert deg/s → rad/s.
             float turnRad = turn * (_turnSpeed * _speedMultiplier * Mathf.Deg2Rad);
@@ -113,6 +119,19 @@ namespace BattleRobots.Physics
         }
 
         /// <summary>
+        /// Overrides the base move speed for this match session.
+        /// Intended to be called by <c>CombatStatsApplicator</c> with
+        /// <c>RobotCombatStats.EffectiveSpeed</c> after parts are assembled.
+        /// Stored separately so the inspector's <c>_moveSpeed</c> value is preserved;
+        /// calling multiple times sets (not compounds) the override.
+        /// Values below 0.01 are clamped to 0.01. Allocation-free.
+        /// </summary>
+        public void SetBaseSpeed(float speed)
+        {
+            _runtimeMoveSpeed = Mathf.Max(0.01f, speed);
+        }
+
+        /// <summary>
         /// Applies a one-time speed multiplier from a <c>BotDifficultyConfig</c> SO.
         /// Stores the value separately so the inspector's base speeds are preserved;
         /// calling this method multiple times sets (not compounds) the multiplier.
@@ -123,6 +142,12 @@ namespace BattleRobots.Physics
         {
             _speedMultiplier = Mathf.Max(0.01f, multiplier);
         }
+
+        /// <summary>
+        /// Effective base move speed (runtime override if set, inspector value otherwise).
+        /// Used by <c>CombatStatsApplicatorTests</c> to verify stat application.
+        /// </summary>
+        public float BaseSpeed => EffectiveMoveSpeed;
 
         /// <summary>Expose speed for UI / debug without referencing ArticulationBody directly.</summary>
         public float CurrentSpeedMs => _rootBody != null ? _rootBody.linearVelocity.magnitude : 0f;

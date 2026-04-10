@@ -47,9 +47,10 @@ namespace BattleRobots.Physics
 
         // ── Private state ─────────────────────────────────────────────────────
 
-        private readonly List<string>     _equippedPartIds = new List<string>();
-        private readonly List<GameObject> _spawnedParts    = new List<GameObject>();
-        private bool                      _assembled;
+        private readonly List<string>         _equippedPartIds   = new List<string>();
+        private readonly List<PartDefinition> _assembledPartDefs = new List<PartDefinition>();
+        private readonly List<GameObject>     _spawnedParts      = new List<GameObject>();
+        private bool                          _assembled;
 
         // ── Public API ────────────────────────────────────────────────────────
 
@@ -121,6 +122,7 @@ namespace BattleRobots.Physics
 
                 // Record the part regardless of whether it has a prefab (stat-only parts are valid).
                 _equippedPartIds.Add(partDef.PartId);
+                _assembledPartDefs.Add(partDef);
 
                 if (partDef.Prefab == null)
                     continue;   // stat-only part — no geometry to spawn
@@ -149,6 +151,7 @@ namespace BattleRobots.Physics
             }
             _spawnedParts.Clear();
             _equippedPartIds.Clear();
+            _assembledPartDefs.Clear();
             _assembled = false;
         }
 
@@ -158,6 +161,14 @@ namespace BattleRobots.Physics
         /// Returns an empty list if Assemble() has not been called.
         /// </summary>
         public IReadOnlyList<string> GetEquippedPartIds() => _equippedPartIds;
+
+        /// <summary>
+        /// Returns the PartDefinition SOs for every part successfully placed in a slot.
+        /// Pass this to <see cref="BattleRobots.Core.RobotStatsAggregator.Compute"/> to
+        /// resolve the robot's final <see cref="BattleRobots.Core.RobotCombatStats"/>.
+        /// Returns an empty list if <see cref="Assemble"/> has not been called.
+        /// </summary>
+        public IReadOnlyList<PartDefinition> GetEquippedParts() => _assembledPartDefs;
 
         // ── Lifecycle ─────────────────────────────────────────────────────────
 

@@ -27,10 +27,28 @@ namespace BattleRobots.Physics
         [Tooltip("The HealthSO asset that tracks this robot's current health.")]
         [SerializeField] private HealthSO _health;
 
+        [Header("Armor")]
+        [Tooltip("Flat damage reduction per hit (0 = no reduction, 100 = immune). " +
+                 "Set at runtime by CombatStatsApplicator from RobotCombatStats.TotalArmorRating.")]
+        [SerializeField, Range(0, 100)] private int _armorRating = 0;
+
         // ── Public API ────────────────────────────────────────────────────────
+
+        /// <summary>Current flat damage-reduction rating. Range [0, 100].</summary>
+        public int ArmorRating => _armorRating;
+
+        /// <summary>
+        /// Overrides the armor rating at runtime (e.g., from CombatStatsApplicator).
+        /// Values are clamped to [0, 100]. Allocation-free.
+        /// </summary>
+        public void SetArmorRating(int rating)
+        {
+            _armorRating = Mathf.Clamp(rating, 0, 100);
+        }
 
         /// <summary>
         /// Apply a raw damage amount (e.g. from a collision callback or projectile hit).
+        /// Applies flat armor reduction before forwarding to HealthSO.
         /// No allocation — value type param.
         /// </summary>
         public void TakeDamage(float amount)
@@ -40,7 +58,8 @@ namespace BattleRobots.Physics
                 Debug.LogWarning($"[DamageReceiver] '{name}' has no HealthSO assigned.", this);
                 return;
             }
-            _health.ApplyDamage(amount);
+            float reduced = Mathf.Max(0f, amount - _armorRating);
+            _health.ApplyDamage(reduced);
         }
 
         /// <summary>
