@@ -90,5 +90,12 @@ namespace BattleRobots.Core
         /// load at full volume.
         /// </summary>
         public SettingsSnapshot settingsSnapshot = new SettingsSnapshot();
+
+        /// <summary>
+        /// Part IDs that form the player's saved loadout (the build they want to use next match).
+        /// Written by <see cref="PlayerLoadout"/> via the caller's Load→mutate→Save pattern.
+        /// Initialised to an empty list so saves predating this field load with an empty loadout.
+        /// </summary>
+        public List<string> loadoutPartIds = new List<string>();
     }
 }

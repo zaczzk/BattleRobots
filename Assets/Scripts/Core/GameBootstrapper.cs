@@ -20,6 +20,10 @@ namespace BattleRobots.Core
                  "Leave null to skip starter distribution.")]
         [SerializeField] private StarterInventoryConfig _starterConfig;
 
+        [Tooltip("Persisted equipped-part configuration. LoadSnapshot called on startup. " +
+                 "Leave null to skip loadout rehydration.")]
+        [SerializeField] private PlayerLoadout _playerLoadout;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -63,6 +67,10 @@ namespace BattleRobots.Core
             // Restore audio volume preferences.
             // LoadSnapshot is a no-op when settingsSnapshot is null (old saves get defaults).
             _gameSettings?.LoadSnapshot(save.settingsSnapshot);
+
+            // Restore the player's saved part loadout.
+            // LoadSnapshot is a no-op on null (old saves get an empty loadout).
+            _playerLoadout?.LoadSnapshot(save.loadoutPartIds);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

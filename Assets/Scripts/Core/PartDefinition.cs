@@ -1,7 +1,41 @@
+using System;
 using UnityEngine;
 
 namespace BattleRobots.Core
 {
+    /// <summary>
+    /// Gameplay-stat contribution of a single robot part.
+    /// Values combine additively (health) or multiplicatively (speed/damage)
+    /// inside <see cref="RobotStatsAggregator.Compute"/>.
+    /// </summary>
+    [Serializable]
+    public struct PartStats
+    {
+        [Tooltip("Added to RobotDefinition.MaxHitPoints. Non-negative.")]
+        [Min(0)] public int healthBonus;
+
+        [Tooltip("Multiplied with RobotDefinition.MoveSpeed. 1.0 = no change.")]
+        [Range(0.1f, 3f)] public float speedMultiplier;
+
+        [Tooltip("Scales outgoing damage dealt by this robot. 1.0 = no change.")]
+        [Range(0.1f, 3f)] public float damageMultiplier;
+
+        [Tooltip("Flat damage reduction per hit. Summed across all parts, clamped to [0, 100].")]
+        [Range(0, 100)] public int armorRating;
+
+        /// <summary>
+        /// Neutral default: zero bonus, neutral multipliers, zero armor.
+        /// Equivalent to a stat-less cosmetic part.
+        /// </summary>
+        public static PartStats Default => new PartStats
+        {
+            healthBonus      = 0,
+            speedMultiplier  = 1f,
+            damageMultiplier = 1f,
+            armorRating      = 0,
+        };
+    }
+
     /// <summary>
     /// Immutable ScriptableObject describing a purchasable robot part.
     ///
@@ -46,6 +80,13 @@ namespace BattleRobots.Core
                  "by RobotAssembler during match setup. Leave null for stat-only parts.")]
         [SerializeField] private GameObject _prefab;
 
+        // ── Stats ─────────────────────────────────────────────────────────────
+
+        [Header("Combat Stats")]
+        [Tooltip("Stat contribution of this part. Combined by RobotStatsAggregator.Compute() "
+                 "at match start to derive the robot's final combat stats.")]
+        [SerializeField] private PartStats _stats = PartStats.Default;
+
         // ── Public API ────────────────────────────────────────────────────────
 
         public string       PartId      => _partId;
@@ -55,6 +96,12 @@ namespace BattleRobots.Core
         public int          Cost        => _cost;
         public Sprite       Thumbnail   => _thumbnail;
         public GameObject   Prefab      => _prefab;
+
+        /// <summary>
+        /// Gameplay-stat contribution of this part.
+        /// Consumed by <see cref="RobotStatsAggregator.Compute"/> at match start.
+        /// </summary>
+        public PartStats Stats => _stats;
 
         // ── Editor validation ─────────────────────────────────────────────────
 
