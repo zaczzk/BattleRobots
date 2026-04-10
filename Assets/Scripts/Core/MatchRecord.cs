@@ -40,8 +40,8 @@ namespace BattleRobots.Core
     }
 
     /// <summary>
-    /// Top-level save file container. Holds the running wallet balance and
-    /// the full match history.
+    /// Top-level save file container. Holds the running wallet balance,
+    /// the full match history, and the set of part IDs the player owns.
     /// </summary>
     [Serializable]
     public sealed class SaveData
@@ -51,5 +51,14 @@ namespace BattleRobots.Core
 
         /// <summary>All match records in chronological order.</summary>
         public List<MatchRecord> matchHistory = new List<MatchRecord>();
+
+        /// <summary>
+        /// Part IDs unlocked via the shop. Populated by ShopManager after each
+        /// purchase; rehydrated into <see cref="PlayerInventory"/> by
+        /// <see cref="GameBootstrapper"/> at startup.
+        /// Initialised to an empty list so JsonUtility round-trips without null
+        /// even when deserialising saves that predate this field.
+        /// </summary>
+        public List<string> unlockedPartIds = new List<string>();
     }
 }

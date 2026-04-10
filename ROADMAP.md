@@ -63,6 +63,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T025 | SceneWiringValidator EditorWindow — scans scene for null SO refs | 70 | **Done** | Tools▶BattleRobots menu; SerializedObject iterator; groups by type; ping+select; copy report |
 | T026 | EditMode Unit Tests — SaveSystem, MatchRecord, PlayerWallet, HealthSO, VoidGameEvent, DamageInfo | 85 | **Done** | 6 test files, 42 test cases; asmdef + test-framework package added to manifest; all systems testable without scene |
 | T027 | BotDifficultyConfig SO + RobotAIController integration | 65 | **Done** | SO in BattleRobots.Core with 6 tuning properties; RobotAIController applies preset in Awake; RobotLocomotionController.SetSpeedMultiplier stores multiplier separately (idempotent, zero alloc) |
+| T028 | PlayerInventory SO — part ownership tracking + persistence | 75 | **Done** | PlayerInventory SO (BattleRobots.Core): UnlockPart/HasPart/LoadSnapshot/Reset; HashSet mirror for O(1) lookup; VoidGameEvent _onInventoryChanged. SaveData.unlockedPartIds added (backwards-compatible). GameBootstrapper rehydrates inventory on startup. ShopManager: already-owned gate, UnlockPart after purchase, PersistPurchase (load→mutate→save, preserves match history). IsOwned() public API for shop UI. 18 PlayerInventoryTests. |
 
 ---
 
@@ -70,7 +71,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T027). Full match loop + HUD + Pause + Results C# layer done. Test suite added. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T028). Full match loop + HUD + Pause + Results C# layer done. Test suite (60 tests) added. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -105,6 +106,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T025 — SceneWiringValidator EditorWindow | 2026-04-10 | SceneWiringValidator (BattleRobots.Editor): EditorWindow opened via Tools▶BattleRobots▶Scene Wiring Validator. Scans all BattleRobots MBs via SerializedObject iterator; lists null Object refs grouped by type; ping/select button per row; copy-report-to-clipboard. Directly unblocks Editor wiring pass. |
 | T026 — EditMode Unit Tests | 2026-04-10 | com.unity.test-framework 1.1.33 added to manifest. BattleRobots.Tests.EditMode asmdef (Editor-only, overrideReferences false). 6 test files: SaveSystemTests (8 tests, XOR round-trip + edge cases), MatchRecordTests (7 tests, JSON round-trip + SaveData), PlayerWalletTests (10 tests, AddFunds/Deduct/Reset), HealthSOTests (13 tests, ApplyDamage/Heal/IsDead), VoidGameEventTests (10 tests, register/unregister/safe-iteration), DamageInfoTests (8 tests, struct semantics). Total 42 test cases. |
 | T027 — BotDifficultyConfig SO | 2026-04-10 | BotDifficultyConfig SO (BattleRobots.Core, CreateAssetMenu): 6 read-only properties (DetectionRange, AttackRange, AttackDamage, AttackCooldown, FacingThreshold, MoveSpeedMultiplier). RobotAIController: optional _difficultyConfig field; copies all tuning properties in Awake; calls _locomotion.SetSpeedMultiplier(). RobotLocomotionController: private _speedMultiplier field; SetSpeedMultiplier() stores (not multiplies) value; ApplyLocomotion() applies multiplier to both linear and angular velocity. Inspector base speeds preserved. |
+| T028 — PlayerInventory SO | 2026-04-10 | PlayerInventory SO (BattleRobots.Core, CreateAssetMenu): runtime state via List<string>+HashSet mirror; UnlockPart (idempotent), HasPart (O(1)), LoadSnapshot, Reset; VoidGameEvent _onInventoryChanged. SaveData: unlockedPartIds List<string> (backwards-compatible initialiser). GameBootstrapper: _playerInventory field; LoadSnapshot called in LoadAndApplySaveData. ShopManager: _inventory PlayerInventory field; already-owned gate in BuyPart; UnlockPart+PersistPurchase on success; IsOwned() helper; PersistPurchase load-mutate-save preserves match history. 18 PlayerInventoryTests. Total tests: 60. |
 
 ---
 
@@ -122,14 +124,15 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-09 | PM Agent | Session 8: T020 CombatHUDController (timer MM:SS + player/enemy health sliders+labels, show/hide on match start/end, all delegates cached, int-second timer dedup). T021 PauseManager (Escape key, Time.timeScale, auto-resume) + PauseMenuController (panel show/hide, Resume/QuitToMenu buttons). T022 MatchResultSO blackboard SO + PostMatchController (outcome/duration/earned/balance text, PlayAgain/MainMenu buttons). T023 MatchManager patched: RobotAssembler equippedPartIds + MatchResultSO write before MatchEnded. Total tasks Done: T001–T023. |
 | 2026-04-10 | PM Agent | Session 9: Discovered architectural gap — no component raised the MatchStarted VoidGameEvent (all systems subscribed but nothing fired it). T024 MatchStarter MB: raises _matchStartedEvent in Start() with optional _startDelay (0.1s default). T025 SceneWiringValidator EditorWindow: Tools▶BattleRobots menu, scans all BattleRobots MBs for null SO refs, groups by type, ping/select per row, copy report. Total tasks Done: T001–T025. |
 | 2026-04-10 | PM Agent | Session 10: T026 EditMode Unit Tests — added com.unity.test-framework 1.1.33 to manifest; Editor-only asmdef; 42 test cases across 6 files (SaveSystem, MatchRecord, PlayerWallet, HealthSO, VoidGameEvent, DamageInfo). T027 BotDifficultyConfig SO — immutable Core SO with 6 tuning properties; RobotAIController applies preset in Awake (all field writes, no alloc); RobotLocomotionController.SetSpeedMultiplier() stores multiplier separately (idempotent). Total tasks Done: T001–T027. |
+| 2026-04-10 | PM Agent | Session 11: T028 PlayerInventory SO — closes the "unlock upgraded parts" loop missing from the economy. PlayerInventory SO (Core, HashSet+List for O(1) HasPart), SaveData.unlockedPartIds (backwards-compatible), GameBootstrapper rehydrates on startup, ShopManager already-owned gate + PersistPurchase (load→mutate→save preserves history), IsOwned() helper. 18 PlayerInventoryTests added. Total tests: 60. Total tasks Done: T001–T028. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T026 EditMode Unit Tests (42 tests across 6 files), T027 BotDifficultyConfig SO + RobotAIController/LocomotionController integration — all 27 backlog items **Done**.
+**Last completed:** T028 PlayerInventory SO — closes the "unlock upgraded parts" loop. 60 total tests across 7 files. All 28 backlog items **Done**.
 
-**C# layer status:** Complete. Every system is implemented and compiles cleanly. Test suite covers core persistence and event systems.
+**C# layer status:** Complete. Every system is implemented and compiles cleanly. Economy loop is fully closed: earn → spend → own → persist → restore.
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
@@ -139,9 +142,16 @@ The tool will list every null SO reference across all BattleRobots components an
 
 ### Running the test suite
 Open the project in Unity → Window ▶ General ▶ Test Runner → EditMode tab → Run All.
-All 42 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+All 60 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
 
-### BotDifficultyConfig wiring (new — optional)
+### PlayerInventory wiring (new — T028)
+- Create SO asset: Assets ▶ Create ▶ BattleRobots ▶ Economy ▶ PlayerInventory (one global instance).
+- Assign the **same** SO asset to `GameBootstrapper._playerInventory` AND `ShopManager._inventory`.
+- Create a VoidGameEvent SO ("InventoryChanged") and assign to `PlayerInventory._onInventoryChanged`.
+- Wire `InventoryChanged` → VoidGameEventListener → shop panel refresh method to grey-out owned parts.
+- `ShopManager.IsOwned(partDef)` can be called per-row to set interactable state on buy buttons.
+
+### BotDifficultyConfig wiring (optional)
 - Create SO assets: Assets ▶ Create ▶ BattleRobots ▶ AI ▶ BotDifficultyConfig (Easy / Normal / Hard presets).
 - Assign the desired SO to `RobotAIController._difficultyConfig` on enemy robots in the Arena scene.
 - Leave null to use per-component inspector values directly (backwards-compatible).

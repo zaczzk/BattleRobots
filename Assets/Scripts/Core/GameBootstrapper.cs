@@ -12,6 +12,9 @@ namespace BattleRobots.Core
         [Header("Economy")]
         [SerializeField] private PlayerWallet _playerWallet;
 
+        [Tooltip("Inventory SO rehydrated from SaveData.unlockedPartIds on startup.")]
+        [SerializeField] private PlayerInventory _playerInventory;
+
         [Header("Events")]
         [SerializeField] private VoidGameEvent _onGameBootstrapped;
 
@@ -33,6 +36,10 @@ namespace BattleRobots.Core
                 _playerWallet.LoadSnapshot(save.walletBalance > 0
                     ? save.walletBalance
                     : _playerWallet.Balance); // keeps starting balance on first launch
+
+            // Rehydrate owned-part list from persisted snapshot.
+            // Safe when save.unlockedPartIds is null (old saves) or empty (new game).
+            _playerInventory?.LoadSnapshot(save.unlockedPartIds);
         }
 
         /// <summary>
