@@ -61,6 +61,12 @@ namespace BattleRobots.UI
         [Tooltip("Displays the new wallet balance after rewards.")]
         [SerializeField] private Text _balanceText;
 
+        [Tooltip("Optional: displays total damage dealt by the player this match.")]
+        [SerializeField] private Text _damageDoneText;
+
+        [Tooltip("Optional: displays total damage taken by the player this match.")]
+        [SerializeField] private Text _damageTakenText;
+
         [Header("Event Channels — In")]
         [Tooltip("VoidGameEvent raised by MatchManager when the round ends.")]
         [SerializeField] private VoidGameEvent _onMatchEnded;
@@ -120,6 +126,13 @@ namespace BattleRobots.UI
             // New wallet balance
             if (_balanceText != null)
                 _balanceText.text = string.Format("Balance: {0}", _matchResult.NewWalletBalance);
+
+            // Damage statistics (optional — labels may not exist in every scene layout)
+            if (_damageDoneText != null)
+                _damageDoneText.text = string.Format("Damage Dealt: {0:F0}", _matchResult.DamageDone);
+
+            if (_damageTakenText != null)
+                _damageTakenText.text = string.Format("Damage Taken: {0:F0}", _matchResult.DamageTaken);
 
             Debug.Log($"[PostMatchController] Results shown — " +
                       $"PlayerWon={_matchResult.PlayerWon}, " +

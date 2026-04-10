@@ -69,6 +69,13 @@ namespace BattleRobots.Core
                  "Its equipped part IDs are recorded in the MatchRecord.")]
         [SerializeField] private RobotAssembler _playerAssembler;
 
+        [Header("Statistics (optional)")]
+        [Tooltip("Runtime stat blackboard that accumulates per-hit damage data via " +
+                 "DamageGameEventListener components in the scene. When assigned, EndMatch() " +
+                 "reads TotalDamageDealt/TotalDamageTaken from here instead of the end-of-match " +
+                 "health-difference approximation. Reset() is called at HandleMatchStarted().")]
+        [SerializeField] private MatchStatisticsSO _matchStatistics;
+
         [Header("Audio")]
         [Tooltip("AudioEvent SO played when the player wins the match.")]
         [SerializeField] private AudioEvent _onWinJingle;
@@ -140,6 +147,9 @@ namespace BattleRobots.Core
             _playerHealth.Reset();
             _enemyHealth.Reset();
 
+            // Clear per-match stat accumulator so previous match data does not bleed in.
+            _matchStatistics?.Reset();
+
             _timeRemaining = _roundDuration;
             _matchRunning  = true;
 
@@ -157,12 +167,17 @@ namespace BattleRobots.Core
             if (!_matchRunning) return;
             _matchRunning = false;
 
-            float elapsed    = _roundDuration - Mathf.Max(0f, _timeRemaining);
-            int   reward     = playerWon ? _winReward : _lossConsolationReward;
-            float damageDone = _enemyHealth  != null
-                ? _enemyHealth.MaxHealth  - _enemyHealth.CurrentHealth  : 0f;
-            float damageTaken = _playerHealth != null
-                ? _playerHealth.MaxHealth - _playerHealth.CurrentHealth : 0f;
+            float elapsed = _roundDuration - Mathf.Max(0f, _timeRemaining);
+            int   reward  = playerWon ? _winReward : _lossConsolationReward;
+
+            // Prefer accumulated per-hit stats from MatchStatisticsSO when available;
+            // fall back to the end-of-match health-difference approximation otherwise.
+            float damageDone = _matchStatistics != null
+                ? _matchStatistics.TotalDamageDealt
+                : (_enemyHealth  != null ? _enemyHealth.MaxHealth  - _enemyHealth.CurrentHealth  : 0f);
+            float damageTaken = _matchStatistics != null
+                ? _matchStatistics.TotalDamageTaken
+                : (_playerHealth != null ? _playerHealth.MaxHealth - _playerHealth.CurrentHealth : 0f);
 
             // Award currency
             if (_playerWallet != null)
@@ -196,7 +211,7 @@ namespace BattleRobots.Core
 
             // Write blackboard SO before raising MatchEnded so PostMatchController
             // reads correct data when its callback fires.
-            _matchResult?.Write(playerWon, elapsed, reward, walletSnapshot);
+            _matchResult?.Write(playerWon, elapsed, reward, walletSnapshot, damageDone, damageTaken);
 
             // Signal other systems
             _onMatchEnded?.Raise();

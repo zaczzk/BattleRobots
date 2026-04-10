@@ -38,19 +38,42 @@ namespace BattleRobots.Core
         /// <summary>Wallet balance after rewards are applied.</summary>
         public int NewWalletBalance { get; private set; }
 
+        /// <summary>
+        /// Total damage the player dealt to the enemy this match.
+        /// Populated from <see cref="MatchStatisticsSO.TotalDamageDealt"/> when a
+        /// MatchStatisticsSO is assigned to MatchManager; otherwise approximated from
+        /// the enemy's health-difference at match end.
+        /// </summary>
+        public float DamageDone { get; private set; }
+
+        /// <summary>
+        /// Total damage the player received from the enemy this match.
+        /// Populated from <see cref="MatchStatisticsSO.TotalDamageTaken"/> when a
+        /// MatchStatisticsSO is assigned to MatchManager; otherwise approximated from
+        /// the player's health-difference at match end.
+        /// </summary>
+        public float DamageTaken { get; private set; }
+
         // ── Mutator — called by MatchManager only ─────────────────────────────
 
         /// <summary>
         /// Overwrite all fields with fresh match data.
         /// Must be called <b>before</b> raising the MatchEnded VoidGameEvent
         /// so that subscribers read up-to-date values.
+        ///
+        /// The <paramref name="damageDone"/> and <paramref name="damageTaken"/>
+        /// parameters are optional (default 0) for backwards compatibility with
+        /// callers that do not yet track damage statistics.
         /// </summary>
-        public void Write(bool playerWon, float durationSeconds, int currencyEarned, int newWalletBalance)
+        public void Write(bool playerWon, float durationSeconds, int currencyEarned, int newWalletBalance,
+                          float damageDone = 0f, float damageTaken = 0f)
         {
             PlayerWon        = playerWon;
             DurationSeconds  = durationSeconds;
             CurrencyEarned   = currencyEarned;
             NewWalletBalance = newWalletBalance;
+            DamageDone       = damageDone;
+            DamageTaken      = damageTaken;
         }
     }
 }

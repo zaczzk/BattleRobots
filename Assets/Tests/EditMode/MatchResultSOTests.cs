@@ -127,5 +127,51 @@ namespace BattleRobots.Tests
             Assert.AreEqual(450,    _result.CurrencyEarned);
             Assert.AreEqual(950,    _result.NewWalletBalance);
         }
+
+        // ── Write — damage fields (optional params) ───────────────────────────
+
+        [Test]
+        public void FreshInstance_DamageDone_IsZero()
+        {
+            Assert.AreEqual(0f, _result.DamageDone, 0.0001f);
+        }
+
+        [Test]
+        public void FreshInstance_DamageTaken_IsZero()
+        {
+            Assert.AreEqual(0f, _result.DamageTaken, 0.0001f);
+        }
+
+        [Test]
+        public void Write_WithDamageParams_StoresDamageDoneAndTaken()
+        {
+            _result.Write(playerWon: true, durationSeconds: 60f, currencyEarned: 200,
+                          newWalletBalance: 700, damageDone: 125.5f, damageTaken: 80f);
+
+            Assert.AreEqual(125.5f, _result.DamageDone,   0.0001f);
+            Assert.AreEqual(80f,    _result.DamageTaken,  0.0001f);
+        }
+
+        [Test]
+        public void Write_OmittingDamageParams_DefaultsToZero()
+        {
+            // Four-arg call must still compile (optional params = backwards-compatible).
+            _result.Write(playerWon: false, durationSeconds: 30f, currencyEarned: 50, newWalletBalance: 550);
+
+            Assert.AreEqual(0f, _result.DamageDone,  0.0001f);
+            Assert.AreEqual(0f, _result.DamageTaken, 0.0001f);
+        }
+
+        [Test]
+        public void Write_CalledTwice_OverwritesDamageValues()
+        {
+            _result.Write(playerWon: true,  durationSeconds: 30f, currencyEarned: 200,
+                          newWalletBalance: 700, damageDone: 200f, damageTaken: 100f);
+            _result.Write(playerWon: false, durationSeconds: 90f, currencyEarned: 50,
+                          newWalletBalance: 300, damageDone: 40f,  damageTaken: 80f);
+
+            Assert.AreEqual(40f, _result.DamageDone,  0.0001f);
+            Assert.AreEqual(80f, _result.DamageTaken, 0.0001f);
+        }
     }
 }

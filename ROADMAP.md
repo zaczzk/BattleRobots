@@ -101,6 +101,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T063 | RobotAIControllerTests — FSM transitions, Disable, SetDamageMultiplier, Awake difficulty override | 65 | **Done** | 18 tests: FreshInstance_CurrentState_IsIdle; DamageMultiplier_Default_IsOne; SetDamageMultiplier stores/clamps-negative/clamps-zero/last-call-wins; SetTarget stores Transform in _target; Disable_Idle/Chase/Attack→Idle; Disable_NullLocomotion_NoThrow; Disable_HaltsLocomotionInputs; Awake_WithDifficultyConfig_OverridesDetectionRange; Awake_NullConfig_KeepsDefault; Awake_SelectedDifficulty_TakesPrecedence (inactive-GO pattern for all Awake tests); FixedUpdate_NullLocomotion_NoThrow; FixedUpdate_NullTarget_NoThrow; FixedUpdate_Idle→Chase (target 10m, range 20m); FixedUpdate_Idle_StaysIdle (target 30m, range 5m); FixedUpdate_Chase→Attack (target 5m, attack 10m); FixedUpdate_Attack→Chase (target 8m, attack 5m). Total tests: 548 across 42 files. |
 | T064 | RobotLocomotionControllerTests — SetInputs clamping, SetBaseSpeed, SetSpeedMultiplier, Halt | 55 | **Done** | 14 tests: SetInputs stores move/turn values; clamps move above 1; clamps move below -1; clamps turn above 1; clamps turn below -1; Halt zeros MoveInput; Halt zeros TurnInput; SetBaseSpeed stores value; clamps negative to 0.01; clamps zero to 0.01; called-twice last-wins; BaseSpeed without override returns inspector default (5); SetSpeedMultiplier stores value (via reflection); clamps negative to 0.01 (via reflection). Total tests: 562 across 43 files. |
 | T065 | LoadoutBuilderControllerTests — ConfirmLoadout guards, BuildCategoryOwnedParts, FindPartById, OnDestroy | 60 | **Done** | 14 tests: ConfirmLoadout null loadout no-throw; with loadout + no rows writes empty list to PlayerLoadout; persists empty list to disk (SaveSystem.Load().loadoutPartIds); RefreshAllSlots empty-rows no-throw; BuildCategoryOwnedParts null-catalog returns empty; null-inventory returns empty; owned part included under category; unowned part excluded; FindPartById null-catalog returns null; known ID returns PartDefinition; unknown ID returns null; OnDestroy unregisters RefreshAllSlots from VoidGameEvent (inactive-GO + counter-callback pattern verifies only test counter fires post-destruction). Total tests: 576 across 44 files. |
+| T066 | MatchStatisticsSO — per-match runtime damage stat accumulator | 75 | **Done** | MatchStatisticsSO (Core, CreateAssetMenu): TotalDamageDealt/TotalDamageTaken/HitCount/HitsReceived; RecordDamageDealt/RecordDamageTaken (float + DamageInfo overloads); DamageEfficiency [0,1] safe-division ratio; Reset(). MatchResultSO extended: DamageDone + DamageTaken properties; Write() optional damageDone/damageTaken params (backwards-compat default 0). MatchManager: optional _matchStatistics field; resets SO in HandleMatchStarted; EndMatch() prefers accumulated stats over health-diff approximation when SO assigned; passes damage values to Write(). PostMatchController: optional _damageDoneText + _damageTakenText Text fields wired in ShowResults(). 19 MatchStatisticsSOTests + 5 new MatchResultSOTests. Total tests: 600 across 45 files. |
 
 ---
 
@@ -108,7 +109,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T065). Test suite: 576 tests across 44 files. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T066). Test suite: 600 tests across 45 files. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -177,6 +178,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T063 — RobotAIControllerTests | 2026-04-10 | 18 tests: default Idle/DamageMultiplier; SetDamageMultiplier clamp/store/idempotent; SetTarget stores _target; Disable all-states + null loco + halt verification; Awake difficulty override (config / SelectedDifficultySO / null); FixedUpdate null guards; 4 FSM transition scenarios (Idle→Chase, Idle stays Idle, Chase→Attack, Attack→Chase) using real Transform positions. Total tests: 548 across 42 files. |
 | T064 — RobotLocomotionControllerTests | 2026-04-10 | 14 tests: SetInputs store/5-clamp-cases; Halt zeros MoveInput+TurnInput; SetBaseSpeed store/clamp-negative/clamp-zero/idempotent/inspector-default; SetSpeedMultiplier store+clamp via reflection. Total tests: 562 across 43 files. |
 | T065 — LoadoutBuilderControllerTests | 2026-04-10 | 14 tests: ConfirmLoadout null guard + empty-rows path + disk persistence; RefreshAllSlots empty guard; BuildCategoryOwnedParts null-catalog/null-inventory/owned/unowned; FindPartById null-catalog/known/unknown; OnDestroy unregisters RefreshAllSlots (inactive-GO + counter-callback pattern). Total tests: 576 across 44 files. |
+| T066 — MatchStatisticsSO + MatchResultSO damage extension | 2026-04-10 | MatchStatisticsSO (Core): TotalDamageDealt/TotalDamageTaken/HitCount/HitsReceived; float + DamageInfo RecordDamage* overloads; DamageEfficiency ratio; Reset(). MatchResultSO.Write() extended with optional damageDone/damageTaken params (backwards-compat). MatchManager: optional _matchStatistics field; resets on match start; EndMatch reads from SO when assigned. PostMatchController: optional _damageDoneText/_damageTakenText. 19+5=24 new tests. Total tests: 600 across 45 files. |
 
 ---
 
@@ -211,14 +213,15 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-10 | PM Agent | Session 24: T057 PartUpgradeSystem — adds part upgrade tier progression to the economy loop. PartUpgradeConfig SO (Core): MaxTier/TierCosts[]/TierStatMultipliers[]; GetUpgradeCost(currentTier) returns -1 at max; GetStatMultiplier(tier) returns 1.0 out-of-range; OnValidate array-length + positive-value checks. PlayerPartUpgrades SO (Core): parallel List<string>/List<int> for JsonUtility compat; Dictionary mirror O(1) GetTier; SetTier (clamp≥0, fires VoidGameEvent); LoadSnapshot (bootstrapper-safe, no event); TakeSnapshot (copy); Reset (silent). SaveData: two new fields upgradePartIds + upgradePartTierValues (backwards-compat empty defaults). GameBootstrapper: _playerPartUpgrades field + LoadSnapshot call. RobotStatsAggregator: upgrade-aware Compute overload — scales healthBonus+armorRating additively (×mult), scales speed/damage bonus-above-1 (1+(val-1)×mult) preventing neutral-part compounding; null-upgrades/null-config falls back to base overload. UpgradeManager MB (UI): UpgradePart() guards (null part/wallet/upgrades/config, at-max-tier, insufficient-funds), deduct wallet, SetTier, PersistUpgrade (Load→mutate→Save), fire VoidGameEvent; GetCurrentTier/GetNextUpgradeCost read-only accessors. UpgradeController MB (UI): Setup(part) + cached Refresh Action; subscribes _onUpgradesChanged on OnEnable/OnDisable; _tierLabel (★★☆/MAX), _costLabel (Cost: N/MAX), _upgradeButton interactable gating; FormatTierStars internal static (char[] alloc, not in Update). 4 test files: PartUpgradeConfigTests (13), PlayerPartUpgradesTests (21), UpgradeManagerTests (20), RobotStatsAggregatorUpgradeTests (13). Total tasks Done: T001–T057. Total tests: 479 across 37 files. |
 | 2026-04-10 | PM Agent | Session 26: T061 MatchFlowControllerTests (13 tests) — first dedicated tests for the core Arena scene coordinator. Covers HandleMatchStarted assembler routing (single/two assemblers IsAssembled; null entry skipped); AI targeting (player root set on each AI controller; null root skips; null AI in list skipped); CameraRig null safety; HandleMatchEnded AI state reset (pre-set Chase/Attack → Idle verified via CurrentState; null entry skipped); locomotion Halt (MoveInput/TurnInput zeroed after HandleMatchEnded call; ArticulationBody data-container confirmed no-throw in EditMode); MatchStarted SO channel subscription (inactive-GO pattern). T062 GameBootstrapperTests (9 tests) — closes the gap where RecordMatchAndSave and isFirstLaunch detection had zero test coverage. RecordMatchAndSave: null-guard, record appended, wallet balance persisted, snapshot field set, null-wallet fallback, multi-record accumulation. LoadAndApplySaveData (via reflection): all-zero save → Reset()→Balance==500; returning-player save → LoadSnapshot(350)→Balance==350. SaveSystem.Delete() prevents cross-test file pollution. Total tasks Done: T001–T062. Total tests: 530 across 41 files. |
 | 2026-04-10 | PM Agent | Session 27: T063 RobotAIControllerTests (18 tests) — closes the last major MB test gap (AI FSM had zero coverage). Tests: default Idle state and 1.0 DamageMultiplier; SetDamageMultiplier store/clamp-negative/clamp-zero/idempotent; SetTarget stores Transform via reflection; Disable transitions Chase and Attack → Idle, null locomotion no-throw, halts locomotion MoveInput/TurnInput; Awake copies DetectionRange from _difficultyConfig, leaves default when null, SelectedDifficultySO.Current overrides _difficultyConfig (all via inactive-GO pattern); FixedUpdate null-locomotion/null-target no-throws; four FSM transitions via real Transform positions + InvokePrivate(FixedUpdate). T064 RobotLocomotionControllerTests (14 tests) — closes locomotion controller test gap: SetInputs stores move/turn, 4 clamp-to-[-1,1] cases; Halt zeros both inputs; SetBaseSpeed store/clamp-negative/clamp-zero/idempotent/inspector-default(5); SetSpeedMultiplier store+clamp via reflection. T065 LoadoutBuilderControllerTests (14 tests) — closes LoadoutBuilderController test gap: ConfirmLoadout null-guard/empty-rows/disk-persistence; RefreshAllSlots empty guard; BuildCategoryOwnedParts null-catalog/null-inventory/owned-part-included/unowned-excluded; FindPartById null-catalog/known-ID/unknown-ID; OnDestroy unregisters RefreshAllSlots (inactive-GO + counter callback). Total tasks Done: T001–T065. Total tests: 576 across 44 files. |
+| 2026-04-10 | PM Agent | Session 28: T066 MatchStatisticsSO — closes the gap where damageDone/damageTaken in MatchRecord were approximated from end-of-match health differences rather than accumulated per-hit. New MatchStatisticsSO (Core, CreateAssetMenu): TotalDamageDealt/TotalDamageTaken/HitCount/HitsReceived properties; RecordDamageDealt(float)/RecordDamageTaken(float) guard zero+negative; DamageInfo overloads for direct DamageGameEventListener UnityEvent wiring; DamageEfficiency [0,1] ratio (safe division on no-hits); Reset(). MatchResultSO.Write() extended with optional damageDone/damageTaken params (default 0, backwards-compatible — all existing callers compile unchanged). MatchManager: optional _matchStatistics inspector field; resets SO in HandleMatchStarted(); EndMatch() prefers SO accumulated values over health-diff approximation when assigned; passes damage to Write(). PostMatchController: optional _damageDoneText + _damageTakenText Text fields; ShowResults() populates "Damage Dealt: N" / "Damage Taken: N" when assigned. Scene wiring via DamageGameEventListener — see Session Handoff. 19 MatchStatisticsSOTests (new file) + 5 new MatchResultSOTests. Total tasks Done: T001–T066. Total tests: 600 across 45 files. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T065 (LoadoutBuilderControllerTests). **576 total tests across 44 files.** All 65 backlog items **Done**.
+**Last completed:** T066 (MatchStatisticsSO). **600 total tests across 45 files.** All 66 backlog items **Done**.
 
-**C# layer status:** Complete and compiles clean. All event channel types tested. Every ScriptableObject in BattleRobots.Core has at least one test file. Newest additions (Session 27): RobotAIControllerTests 18 tests (T063 — full FSM state-machine coverage including 4 transition scenarios, Disable, Awake difficulty override via inactive-GO); RobotLocomotionControllerTests 14 tests (T064 — SetInputs clamping, Halt, SetBaseSpeed/SetSpeedMultiplier); LoadoutBuilderControllerTests 14 tests (T065 — ConfirmLoadout guards + persistence, BuildCategoryOwnedParts owned/unowned filtering, FindPartById, OnDestroy unregistration).
+**C# layer status:** Complete and compiles clean. All event channel types tested. Every ScriptableObject in BattleRobots.Core has at least one test file. Newest additions (Session 28): MatchStatisticsSO (T066 — per-match damage stat accumulator with float + DamageInfo overloads, DamageEfficiency ratio, 19 tests); MatchResultSO extended (DamageDone/DamageTaken optional Write() params, 5 new tests); MatchManager extended (optional _matchStatistics field, resets on start, prefers accumulated stats in EndMatch); PostMatchController extended (optional _damageDoneText/_damageTakenText Text fields).
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
@@ -228,7 +231,30 @@ The tool will list every null SO reference across all BattleRobots components an
 
 ### Running the test suite
 Open the project in Unity → Window ▶ General ▶ Test Runner → EditMode tab → Run All.
-All 576 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+All 600 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+
+### MatchStatisticsSO wiring (new — T066) ← next priority
+This adds accurate per-hit damage tracking to the post-match results screen.
+
+1. Create SO asset via Assets ▶ Create ▶ BattleRobots ▶ Core ▶ MatchStatisticsSO.
+   One global instance — no fields to set in Inspector.
+
+2. In the Arena scene, add two `DamageGameEventListener` components (on any persistent GO):
+   - **Listener A** (player attacks):
+     - `Event` → the DamageGameEvent SO that the **enemy's** `DamageReceiver` listens to
+       (i.e. the channel your `RobotAIController.FireAttack()` raises).
+     - `Response (UnityEvent<DamageInfo>)` → `MatchStatisticsSO.RecordDamageDealt(DamageInfo)`.
+   - **Listener B** (enemy attacks):
+     - `Event` → the DamageGameEvent SO that the **player's** `DamageReceiver` listens to.
+     - `Response (UnityEvent<DamageInfo>)` → `MatchStatisticsSO.RecordDamageTaken(DamageInfo)`.
+
+3. Assign the MatchStatisticsSO to `MatchManager._matchStatistics`.
+   EndMatch() will now use `TotalDamageDealt/TotalDamageTaken` instead of the
+   health-difference approximation.
+
+4. Optionally, in the Arena Canvas, add `Text` fields to the PostMatchController panel and
+   assign them to `PostMatchController._damageDoneText` and `_damageTakenText`.
+   ShowResults() will format them as "Damage Dealt: N" / "Damage Taken: N".
 
 ### PartUpgradeSystem wiring (new — T057) ← next priority
 This adds per-part upgrade tiers to the economy loop. Create the following SO assets and wire one upgrade panel per part row in the LoadoutBuilder or Shop scenes.
