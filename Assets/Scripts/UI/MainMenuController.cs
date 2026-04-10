@@ -10,7 +10,7 @@ namespace BattleRobots.UI
     /// onClick UnityEvent in the Inspector — no code coupling required.
     ///
     /// ── Scene wiring instructions ─────────────────────────────────────────────
-    ///   • Assign _arenaSceneName and _shopSceneName in the Inspector.
+    ///   • Assign _sceneRegistry (SceneRegistry SO) in the Inspector.
     ///   • Assign _onMenuAction (VoidGameEvent SO) if audio/analytics must react.
     ///   • Wire Button onClick events:
     ///       Play Button  → MainMenuController.PlayGame()
@@ -21,18 +21,17 @@ namespace BattleRobots.UI
     ///   - BattleRobots.UI namespace; no Physics references.
     ///   - No Update / FixedUpdate — purely button-driven.
     ///   - SceneLoader (static helper) centralises async loading.
+    ///   - Scene names sourced from SceneRegistry SO — single source of truth.
     ///   - _onMenuAction SO channel decouples audio/analytics from this MB.
     /// </summary>
     public sealed class MainMenuController : MonoBehaviour
     {
         // ── Inspector ─────────────────────────────────────────────────────────
 
-        [Header("Scene Names (must match Build Settings)")]
-        [Tooltip("Scene to load when the player clicks Play.")]
-        [SerializeField] private string _arenaSceneName = "Arena";
-
-        [Tooltip("Scene to load when the player clicks Shop.")]
-        [SerializeField] private string _shopSceneName = "Shop";
+        [Header("Scene Names")]
+        [Tooltip("Single SO that holds all scene names. " +
+                 "Create via Assets ▶ Create ▶ BattleRobots ▶ Core ▶ SceneRegistry.")]
+        [SerializeField] private SceneRegistry _sceneRegistry;
 
         [Header("Event Channels — Out")]
         [Tooltip("Raised on any menu action (play, shop, quit). Optional — for audio/analytics.")]
@@ -47,7 +46,8 @@ namespace BattleRobots.UI
         public void PlayGame()
         {
             _onMenuAction?.Raise();
-            SceneLoader.LoadScene(_arenaSceneName);
+            string sceneName = _sceneRegistry != null ? _sceneRegistry.ArenaSceneName : "Arena";
+            SceneLoader.LoadScene(sceneName);
             Debug.Log("[MainMenuController] PlayGame — loading arena scene.");
         }
 
@@ -58,7 +58,8 @@ namespace BattleRobots.UI
         public void OpenShop()
         {
             _onMenuAction?.Raise();
-            SceneLoader.LoadScene(_shopSceneName);
+            string sceneName = _sceneRegistry != null ? _sceneRegistry.ShopSceneName : "Shop";
+            SceneLoader.LoadScene(sceneName);
             Debug.Log("[MainMenuController] OpenShop — loading shop scene.");
         }
 
@@ -83,10 +84,9 @@ namespace BattleRobots.UI
 #if UNITY_EDITOR
         private void OnValidate()
         {
-            if (string.IsNullOrWhiteSpace(_arenaSceneName))
-                Debug.LogWarning("[MainMenuController] _arenaSceneName is empty — PlayGame will fail.");
-            if (string.IsNullOrWhiteSpace(_shopSceneName))
-                Debug.LogWarning("[MainMenuController] _shopSceneName is empty — OpenShop will fail.");
+            if (_sceneRegistry == null)
+                Debug.LogWarning("[MainMenuController] _sceneRegistry not assigned — " +
+                                 "PlayGame/OpenShop will fall back to hard-coded scene names.", this);
         }
 #endif
     }

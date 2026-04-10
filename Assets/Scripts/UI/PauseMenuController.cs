@@ -14,13 +14,13 @@ namespace BattleRobots.UI
     ///   2. Assign _pausePanel — the root GameObject of the pause overlay.
     ///   3. Assign _pauseManager — the PauseManager component in the scene.
     ///   4. Assign _onPaused / _onResumed — the same VoidGameEvent SOs used by PauseManager.
-    ///   5. Wire the Resume button onClick → PauseMenuController.OnResumePressed().
-    ///   6. Wire the Quit button onClick → PauseMenuController.OnQuitToMenuPressed().
-    ///   7. Set _mainMenuSceneName to the exact name of the Main Menu scene.
+    ///   5. Assign _sceneRegistry — the shared SceneRegistry SO asset.
+    ///   6. Wire the Resume button onClick → PauseMenuController.OnResumePressed().
+    ///   7. Wire the Quit button onClick → PauseMenuController.OnQuitToMenuPressed().
     ///
     /// ── Architecture notes ────────────────────────────────────────────────────
     ///   - BattleRobots.UI namespace. References BattleRobots.Core (PauseManager,
-    ///     VoidGameEvent, SceneLoader) — allowed by architecture rules.
+    ///     VoidGameEvent, SceneLoader, SceneRegistry) — allowed by architecture rules.
     ///   - Must NOT reference BattleRobots.Physics.
     ///   - No Update / FixedUpdate — purely event-driven.
     ///   - Delegates cached in Awake — zero alloc on Subscribe/Unsubscribe.
@@ -45,8 +45,9 @@ namespace BattleRobots.UI
         [SerializeField] private VoidGameEvent _onResumed;
 
         [Header("Scene Names")]
-        [Tooltip("Exact build-settings scene name for the main menu.")]
-        [SerializeField] private string _mainMenuSceneName = "MainMenu";
+        [Tooltip("Single SO holding all scene names. " +
+                 "Create via Assets ▶ Create ▶ BattleRobots ▶ Core ▶ SceneRegistry.")]
+        [SerializeField] private SceneRegistry _sceneRegistry;
 
         // ── Cached delegates ──────────────────────────────────────────────────
 
@@ -102,7 +103,8 @@ namespace BattleRobots.UI
         {
             // Resume first to restore Time.timeScale = 1 before async load.
             _pauseManager?.Resume();
-            SceneLoader.LoadSceneAsync(_mainMenuSceneName);
+            string sceneName = _sceneRegistry != null ? _sceneRegistry.MainMenuSceneName : "MainMenu";
+            SceneLoader.LoadScene(sceneName);
         }
 
         // ── Editor validation ─────────────────────────────────────────────────
@@ -118,6 +120,9 @@ namespace BattleRobots.UI
                 Debug.LogWarning("[PauseMenuController] _onPaused not assigned.", this);
             if (_onResumed == null)
                 Debug.LogWarning("[PauseMenuController] _onResumed not assigned.", this);
+            if (_sceneRegistry == null)
+                Debug.LogWarning("[PauseMenuController] _sceneRegistry not assigned — " +
+                                 "QuitToMenu will fall back to hard-coded scene name.", this);
         }
 #endif
     }

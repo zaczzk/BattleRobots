@@ -24,11 +24,11 @@ namespace BattleRobots.UI
     ///   2. Assign _resultPanel — the root GameObject of the results overlay.
     ///   3. Assign _matchResult — the MatchResultSO asset.
     ///   4. Assign _onMatchEnded — the same VoidGameEvent SO as MatchManager._onMatchEnded.
-    ///   5. Assign the four optional Text fields.
-    ///   6. Wire buttons:
+    ///   5. Assign _sceneRegistry — the shared SceneRegistry SO asset.
+    ///   6. Assign the four optional Text fields.
+    ///   7. Wire buttons:
     ///        "Play Again" → PostMatchController.OnPlayAgainPressed()
     ///        "Main Menu"  → PostMatchController.OnMainMenuPressed()
-    ///   7. Set _mainMenuSceneName / _arenaSceneName to your actual build scene names.
     ///
     /// ── Architecture notes ────────────────────────────────────────────────────
     ///   - BattleRobots.UI namespace. References BattleRobots.Core only.
@@ -66,11 +66,9 @@ namespace BattleRobots.UI
         [SerializeField] private VoidGameEvent _onMatchEnded;
 
         [Header("Scene Names")]
-        [Tooltip("Exact build-settings scene name for the main menu scene.")]
-        [SerializeField] private string _mainMenuSceneName = "MainMenu";
-
-        [Tooltip("Exact build-settings scene name for the arena / battle scene.")]
-        [SerializeField] private string _arenaSceneName = "Arena";
+        [Tooltip("Single SO holding all scene names. " +
+                 "Create via Assets ▶ Create ▶ BattleRobots ▶ Core ▶ SceneRegistry.")]
+        [SerializeField] private SceneRegistry _sceneRegistry;
 
         // ── Cached delegate ───────────────────────────────────────────────────
 
@@ -136,14 +134,16 @@ namespace BattleRobots.UI
         public void OnPlayAgainPressed()
         {
             if (_resultPanel != null) _resultPanel.SetActive(false);
-            SceneLoader.LoadSceneAsync(_arenaSceneName);
+            string sceneName = _sceneRegistry != null ? _sceneRegistry.ArenaSceneName : "Arena";
+            SceneLoader.LoadScene(sceneName);
         }
 
         /// <summary>Called by the Main Menu button — returns to the main menu.</summary>
         public void OnMainMenuPressed()
         {
             if (_resultPanel != null) _resultPanel.SetActive(false);
-            SceneLoader.LoadSceneAsync(_mainMenuSceneName);
+            string sceneName = _sceneRegistry != null ? _sceneRegistry.MainMenuSceneName : "MainMenu";
+            SceneLoader.LoadScene(sceneName);
         }
 
         // ── Editor validation ─────────────────────────────────────────────────
@@ -157,6 +157,9 @@ namespace BattleRobots.UI
                 Debug.LogWarning("[PostMatchController] _onMatchEnded not assigned.", this);
             if (_resultPanel == null)
                 Debug.LogWarning("[PostMatchController] _resultPanel not assigned.", this);
+            if (_sceneRegistry == null)
+                Debug.LogWarning("[PostMatchController] _sceneRegistry not assigned — " +
+                                 "button transitions will fall back to hard-coded scene names.", this);
         }
 #endif
     }

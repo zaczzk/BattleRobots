@@ -68,6 +68,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T030 | StarterInventoryConfig SO + GameBootstrapper starter-parts | 65 | **Done** | StarterInventoryConfig SO (BattleRobots.Core, CreateAssetMenu): immutable IReadOnlyList<string> of starter partIds; OnValidate warns on nulls/duplicates. GameBootstrapper: new _starterConfig field; after LoadSnapshot, if inventory.Count==0 and config has entries, ApplyStarterInventory() unlocks all starters and immediately persists to disk. Backwards-compatible (null config = skip). 8 StarterInventoryConfigTests added. Total tests: 76. |
 | T031 | GameBootstrapper first-launch wallet bug fix | 90 | **Done** | Bug: `walletBalance > 0` guard caused new players to start with 0 credits instead of 500 (_playerWallet.Balance is 0 before Reset() is ever called). Fix: `isFirstLaunch = matchHistory.Count==0 && walletBalance==0 && unlockedPartIds.Count==0`; branches to `Reset()` on true first launch, `LoadSnapshot(balance)` otherwise. Correctly handles returning player with legitimately empty wallet. |
 | T032 | Test coverage expansion — MatchResultSO, IntGameEvent, ShopCatalog/PartDefinition | 75 | **Done** | MatchResultSOTests (10): Write() stores all 4 fields, zero values, overwrite semantics, fresh-instance defaults. IntGameEventTests (13): payload delivery, multi-subscriber, zero/negative payloads, unregister, duplicate guard, safe self-unregister during iteration. ShopCatalogTests (9): fresh-instance Parts not-null/empty/IReadOnlyList; PartDefinition default field contracts. Total tests: 108 across 11 files. |
+| T033 | Compile-error fix: SceneLoader.LoadSceneAsync → LoadScene | 100 | **Done** | PostMatchController + PauseMenuController called non-existent SceneLoader.LoadSceneAsync(); fixed to LoadScene() (method that actually exists). Would have prevented project from building. |
+| T034 | SceneRegistry SO — single source of truth for scene names | 85 | **Done** | SceneRegistry (BattleRobots.Core, CreateAssetMenu): three read-only string properties (MainMenuSceneName, ArenaSceneName, ShopSceneName); OnValidate warns on empty strings. MainMenuController/PostMatchController/PauseMenuController all updated to inject _sceneRegistry and fall back to hard-coded defaults if null (backwards-safe). 7 SceneRegistryTests added. Total tests: 115 across 12 files. |
 
 ---
 
@@ -75,7 +77,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T032). Bug fix: GameBootstrapper first-launch wallet. Test suite expanded to 108 tests across 11 files. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T034). Compile-error fix (T033) + SceneRegistry SO (T034). Test suite: 115 tests across 12 files. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -133,14 +135,15 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-10 | PM Agent | Session 11: T028 PlayerInventory SO — closes the "unlock upgraded parts" loop missing from the economy. PlayerInventory SO (Core, HashSet+List for O(1) HasPart), SaveData.unlockedPartIds (backwards-compatible), GameBootstrapper rehydrates on startup, ShopManager already-owned gate + PersistPurchase (load→mutate→save preserves history), IsOwned() helper. 18 PlayerInventoryTests added. Total tests: 60. Total tasks Done: T001–T028. |
 | 2026-04-10 | PM Agent | Session 12: T029 ShopItemController + ShopCatalogView — bridges data layer to shop UI. ShopItemController (UI): Setup injects PartDefinition+ShopManager, Refresh updates owned badge/cost/button; ShopCatalogView (UI): subscribes to inventory+wallet SO channels, PopulateCatalog spawns one row per catalog entry, RefreshAll propagates on change; zero alloc after Awake. T030 StarterInventoryConfig SO — new player UX: immutable SO lists starter partIds; GameBootstrapper applies starters when inventory empty after load, persists immediately; backwards-compatible. 8 StarterInventoryConfigTests added. Total tests: 76. Total tasks Done: T001–T030. |
 | 2026-04-10 | PM Agent | Session 13: T031 Bug fix — GameBootstrapper first-launch wallet: `walletBalance > 0` guard was broken (Balance is 0 before Reset()), new players got 0 credits. Fix uses `isFirstLaunch` flag (all three SaveData fields == 0/empty); branches to Reset() vs LoadSnapshot(). T032 Test expansion — MatchResultSOTests (10), IntGameEventTests (13), ShopCatalogTests (9) added; 3 new test files. Total tests: 108 across 11 files. All 32 backlog items Done. |
+| 2026-04-10 | PM Agent | Session 14: T033 Critical compile-error fix — PostMatchController + PauseMenuController called SceneLoader.LoadSceneAsync() which does not exist; corrected to LoadScene(). T034 SceneRegistry SO (BattleRobots.Core): eliminates scene-name magic strings duplicated across 3 UI controllers; OnValidate warns on empty names; all 3 controllers updated to inject _sceneRegistry with null-safe fallback. 7 SceneRegistryTests added. Total tests: 115 across 12 files. Total tasks Done: T001–T034. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T031 GameBootstrapper wallet bug fix + T032 test expansion (MatchResultSO, IntGameEvent, ShopCatalog/PartDefinition). **108 total tests across 11 files.** All 32 backlog items **Done**.
+**Last completed:** T033 compile-error fix (SceneLoader.LoadSceneAsync → LoadScene) + T034 SceneRegistry SO. **115 total tests across 12 files.** All 34 backlog items **Done**.
 
-**C# layer status:** Complete. Economy loop fully closed; shop UI row layer complete; new-player starter-parts UX added; first-launch wallet bug fixed.
+**C# layer status:** Complete and compiles clean. Compile errors in PostMatchController + PauseMenuController fixed. Scene name strings centralised into SceneRegistry SO.
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
@@ -150,7 +153,16 @@ The tool will list every null SO reference across all BattleRobots components an
 
 ### Running the test suite
 Open the project in Unity → Window ▶ General ▶ Test Runner → EditMode tab → Run All.
-All 76 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+All 115 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+
+### SceneRegistry wiring (new — T034)
+- Create SO asset: Assets ▶ Create ▶ BattleRobots ▶ Core ▶ SceneRegistry (one global instance).
+- Set `_mainMenuSceneName`, `_arenaSceneName`, `_shopSceneName` to match exact Build Settings scene names.
+- Assign the **same** SceneRegistry SO to:
+  - `MainMenuController._sceneRegistry`
+  - `PostMatchController._sceneRegistry`
+  - `PauseMenuController._sceneRegistry`
+- If left null, each controller falls back to hard-coded defaults ("MainMenu", "Arena", "Shop") — safe for initial testing.
 
 ### StarterInventoryConfig wiring (new — T030)
 - Create SO asset: Assets ▶ Create ▶ BattleRobots ▶ Economy ▶ StarterInventoryConfig.
