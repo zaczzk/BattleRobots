@@ -118,6 +118,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T080 | MatchEndScreenUI — post-match win/loss result panel | 80 | **Done** 2026-04-08 | Reads last MatchRecord from SaveSystem on HandleMatchEnd; IsPanelVisible+LastMatchWon properties; Continue button raises VoidGameEvent; no Update |
 | T081 | BGMController — SO-driven background music state machine | 65 | **Done** 2026-04-08 | BGMBinding[] (VoidGameEvent trigger + AudioClipSO); closures pre-allocated in Awake; zero-alloc OnEnable/OnDisable; SetMasterVolume; _defaultClip on Awake; BattleRobots.Core |
 | T082 | EditMode tests for HealthBarUI + MatchEndScreenUI (20 cases) | 75 | **Done** 2026-04-08 | HealthBarAndMatchEndScreenTests.cs: HealthBarUI ×10 (DisplayedHp/MaxHp, SetMaxHp, HandleHealthChanged path via reflection, null channel), MatchEndScreenUI ×10 (IsPanelVisible, LastMatchWon, win/loss records, Continue, multi-record) |
+| T083 | ReplayController EditMode tests (7 cases) | 70 | **Done** 2026-04-11 | ReplayControllerTests.cs: Awake null-camera no-throw; Update null-replayUI no-throw; Awake with camera disables _advancePlayback (reflection); Update not-playing no playhead advance; Update playing calls AdvancePlayback (zero-duration trick); Update null-camera no-throw; Update with camera no-throw |
 
 ---
 
@@ -125,7 +126,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | T079–T082 complete. All backlog tasks done. Awaiting Editor-session wiring pass or new backlog additions. |
+| — | — | — | T083 complete. All backlog tasks done. Awaiting T084 (MatchManager PlayMode replay integration) or Editor-session wiring pass. |
 
 ---
 
@@ -252,15 +253,15 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-07 | PM Agent | Session 47: T061 Room chat channel. ChatSO (Core SO): string[] ring-buffer, _capacity=50, AddMessage/Clear/Count/GetMessages (oldest-first), fires StringGameEvent _onMessageReceived, null/empty guard, EnsureBuffer lazy-alloc. INetworkAdapter: SendChatMessage(string) method + OnChatMessageReceived Action<string> callback. StubNetworkAdapter: OnChatMessageReceived auto-property; SentChatMessages List<string>(8); SendChatMessage(null-guarded, appends list — no loopback). NetworkEventBridge: _chat ChatSO + _onChatReceivedChannel StringGameEvent Inspector fields; SendChat(sender,text) public method (formats "sender: text", delegates to adapter); RegisterAdapterCallbacks wires OnChatMessageReceived → _chat?.AddMessage + channel?.Raise. ChatUI (BattleRobots.UI MB): _scrollContent/messagePrefab/inputField/sendButton/bridge/localPlayerName/_chatSO; Awake wires send button; OnEnable replays history from ChatSO; AppendMessage/HandleSend (format+send+clear+refocus)/ClearPanel; no Update; no Physics refs. ChatTests.cs: 10 EditMode cases (ring-buffer store, capacity overflow eviction, Clear, event fires via StringGameEventListener reflection injection, null/empty ignored, SentChatMessages, null-message guard, OnChatMessageReceived invokable, Bridge.SendChat format, Bridge incoming→ChatSO). |
 
 | 2026-04-08 | PM Agent | Session 62: T079 HealthBarUI (BattleRobots.UI): FloatGameEvent channel subscription via cached Action<float> delegate (zero alloc); DisplayedHp/DisplayedMaxHp testable properties; SetMaxHp runtime API for HP-bonus scenarios; null-safe Slider/Text wiring; OnEnable RegisterCallback/OnDisable UnregisterCallback. T080 MatchEndScreenUI (BattleRobots.UI): reads last MatchRecord from SaveSystem.Load() on HandleMatchEnd (cold path, one disk read per match end); IsPanelVisible+LastMatchWon testable state; HandleContinueClicked hides panel + raises _onContinue VoidGameEvent; _panelRoot/_winPanel/_losePanel null-safe; no Update. T081 BGMController (BattleRobots.Core): BGMBinding[] struct (VoidGameEvent trigger + AudioClipSO); closures pre-allocated in Awake (one Action per binding slot, captured int idx, no alloc in OnEnable/OnDisable); PlayClipInternal hard-cut with same-clip skip; SetMasterVolume/StopMusic public API; _defaultClip plays on Awake. T082 HealthBarAndMatchEndScreenTests.cs: 20 hermetic EditMode cases (HealthBarUI ×10 — DisplayedHp default, DisplayedMaxHp, SetMaxHp update/reset/clamp, HandleHealthChanged via reflection, multi-update, zero-hp, null-channel cycle, combined state; MatchEndScreenUI ×10 — IsPanelVisible default, LastMatchWon null, HandleMatchEnd no-save/win/loss, two-call reflect-latest, Continue hide, multi-record last, null-channel no-throw). |
+| 2026-04-11 | PM Agent | Session 63: T083 ReplayControllerTests.cs (7 hermetic EditMode cases): [01] Awake null-camera no-throw; [02] Update null-replayUI no-throw (early-return guard); [03] Awake with camera injects SpectatorCameraController via reflection — _advancePlayback verified false (DisableInternalPlaybackAdvance wiring); [04] Update not-playing — PlayheadTime unchanged; [05] Update playing — zero-duration ReplaySO trick (TotalDuration=0, AdvancePlayback(0) auto-stops → IsPlaying=false, proves Update invoked AdvancePlayback); [06] Update null-camera no-throw while playing; [07] Update with SpectatorCameraController assigned — InvokeAwake wires flag, StartPlayback, InvokeUpdate no-throw. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** Session 62 — T079 HealthBarUI, T080 MatchEndScreenUI, T081 BGMController, T082 EditMode tests (20 cases). All backlog tasks T001–T082 are Done.
+**Last completed:** Session 63 — T083 ReplayControllerTests (7 EditMode cases). All backlog tasks T001–T083 are Done.
 
-**Next action:** Editor-session wiring pass for the full scene inventory. New backlog candidates:
-  - T083: ReplayController EditMode tests (null guard, DisableInternalPlaybackAdvance wiring, AdvancePlayback via Update)
+**Next action:** Continue with T084 or T085.
   - T084: MatchManager PlayMode replay integration (frames recorded, SaveSystem.LoadReplay round-trip)
   - T085: Full replay UI round-trip (OnReplayReady activates panel; scrubber progresses playhead)
 
