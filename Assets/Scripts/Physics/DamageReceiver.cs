@@ -38,6 +38,14 @@ namespace BattleRobots.Physics
                  "to armor reduction and HealthSO. Leave null for no shield.")]
         [SerializeField] private ShieldController _shield;
 
+        [Header("Status Effects (optional)")]
+        [Tooltip("StatusEffectController on this robot. When assigned and a DamageInfo " +
+                 "carries a non-null statusEffect field, ApplyEffect() is called automatically " +
+                 "inside TakeDamage(DamageInfo). Also used by TriggerStatusEffect() for " +
+                 "direct effect application (e.g. from HazardZone or power-up triggers). " +
+                 "Leave null to skip status-effect processing (backwards-compatible).")]
+        [SerializeField] private StatusEffectController _statusEffectController;
+
         // ── Public API ────────────────────────────────────────────────────────
 
         /// <summary>Current flat damage-reduction rating. Range [0, 100].</summary>
@@ -74,11 +82,33 @@ namespace BattleRobots.Physics
         /// Apply damage from a <see cref="DamageInfo"/> payload.
         /// Called by a DamageGameEventListener component wired in the Inspector,
         /// or directly from code when the full damage context is needed.
-        /// No allocation — DamageInfo is a struct.
+        ///
+        /// When <paramref name="info"/>.<see cref="DamageInfo.statusEffect"/> is non-null,
+        /// the effect is automatically routed to the optional
+        /// <see cref="_statusEffectController"/> so that a single hit can deal damage
+        /// and apply a Burn / Stun / Slow simultaneously.
+        ///
+        /// No allocation — DamageInfo is a struct; StatusEffectSO is a cached reference.
         /// </summary>
         public void TakeDamage(DamageInfo info)
         {
             TakeDamage(info.amount);
+
+            // Route optional status effect carried in the damage payload.
+            if (info.statusEffect != null)
+                _statusEffectController?.ApplyEffect(info.statusEffect);
+        }
+
+        /// <summary>
+        /// Directly apply a status effect to this robot without dealing damage.
+        /// Useful for HazardZone or power-up triggers that inflict effects independently
+        /// of a damage hit.
+        /// Delegates to <see cref="StatusEffectController.ApplyEffect"/>; no-op when no
+        /// controller is assigned. Allocation-free — reference-type param, no boxing.
+        /// </summary>
+        public void TriggerStatusEffect(StatusEffectSO effect)
+        {
+            _statusEffectController?.ApplyEffect(effect);
         }
 
         /// <summary>

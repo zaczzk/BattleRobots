@@ -40,8 +40,15 @@ namespace BattleRobots.Physics
         // ── Speed fields (set at match start; inspector values are preserved) ────
         // _runtimeMoveSpeed: base-speed override from CombatStatsApplicator (-1 = use inspector).
         // _speedMultiplier:  fractional modifier from BotDifficultyConfig (1 = no change).
+        // _statusSlowFactor: runtime slow multiplier from StatusEffectController (1 = no slowdown).
         private float _runtimeMoveSpeed = -1f;
         private float _speedMultiplier  = 1f;
+        private float _statusSlowFactor = 1f;
+
+        // ── Stun override (set by StatusEffectController) ─────────────────────
+        // When true, FixedUpdate zeros velocities and skips ApplyLocomotion so
+        // neither player input nor AI SetInputs calls have any locomotion effect.
+        private bool _isStunned;
 
         // ── Effective base speed (respects runtime override) ─────────────────
         // Not a hot-path property — only referenced inside ApplyLocomotion (cold path).
@@ -71,6 +78,19 @@ namespace BattleRobots.Physics
 
         private void FixedUpdate()
         {
+            // While stunned: freeze in place and suppress all inputs.
+            // StatusEffectController sets _isStunned via SetStunned() each FixedUpdate
+            // tick so this state is always current.
+            if (_isStunned)
+            {
+                if (_rootBody != null)
+                {
+                    _rootBody.linearVelocity  = Vector3.zero;
+                    _rootBody.angularVelocity = Vector3.zero;
+                }
+                return;
+            }
+
             if (_isPlayerControlled)
             {
                 // Input.GetAxis is allocation-free — returns a float from native side.
@@ -86,10 +106,13 @@ namespace BattleRobots.Physics
         private void ApplyLocomotion(float move, float turn)
         {
             // Linear velocity along local-forward — value-type vector ops, no alloc.
-            _rootBody.linearVelocity = transform.forward * (move * EffectiveMoveSpeed * _speedMultiplier);
+            // Three independent multipliers stack: base speed × difficulty × status slow.
+            _rootBody.linearVelocity = transform.forward *
+                (move * EffectiveMoveSpeed * _speedMultiplier * _statusSlowFactor);
 
             // Angular velocity around world-up; convert deg/s → rad/s.
-            float turnRad = turn * (_turnSpeed * _speedMultiplier * Mathf.Deg2Rad);
+            // Status slow also reduces turn speed proportionally.
+            float turnRad = turn * (_turnSpeed * _speedMultiplier * _statusSlowFactor * Mathf.Deg2Rad);
             _rootBody.angularVelocity = new Vector3(0f, turnRad, 0f);
         }
 
@@ -141,6 +164,33 @@ namespace BattleRobots.Physics
         public void SetSpeedMultiplier(float multiplier)
         {
             _speedMultiplier = Mathf.Max(0.01f, multiplier);
+        }
+
+        /// <summary>
+        /// Enables or disables the stun override applied by <c>StatusEffectController</c>.
+        /// While stunned, <see cref="FixedUpdate"/> zeros all velocities and skips
+        /// locomotion so neither player input nor AI <c>SetInputs</c> calls move the robot.
+        /// Called every FixedUpdate tick by <c>StatusEffectController</c> — resets to
+        /// false automatically when the Stun effect expires.
+        /// Allocation-free — pure field write.
+        /// </summary>
+        public void SetStunned(bool stunned)
+        {
+            _isStunned = stunned;
+        }
+
+        /// <summary>
+        /// Applies a speed multiplier from an active <c>StatusEffectType.Slow</c> effect.
+        /// Stored separately from the difficulty multiplier so both stack correctly
+        /// (difficulty × status slow). Calling this method multiple times sets
+        /// (not compounds) the slow factor.
+        /// Called every FixedUpdate tick by <c>StatusEffectController</c> — resets to
+        /// 1.0 automatically when the Slow effect expires.
+        /// </summary>
+        /// <param name="factor">Clamped to [0.01, 1]. 1.0 = no slowdown.</param>
+        public void SetSlowFactor(float factor)
+        {
+            _statusSlowFactor = Mathf.Clamp(factor, 0.01f, 1f);
         }
 
         /// <summary>
