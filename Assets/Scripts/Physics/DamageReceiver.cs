@@ -32,6 +32,12 @@ namespace BattleRobots.Physics
                  "Set at runtime by CombatStatsApplicator from RobotCombatStats.TotalArmorRating.")]
         [SerializeField, Range(0, 100)] private int _armorRating = 0;
 
+        [Header("Shield (optional)")]
+        [Tooltip("When assigned, incoming damage is first offered to the shield. " +
+                 "Only the leftover amount that the shield cannot absorb proceeds " +
+                 "to armor reduction and HealthSO. Leave null for no shield.")]
+        [SerializeField] private ShieldController _shield;
+
         // ── Public API ────────────────────────────────────────────────────────
 
         /// <summary>Current flat damage-reduction rating. Range [0, 100].</summary>
@@ -58,7 +64,9 @@ namespace BattleRobots.Physics
                 Debug.LogWarning($"[DamageReceiver] '{name}' has no HealthSO assigned.", this);
                 return;
             }
-            float reduced = Mathf.Max(0f, amount - _armorRating);
+            // Shield absorbs first; any leftover proceeds to armor + HealthSO.
+            float afterShield = _shield != null ? _shield.AbsorbDamage(amount) : amount;
+            float reduced     = Mathf.Max(0f, afterShield - _armorRating);
             _health.ApplyDamage(reduced);
         }
 
