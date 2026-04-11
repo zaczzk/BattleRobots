@@ -39,6 +39,12 @@ namespace BattleRobots.Physics
                  "without touching per-robot inspector values.")]
         [SerializeField] private SelectedDifficultySO _selectedDifficulty;
 
+        [Tooltip("Optional behavioral personality applied on top of the resolved difficulty " +
+                 "settings.  Modifies attack cooldown, detection/attack range, and facing " +
+                 "threshold via multipliers/deltas — all applied AFTER difficulty in Awake. " +
+                 "Leave null for neutral behavior (equivalent to BotPersonalityType.Balanced).")]
+        [SerializeField] private BotPersonalitySO _botPersonality;
+
         [Header("References")]
         [Tooltip("Locomotion controller on this robot's root. Required.")]
         [SerializeField] private RobotLocomotionController _locomotion;
@@ -103,6 +109,17 @@ namespace BattleRobots.Physics
                 // Locomotion speed: _locomotion is serialised so it's valid at Awake time
                 // as long as it's assigned via Inspector (same-scene reference).
                 _locomotion?.SetSpeedMultiplier(_difficultyConfig.MoveSpeedMultiplier);
+            }
+
+            // Apply personality modifiers on top of the resolved difficulty values.
+            // Personality always runs last so it stacks correctly with any difficulty preset.
+            // All operations are simple arithmetic — no heap allocation.
+            if (_botPersonality != null)
+            {
+                _attackCooldown  = Mathf.Max(0.1f, _attackCooldown  * _botPersonality.AttackCooldownMultiplier);
+                _detectionRange  = Mathf.Max(0f,   _detectionRange  + _botPersonality.DetectionRangeDelta);
+                _attackRange     = Mathf.Max(0f,   _attackRange     + _botPersonality.AttackRangeDelta);
+                _facingThreshold = Mathf.Max(1f,   _facingThreshold * _botPersonality.FacingThresholdMultiplier);
             }
         }
 

@@ -408,5 +408,159 @@ namespace BattleRobots.Tests
             Assert.AreEqual(AIState.Chase, _ai.CurrentState,
                 "AI must transition Attack → Chase when target moves beyond attack range.");
         }
+
+        // ── Personality — Awake integration ───────────────────────────────────
+
+        /// <summary>Helper: creates a BotPersonalitySO with all neutral defaults via reflection.</summary>
+        private BotPersonalitySO MakeNeutralPersonality()
+        {
+            var p = MakeSO<BotPersonalitySO>();
+            SetField(p, "_attackCooldownMultiplier",  1f);
+            SetField(p, "_detectionRangeDelta",        0f);
+            SetField(p, "_attackRangeDelta",            0f);
+            SetField(p, "_facingThresholdMultiplier",  1f);
+            return p;
+        }
+
+        [Test]
+        public void Awake_NullPersonality_DoesNotChangeDefaults()
+        {
+            // Standard SetUp: _botPersonality is null → defaults unchanged.
+            Assert.AreEqual(1f,  GetField<float>(_ai, "_attackCooldown"),  1e-6f);
+            Assert.AreEqual(15f, GetField<float>(_ai, "_detectionRange"),  1e-6f);
+            Assert.AreEqual(3f,  GetField<float>(_ai, "_attackRange"),     1e-6f);
+            Assert.AreEqual(20f, GetField<float>(_ai, "_facingThreshold"), 1e-6f);
+        }
+
+        [Test]
+        public void Awake_Personality_ScalesAttackCooldown()
+        {
+            var go = new GameObject("AIPersonality_Cooldown");
+            _extraGOs.Add(go);
+            go.SetActive(false);
+            var ai = go.AddComponent<RobotAIController>();
+
+            var p = MakeNeutralPersonality();
+            SetField(p, "_attackCooldownMultiplier", 0.5f);
+            SetField(ai, "_botPersonality", p);
+
+            go.SetActive(true);   // triggers Awake; _attackCooldown default 1f × 0.5 = 0.5f
+
+            Assert.AreEqual(0.5f, GetField<float>(ai, "_attackCooldown"), 1e-6f,
+                "Awake must multiply _attackCooldown by AttackCooldownMultiplier.");
+        }
+
+        [Test]
+        public void Awake_Personality_AddsDetectionRangeDelta()
+        {
+            var go = new GameObject("AIPersonality_Detection");
+            _extraGOs.Add(go);
+            go.SetActive(false);
+            var ai = go.AddComponent<RobotAIController>();
+
+            var p = MakeNeutralPersonality();
+            SetField(p, "_detectionRangeDelta", 5f);
+            SetField(ai, "_botPersonality", p);
+
+            go.SetActive(true);   // 15 (default) + 5 = 20
+
+            Assert.AreEqual(20f, GetField<float>(ai, "_detectionRange"), 1e-6f,
+                "Awake must add DetectionRangeDelta to _detectionRange.");
+        }
+
+        [Test]
+        public void Awake_Personality_AddsAttackRangeDelta()
+        {
+            var go = new GameObject("AIPersonality_Attack");
+            _extraGOs.Add(go);
+            go.SetActive(false);
+            var ai = go.AddComponent<RobotAIController>();
+
+            var p = MakeNeutralPersonality();
+            SetField(p, "_attackRangeDelta", 2f);
+            SetField(ai, "_botPersonality", p);
+
+            go.SetActive(true);   // 3 (default) + 2 = 5
+
+            Assert.AreEqual(5f, GetField<float>(ai, "_attackRange"), 1e-6f,
+                "Awake must add AttackRangeDelta to _attackRange.");
+        }
+
+        [Test]
+        public void Awake_Personality_ScalesFacingThreshold()
+        {
+            var go = new GameObject("AIPersonality_Facing");
+            _extraGOs.Add(go);
+            go.SetActive(false);
+            var ai = go.AddComponent<RobotAIController>();
+
+            var p = MakeNeutralPersonality();
+            SetField(p, "_facingThresholdMultiplier", 2f);
+            SetField(ai, "_botPersonality", p);
+
+            go.SetActive(true);   // 20 (default) × 2 = 40
+
+            Assert.AreEqual(40f, GetField<float>(ai, "_facingThreshold"), 1e-6f,
+                "Awake must multiply _facingThreshold by FacingThresholdMultiplier.");
+        }
+
+        [Test]
+        public void Awake_Personality_AppliedAfterDifficulty_Stacks()
+        {
+            var go = new GameObject("AIPersonality_Stack");
+            _extraGOs.Add(go);
+            go.SetActive(false);
+            var ai = go.AddComponent<RobotAIController>();
+
+            // Difficulty sets attackCooldown = 2.0; personality halves it → 1.0.
+            var config = MakeConfig(attackCooldown: 2f);
+            var p      = MakeNeutralPersonality();
+            SetField(p, "_attackCooldownMultiplier", 0.5f);
+
+            SetField(ai, "_difficultyConfig", config);
+            SetField(ai, "_botPersonality",   p);
+
+            go.SetActive(true);   // 2.0 × 0.5 = 1.0
+
+            Assert.AreEqual(1f, GetField<float>(ai, "_attackCooldown"), 1e-6f,
+                "Personality must be applied AFTER difficulty: 2.0 × 0.5 = 1.0.");
+        }
+
+        [Test]
+        public void Awake_Personality_AttackCooldownClampedToMinimum()
+        {
+            var go = new GameObject("AIPersonality_CooldownClamp");
+            _extraGOs.Add(go);
+            go.SetActive(false);
+            var ai = go.AddComponent<RobotAIController>();
+
+            var p = MakeNeutralPersonality();
+            // Force below-minimum multiplier via reflection (bypasses [Min] attribute).
+            SetField(p, "_attackCooldownMultiplier", 0.05f);
+            SetField(ai, "_botPersonality", p);
+
+            go.SetActive(true);   // 1.0 × 0.05 = 0.05 → clamped to 0.1
+
+            Assert.AreEqual(0.1f, GetField<float>(ai, "_attackCooldown"), 1e-6f,
+                "Attack cooldown must be clamped to minimum 0.1 after personality multiply.");
+        }
+
+        [Test]
+        public void Awake_Personality_NegativeDetectionDelta_ClampedToZero()
+        {
+            var go = new GameObject("AIPersonality_DetectionClamp");
+            _extraGOs.Add(go);
+            go.SetActive(false);
+            var ai = go.AddComponent<RobotAIController>();
+
+            var p = MakeNeutralPersonality();
+            SetField(p, "_detectionRangeDelta", -100f);   // would go deeply negative
+            SetField(ai, "_botPersonality", p);
+
+            go.SetActive(true);   // 15 + (−100) = −85 → clamped to 0
+
+            Assert.AreEqual(0f, GetField<float>(ai, "_detectionRange"), 1e-6f,
+                "Detection range must be clamped to 0 when delta drives it negative.");
+        }
     }
 }
