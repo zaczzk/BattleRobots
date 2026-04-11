@@ -73,6 +73,14 @@ namespace BattleRobots.Physics
         [Tooltip("(Optional) DamageReceiver. SetArmorRating(TotalArmorRating) called on match start.")]
         [SerializeField] private DamageReceiver _damageReceiver;
 
+        [Header("Match Modifier (optional)")]
+        [Tooltip("Runtime SO written by MatchModifierSelectionController. " +
+                 "When assigned and HasSelection is true:\n" +
+                 "  • Current.SpeedMultiplier scales the computed base move speed.\n" +
+                 "  • Current.ArmorMultiplier scales the computed armor rating (clamped [0,100]).\n" +
+                 "Leave null to use unmodified stats (backwards-compatible).")]
+        [SerializeField] private SelectedModifierSO _selectedModifier;
+
         // ── Cached delegate ───────────────────────────────────────────────────
 
         private System.Action _onMatchStarted;
@@ -116,19 +124,28 @@ namespace BattleRobots.Physics
                 _health.Reset();
             }
 
+            // Resolve match-modifier multipliers (1.0 when no modifier is active).
+            bool hasModifier = _selectedModifier != null
+                               && _selectedModifier.HasSelection
+                               && _selectedModifier.Current != null;
+            float speedMult = hasModifier ? _selectedModifier.Current.SpeedMultiplier : 1f;
+            float armorMult = hasModifier ? _selectedModifier.Current.ArmorMultiplier : 1f;
+
             // ── Locomotion ────────────────────────────────────────────────────
-            _locomotion?.SetBaseSpeed(stats.EffectiveSpeed);
+            _locomotion?.SetBaseSpeed(stats.EffectiveSpeed * speedMult);
 
             // ── AI damage output ──────────────────────────────────────────────
             _aiController?.SetDamageMultiplier(stats.EffectiveDamageMultiplier);
 
             // ── Damage intake (armor) ─────────────────────────────────────────
-            _damageReceiver?.SetArmorRating(stats.TotalArmorRating);
+            int modifiedArmor = Mathf.Clamp(
+                Mathf.RoundToInt(stats.TotalArmorRating * armorMult), 0, 100);
+            _damageReceiver?.SetArmorRating(modifiedArmor);
 
             Debug.Log($"[CombatStatsApplicator] '{name}': HP={stats.TotalMaxHealth} " +
-                      $"Speed={stats.EffectiveSpeed:F2} " +
+                      $"Speed={stats.EffectiveSpeed * speedMult:F2}(x{speedMult:F2}) " +
                       $"DmgMult={stats.EffectiveDamageMultiplier:F2} " +
-                      $"Armor={stats.TotalArmorRating}");
+                      $"Armor={modifiedArmor}(x{armorMult:F2})");
         }
 
         // ── Editor validation ─────────────────────────────────────────────────

@@ -114,6 +114,14 @@ namespace BattleRobots.Core
                  "Leave null to record arenaIndex = 0 (backwards-compatible).")]
         [SerializeField] private SelectedArenaSO _selectedArena;
 
+        [Header("Match Modifier (optional)")]
+        [Tooltip("Runtime SO written by MatchModifierSelectionController. " +
+                 "When assigned and HasSelection is true:\n" +
+                 "  • Current.TimeMultiplier is applied to the base round duration at match start.\n" +
+                 "  • Current.RewardMultiplier is applied to the total reward at match end.\n" +
+                 "Leave null to use unmodified duration and rewards (backwards-compatible).")]
+        [SerializeField] private SelectedModifierSO _selectedModifier;
+
         [Header("Match End Bonuses (optional)")]
         [Tooltip("Catalogue of performance-bonus conditions evaluated at match end. " +
                  "Each satisfied condition adds its BonusAmount to the match reward before the " +
@@ -138,6 +146,11 @@ namespace BattleRobots.Core
 
         private bool  _matchRunning;
         private float _timeRemaining;
+
+        // Cached modified round duration set in HandleMatchStarted (base × time multiplier).
+        // EndMatch reads this instead of recalculating to ensure elapsed is always positive
+        // when a MatchModifier changes the round length.
+        private float _activeRoundDuration;
 
         // ── Lifecycle ─────────────────────────────────────────────────────────
 
@@ -197,6 +210,21 @@ namespace BattleRobots.Core
 
             // Use MatchRewardConfig when assigned; fall back to per-component inspector field.
             _timeRemaining = _rewardConfig != null ? _rewardConfig.RoundDuration : _roundDuration;
+
+            // Apply match-modifier time multiplier when a modifier is selected.
+            // Modifier is applied after the base duration is resolved so both
+            // MatchRewardConfig and per-field inspector paths are covered.
+            if (_selectedModifier != null
+                && _selectedModifier.HasSelection
+                && _selectedModifier.Current != null)
+            {
+                _timeRemaining *= _selectedModifier.Current.TimeMultiplier;
+            }
+
+            // Cache the final (post-modifier) round duration so EndMatch can compute
+            // elapsed time correctly even when a time-multiplier modifier is active.
+            _activeRoundDuration = _timeRemaining;
+
             _matchRunning  = true;
 
             // Broadcast initial timer value so UI can display it immediately
@@ -213,10 +241,9 @@ namespace BattleRobots.Core
             if (!_matchRunning) return;
             _matchRunning = false;
 
-            // Use the same config-aware duration that HandleMatchStarted set _timeRemaining from,
-            // so elapsed is always correct regardless of whether a MatchRewardConfig is assigned.
-            float activeRoundDuration = _rewardConfig != null ? _rewardConfig.RoundDuration : _roundDuration;
-            float elapsed = activeRoundDuration - Mathf.Max(0f, _timeRemaining);
+            // Use _activeRoundDuration (set in HandleMatchStarted after applying any time-modifier)
+            // so elapsed is always correct regardless of MatchRewardConfig or MatchModifier.
+            float elapsed = _activeRoundDuration - Mathf.Max(0f, _timeRemaining);
 
             // Update win streak before computing the bonus so the bonus uses the
             // post-win streak value (e.g. streak was 2, RecordWin() → 3, bonus = +30 %).
@@ -231,6 +258,15 @@ namespace BattleRobots.Core
             int totalReward  = (playerWon && _winStreak != null)
                 ? StreakBonusCalculator.ApplyToReward(baseReward, _winStreak.CurrentStreak)
                 : baseReward;
+
+            // Apply match-modifier reward multiplier when a modifier is selected.
+            // Applied after streak bonus so both stack correctly (streak × modifier).
+            if (_selectedModifier != null
+                && _selectedModifier.HasSelection
+                && _selectedModifier.Current != null)
+            {
+                totalReward = Mathf.RoundToInt(totalReward * _selectedModifier.Current.RewardMultiplier);
+            }
 
             // Award XP — uses post-match streak value (0 after a loss, incremented after a win).
             if (_playerProgression != null)
