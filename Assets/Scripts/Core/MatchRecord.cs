@@ -220,5 +220,16 @@ namespace BattleRobots.Core
         /// completed.  False by default (backwards-compatible).
         /// </summary>
         public bool dailyChallengeCompleted;
+
+        // ── Personal Best Score (T094) ─────────────────────────────────────────
+
+        /// <summary>
+        /// The player's all-time highest match score as computed by
+        /// <see cref="MatchScoreCalculator"/> and tracked by <see cref="PersonalBestSO"/>.
+        /// Written by <see cref="MatchManager"/> in EndMatch via
+        /// <see cref="PersonalBestSO.BestScore"/> after each <see cref="PersonalBestSO.Submit"/>.
+        /// Default 0 — backwards-compatible with saves predating this field.
+        /// </summary>
+        public int personalBestScore;
     }
 }

@@ -136,6 +136,15 @@ namespace BattleRobots.Core
                  "Leave null to skip bonus evaluation (backwards-compatible).")]
         [SerializeField] private MatchBonusCatalogSO _bonusCatalog;
 
+        [Header("Personal Best (optional)")]
+        [Tooltip("Tracks the player's numeric match score and all-time personal best. " +
+                 "MatchScoreCalculator.Calculate() is called in EndMatch() after the " +
+                 "MatchResultSO blackboard is written; Submit() is called before " +
+                 "_onMatchEnded fires so UI subscribers already see the updated score. " +
+                 "BestScore is persisted to SaveData.personalBestScore. " +
+                 "Leave null to skip score tracking (backwards-compatible).")]
+        [SerializeField] private PersonalBestSO _personalBest;
+
         [Header("Audio")]
         [Tooltip("AudioEvent SO played when the player wins the match.")]
         [SerializeField] private AudioEvent _onWinJingle;
@@ -364,13 +373,27 @@ namespace BattleRobots.Core
             // Persist career-wide totals so they survive the next session.
             _careerStats?.PatchSaveData(saveData);
 
-            SaveSystem.Save(saveData);
-
             // Write blackboard SO before raising MatchEnded so PostMatchController
             // reads correct data when its callback fires.
             // bonusEarned is stored separately so the UI can display "Bonus: +N" without
             // re-evaluating conditions; it is already included in totalReward / currencyEarned.
             _matchResult?.Write(playerWon, elapsed, totalReward, walletSnapshot, damageDone, damageTaken, bonusEarned);
+
+            // Compute and submit match score for personal best tracking.
+            // Called AFTER MatchResultSO.Write() so the calculator reads fresh data.
+            // Called BEFORE _onMatchEnded fires so UI subscribers already see the
+            // updated PersonalBestSO.CurrentScore / BestScore / IsNewBest.
+            if (_personalBest != null)
+            {
+                int matchScore = MatchScoreCalculator.Calculate(_matchResult);
+                _personalBest.Submit(matchScore);
+            }
+
+            // Persist personal best score so it survives the next session.
+            if (_personalBest != null)
+                saveData.personalBestScore = _personalBest.BestScore;
+
+            SaveSystem.Save(saveData);
 
             // Signal other systems
             _onMatchEnded?.Raise();

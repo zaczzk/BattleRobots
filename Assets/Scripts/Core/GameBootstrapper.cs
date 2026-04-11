@@ -54,6 +54,12 @@ namespace BattleRobots.Core
                  "Leave null to skip (backwards-compatible).")]
         [SerializeField] private DailyChallengeSO _dailyChallenge;
 
+        [Header("Personal Best (optional)")]
+        [Tooltip("SO that tracks the player's all-time best match score. " +
+                 "LoadSnapshot called on startup to restore the persisted best score. " +
+                 "Leave null to skip (backwards-compatible).")]
+        [SerializeField] private PersonalBestSO _personalBest;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -131,6 +137,10 @@ namespace BattleRobots.Core
             // RefreshIfNeeded() which treats the empty date as a new day.
             _dailyChallenge?.LoadSnapshot(
                 save.dailyChallengeDate, save.dailyChallengeIndex, save.dailyChallengeCompleted);
+
+            // Restore all-time best match score.
+            // LoadSnapshot is bootstrapper-safe (no events); old saves default to 0.
+            _personalBest?.LoadSnapshot(save.personalBestScore);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

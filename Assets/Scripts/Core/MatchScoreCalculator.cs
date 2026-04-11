@@ -1,0 +1,65 @@
+using UnityEngine;
+
+namespace BattleRobots.Core
+{
+    /// <summary>
+    /// Computes a numeric match score from a <see cref="MatchResultSO"/> blackboard.
+    ///
+    /// ── Scoring formula ───────────────────────────────────────────────────────
+    ///   Base      : 1 000 (win) or 100 (loss)
+    ///   Time bonus: max(0, floor(600 − DurationSeconds × 5))  [wins only]
+    ///               Rewards fast finishes: 0 s → +600, 60 s → +300, 120 s → 0.
+    ///   Damage    : floor(DamageDone × 2) − floor(DamageTaken)
+    ///   Bonus ×3  : BonusEarned × 3  (performance-condition credits triple)
+    ///   Final     : max(0, sum of above)  — score is always non-negative.
+    ///
+    /// ── Architecture notes ────────────────────────────────────────────────────
+    ///   - Static utility class — no MonoBehaviour, no ScriptableObject.
+    ///   - BattleRobots.Core namespace; no Physics / UI references.
+    ///   - Allocation-free (pure integer arithmetic on MatchResultSO properties).
+    ///   - Null <paramref name="result"/> → returns 0 (safe to call without guard).
+    /// </summary>
+    public static class MatchScoreCalculator
+    {
+        /// <summary>
+        /// Compute the match score from a populated <see cref="MatchResultSO"/>.
+        /// </summary>
+        /// <param name="result">
+        /// Blackboard written by <see cref="MatchManager"/> before MatchEnded fires.
+        /// Passing <c>null</c> returns 0.
+        /// </param>
+        /// <returns>Non-negative integer score.</returns>
+        public static int Calculate(MatchResultSO result)
+        {
+            if (result == null) return 0;
+
+            // Base points: winning is worth substantially more than surviving a loss.
+            int score = result.PlayerWon ? 1000 : 100;
+
+            // Time bonus — wins only; rewards fast finishes.
+            // Formula: max(0, 600 − duration×5)
+            //   0 s  → +600  (instant KO)
+            //   60 s → +300  (half-time win)
+            //   120s → 0     (just before timer)
+            //   >120s→ 0     (clamped)
+            if (result.PlayerWon)
+            {
+                int timeBonus = Mathf.Max(
+                    0,
+                    Mathf.FloorToInt(600f - result.DurationSeconds * 5f));
+                score += timeBonus;
+            }
+
+            // Damage contribution: dealing damage is worth twice as much as taking it.
+            score += Mathf.FloorToInt(result.DamageDone * 2f);
+            score -= Mathf.FloorToInt(result.DamageTaken);
+
+            // Performance-condition bonus credits triple in score (already included in
+            // CurrencyEarned by MatchManager; tripling here rewards skilled play extra).
+            score += result.BonusEarned * 3;
+
+            // Clamp to non-negative — heavy damage taken should not produce a negative score.
+            return Mathf.Max(0, score);
+        }
+    }
+}
