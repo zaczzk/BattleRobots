@@ -45,6 +45,13 @@ namespace BattleRobots.Physics
                  "Leave null for neutral behavior (equivalent to BotPersonalityType.Balanced).")]
         [SerializeField] private BotPersonalitySO _botPersonality;
 
+        [Tooltip("Optional mutable SO written by OpponentSelectionController in the pre-match UI. " +
+                 "When HasSelection is true the profile's DifficultyConfig (if non-null) and " +
+                 "Personality (if non-null) are applied AFTER all other overrides in Awake, " +
+                 "giving per-opponent settings the highest precedence in the override chain. " +
+                 "Leave null to use inspector-level difficulty / personality settings.")]
+        [SerializeField] private SelectedOpponentSO _selectedOpponent;
+
         [Header("References")]
         [Tooltip("Locomotion controller on this robot's root. Required.")]
         [SerializeField] private RobotLocomotionController _locomotion;
@@ -120,6 +127,37 @@ namespace BattleRobots.Physics
                 _detectionRange  = Mathf.Max(0f,   _detectionRange  + _botPersonality.DetectionRangeDelta);
                 _attackRange     = Mathf.Max(0f,   _attackRange     + _botPersonality.AttackRangeDelta);
                 _facingThreshold = Mathf.Max(1f,   _facingThreshold * _botPersonality.FacingThresholdMultiplier);
+            }
+
+            // Apply opponent profile overrides — runs LAST so opponent-specific settings
+            // always take final precedence over any difficulty/personality already applied.
+            // Both sub-overrides are independently optional: a profile may carry only a
+            // DifficultyConfig, only a Personality, both, or neither.
+            if (_selectedOpponent != null
+                && _selectedOpponent.HasSelection
+                && _selectedOpponent.Current != null)
+            {
+                var profile = _selectedOpponent.Current;
+
+                // Override AI tuning with opponent's bundled difficulty config.
+                if (profile.DifficultyConfig != null)
+                {
+                    _detectionRange  = profile.DifficultyConfig.DetectionRange;
+                    _attackRange     = profile.DifficultyConfig.AttackRange;
+                    _attackDamage    = profile.DifficultyConfig.AttackDamage;
+                    _attackCooldown  = profile.DifficultyConfig.AttackCooldown;
+                    _facingThreshold = profile.DifficultyConfig.FacingThreshold;
+                    _locomotion?.SetSpeedMultiplier(profile.DifficultyConfig.MoveSpeedMultiplier);
+                }
+
+                // Apply opponent's bundled personality on top of the (possibly just-set) difficulty.
+                if (profile.Personality != null)
+                {
+                    _attackCooldown  = Mathf.Max(0.1f, _attackCooldown  * profile.Personality.AttackCooldownMultiplier);
+                    _detectionRange  = Mathf.Max(0f,   _detectionRange  + profile.Personality.DetectionRangeDelta);
+                    _attackRange     = Mathf.Max(0f,   _attackRange     + profile.Personality.AttackRangeDelta);
+                    _facingThreshold = Mathf.Max(1f,   _facingThreshold * profile.Personality.FacingThresholdMultiplier);
+                }
             }
         }
 

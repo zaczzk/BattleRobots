@@ -39,6 +39,14 @@ namespace BattleRobots.Core
         /// <summary>Zero-based arena index the match was played in.</summary>
         public int arenaIndex;
 
+        /// <summary>
+        /// Display name of the selected opponent profile (from <see cref="OpponentProfileSO.DisplayName"/>).
+        /// Empty string when no opponent was selected via the pre-match lobby.
+        /// Backwards-compatible: JsonUtility deserialises missing string fields as null;
+        /// consumer code should treat null as empty.
+        /// </summary>
+        public string opponentName = "";
+
         /// <summary>True if the local player won.</summary>
         public bool playerWon;
 

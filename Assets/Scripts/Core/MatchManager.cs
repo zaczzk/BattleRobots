@@ -114,6 +114,13 @@ namespace BattleRobots.Core
                  "Leave null to record arenaIndex = 0 (backwards-compatible).")]
         [SerializeField] private SelectedArenaSO _selectedArena;
 
+        [Header("Opponent Selection (optional)")]
+        [Tooltip("Runtime SO written by OpponentSelectionController in the pre-match lobby. " +
+                 "When assigned and HasSelection is true, Current.DisplayName is written to " +
+                 "MatchRecord.opponentName so match history shows the opponent chosen. " +
+                 "Leave null to record opponentName = \"\" (backwards-compatible).")]
+        [SerializeField] private SelectedOpponentSO _selectedOpponent;
+
         [Header("Match Modifier (optional)")]
         [Tooltip("Runtime SO written by MatchModifierSelectionController. " +
                  "When assigned and HasSelection is true:\n" +
@@ -310,11 +317,19 @@ namespace BattleRobots.Core
                 ? _selectedArena.Current.config.ArenaIndex
                 : 0;
 
+            // Resolve opponent name from SelectedOpponentSO when available; default to "".
+            string opponentName = (_selectedOpponent != null
+                                   && _selectedOpponent.HasSelection
+                                   && _selectedOpponent.Current != null)
+                ? (_selectedOpponent.Current.DisplayName ?? "")
+                : "";
+
             // Build and persist match record
             var record = new MatchRecord
             {
                 timestamp       = DateTime.UtcNow.ToString("o"),
                 arenaIndex      = arenaIndex,
+                opponentName    = opponentName,
                 playerWon       = playerWon,
                 durationSeconds = elapsed,
                 damageDone      = damageDone,

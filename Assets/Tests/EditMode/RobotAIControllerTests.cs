@@ -562,5 +562,148 @@ namespace BattleRobots.Tests
             Assert.AreEqual(0f, GetField<float>(ai, "_detectionRange"), 1e-6f,
                 "Detection range must be clamped to 0 when delta drives it negative.");
         }
+
+        // ── Awake: SelectedOpponentSO overrides ───────────────────────────────
+
+        /// <summary>
+        /// Creates a SelectedOpponentSO with the given profile already selected.
+        /// The backing field is injected via reflection to bypass the Inspector serialisation path.
+        /// </summary>
+        private SelectedOpponentSO MakeSelectedOpponent(OpponentProfileSO profile)
+        {
+            var so = MakeSO<SelectedOpponentSO>();
+            so.Select(profile);   // sets _current + _hasSelection = true
+            return so;
+        }
+
+        [Test]
+        public void Awake_NullSelectedOpponent_DoesNotChangeDefaults()
+        {
+            var go = new GameObject("AI_NullOpponent");
+            _extraGOs.Add(go);
+            go.SetActive(false);
+            var ai = go.AddComponent<RobotAIController>();
+            // _selectedOpponent is null by default
+
+            go.SetActive(true);
+
+            // Default _detectionRange is 15 — opponent null path must not alter it.
+            Assert.AreEqual(15f, GetField<float>(ai, "_detectionRange"), 1e-6f,
+                "Null _selectedOpponent must not modify inspector defaults.");
+        }
+
+        [Test]
+        public void Awake_SelectedOpponent_HasSelectionFalse_DoesNotOverride()
+        {
+            var go = new GameObject("AI_OpponentNoSelection");
+            _extraGOs.Add(go);
+            go.SetActive(false);
+            var ai = go.AddComponent<RobotAIController>();
+
+            // Create a SelectedOpponentSO without calling Select() — HasSelection = false.
+            var selectedSO = MakeSO<SelectedOpponentSO>();
+            SetField(ai, "_selectedOpponent", selectedSO);
+
+            go.SetActive(true);
+
+            Assert.AreEqual(15f, GetField<float>(ai, "_detectionRange"), 1e-6f,
+                "HasSelection == false must leave inspector defaults unchanged.");
+        }
+
+        [Test]
+        public void Awake_SelectedOpponent_AppliesDifficultyConfig()
+        {
+            var go = new GameObject("AI_OpponentDifficulty");
+            _extraGOs.Add(go);
+            go.SetActive(false);
+            var ai = go.AddComponent<RobotAIController>();
+
+            var config = MakeConfig(detectionRange: 99f, attackRange: 7f, attackCooldown: 0.3f);
+
+            var profile = MakeSO<OpponentProfileSO>();
+            SetField(profile, "_difficultyConfig", config);
+
+            var selectedSO = MakeSelectedOpponent(profile);
+            SetField(ai, "_selectedOpponent", selectedSO);
+
+            go.SetActive(true);
+
+            Assert.AreEqual(99f, GetField<float>(ai, "_detectionRange"), 1e-6f,
+                "Opponent DifficultyConfig must override _detectionRange.");
+            Assert.AreEqual(7f,  GetField<float>(ai, "_attackRange"),     1e-6f,
+                "Opponent DifficultyConfig must override _attackRange.");
+            Assert.AreEqual(0.3f, GetField<float>(ai, "_attackCooldown"), 1e-6f,
+                "Opponent DifficultyConfig must override _attackCooldown.");
+        }
+
+        [Test]
+        public void Awake_SelectedOpponent_AppliesPersonality()
+        {
+            var go = new GameObject("AI_OpponentPersonality");
+            _extraGOs.Add(go);
+            go.SetActive(false);
+            var ai = go.AddComponent<RobotAIController>();
+
+            // Profile has no DifficultyConfig but has a personality that halves cooldown.
+            var personality = MakeNeutralPersonality();
+            SetField(personality, "_attackCooldownMultiplier", 0.5f);
+
+            var profile = MakeSO<OpponentProfileSO>();
+            SetField(profile, "_personality", personality);
+
+            var selectedSO = MakeSelectedOpponent(profile);
+            SetField(ai, "_selectedOpponent", selectedSO);
+
+            go.SetActive(true);   // default cooldown 1.0 × 0.5 = 0.5
+
+            Assert.AreEqual(0.5f, GetField<float>(ai, "_attackCooldown"), 1e-6f,
+                "Opponent Personality must be applied: 1.0 × 0.5 = 0.5.");
+        }
+
+        [Test]
+        public void Awake_SelectedOpponent_NullDifficultyInProfile_DoesNotOverrideDifficulty()
+        {
+            var go = new GameObject("AI_OpponentNullDiff");
+            _extraGOs.Add(go);
+            go.SetActive(false);
+            var ai = go.AddComponent<RobotAIController>();
+
+            // Profile with no DifficultyConfig — should not override inspector defaults.
+            var profile    = MakeSO<OpponentProfileSO>();
+            var selectedSO = MakeSelectedOpponent(profile);
+            SetField(ai, "_selectedOpponent", selectedSO);
+
+            go.SetActive(true);
+
+            Assert.AreEqual(15f, GetField<float>(ai, "_detectionRange"), 1e-6f,
+                "Null DifficultyConfig in profile must not override _detectionRange.");
+        }
+
+        [Test]
+        public void Awake_SelectedOpponent_StacksOnTopOfDirectDifficultyConfig()
+        {
+            var go = new GameObject("AI_OpponentStacks");
+            _extraGOs.Add(go);
+            go.SetActive(false);
+            var ai = go.AddComponent<RobotAIController>();
+
+            // Direct _difficultyConfig sets attackCooldown = 2.0
+            var directConfig = MakeConfig(attackCooldown: 2f);
+            SetField(ai, "_difficultyConfig", directConfig);
+
+            // Opponent profile also carries a DifficultyConfig setting cooldown = 0.5
+            // (opponent wins because it runs AFTER direct config in Awake).
+            var opponentConfig = MakeConfig(attackCooldown: 0.5f);
+            var profile        = MakeSO<OpponentProfileSO>();
+            SetField(profile, "_difficultyConfig", opponentConfig);
+
+            var selectedSO = MakeSelectedOpponent(profile);
+            SetField(ai, "_selectedOpponent", selectedSO);
+
+            go.SetActive(true);
+
+            Assert.AreEqual(0.5f, GetField<float>(ai, "_attackCooldown"), 1e-6f,
+                "SelectedOpponent must override _difficultyConfig (opponent runs LAST in Awake).");
+        }
     }
 }
