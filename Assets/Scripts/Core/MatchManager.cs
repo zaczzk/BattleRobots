@@ -32,15 +32,25 @@ namespace BattleRobots.Core
     {
         // ── Inspector ─────────────────────────────────────────────────────────
 
+        [Header("Match Config (optional)")]
+        [Tooltip("When assigned, RoundDuration / BaseWinReward / ConsolationReward are read " +
+                 "from this SO asset instead of the per-field inspector values below. " +
+                 "Centralises balance tuning to a single shared asset. " +
+                 "Leave null to use the per-component inspector values (backwards-compatible).")]
+        [SerializeField] private MatchRewardConfig _rewardConfig;
+
         [Header("Round Settings")]
-        [Tooltip("Maximum duration of one round in seconds.")]
+        [Tooltip("Maximum duration of one round in seconds. " +
+                 "Ignored when MatchRewardConfig is assigned.")]
         [SerializeField, Min(10f)] private float _roundDuration = 120f;
 
         [Header("Economy")]
-        [Tooltip("Currency awarded to the player for winning a match.")]
+        [Tooltip("Currency awarded to the player for winning a match. " +
+                 "Ignored when MatchRewardConfig is assigned.")]
         [SerializeField, Min(0)] private int _winReward = 200;
 
-        [Tooltip("Consolation currency awarded even on a loss.")]
+        [Tooltip("Consolation currency awarded even on a loss. " +
+                 "Ignored when MatchRewardConfig is assigned.")]
         [SerializeField, Min(0)] private int _lossConsolationReward = 50;
 
         [Header("Combatants")]
@@ -171,13 +181,14 @@ namespace BattleRobots.Core
             // Clear per-match stat accumulator so previous match data does not bleed in.
             _matchStatistics?.Reset();
 
-            _timeRemaining = _roundDuration;
+            // Use MatchRewardConfig when assigned; fall back to per-component inspector field.
+            _timeRemaining = _rewardConfig != null ? _rewardConfig.RoundDuration : _roundDuration;
             _matchRunning  = true;
 
             // Broadcast initial timer value so UI can display it immediately
             _onTimerUpdated?.Raise(_timeRemaining);
 
-            Debug.Log($"[MatchManager] Match started. Round duration: {_roundDuration}s.");
+            Debug.Log($"[MatchManager] Match started. Round duration: {_timeRemaining}s.");
         }
 
         // ── Internal ──────────────────────────────────────────────────────────
@@ -188,7 +199,10 @@ namespace BattleRobots.Core
             if (!_matchRunning) return;
             _matchRunning = false;
 
-            float elapsed = _roundDuration - Mathf.Max(0f, _timeRemaining);
+            // Use the same config-aware duration that HandleMatchStarted set _timeRemaining from,
+            // so elapsed is always correct regardless of whether a MatchRewardConfig is assigned.
+            float activeRoundDuration = _rewardConfig != null ? _rewardConfig.RoundDuration : _roundDuration;
+            float elapsed = activeRoundDuration - Mathf.Max(0f, _timeRemaining);
 
             // Update win streak before computing the bonus so the bonus uses the
             // post-win streak value (e.g. streak was 2, RecordWin() → 3, bonus = +30 %).
@@ -196,7 +210,10 @@ namespace BattleRobots.Core
             else           _winStreak?.RecordLoss();
 
             // Apply streak bonus to win rewards only; consolation reward is never boosted.
-            int baseReward   = playerWon ? _winReward : _lossConsolationReward;
+            // Use MatchRewardConfig when assigned; fall back to per-component inspector fields.
+            int baseReward = playerWon
+                ? (_rewardConfig != null ? _rewardConfig.BaseWinReward     : _winReward)
+                : (_rewardConfig != null ? _rewardConfig.ConsolationReward : _lossConsolationReward);
             int totalReward  = (playerWon && _winStreak != null)
                 ? StreakBonusCalculator.ApplyToReward(baseReward, _winStreak.CurrentStreak)
                 : baseReward;
