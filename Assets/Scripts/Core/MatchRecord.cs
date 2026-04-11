@@ -156,5 +156,35 @@ namespace BattleRobots.Core
         /// with no achievements unlocked.
         /// </summary>
         public List<string> unlockedAchievementIds = new List<string>();
+
+        // ── Career statistics (T071) ───────────────────────────────────────────
+
+        /// <summary>
+        /// Cumulative damage dealt to enemies across all matches ever played.
+        /// Written by <see cref="PlayerCareerStatsSO.PatchSaveData"/> in EndMatch.
+        /// Default 0 — backwards-compatible with saves predating this field.
+        /// </summary>
+        public float careerDamageDealt;
+
+        /// <summary>
+        /// Cumulative damage received by the player across all matches ever played.
+        /// Written by <see cref="PlayerCareerStatsSO.PatchSaveData"/> in EndMatch.
+        /// Default 0 — backwards-compatible with saves predating this field.
+        /// </summary>
+        public float careerDamageTaken;
+
+        /// <summary>
+        /// Cumulative currency earned (before shop spending) across all matches.
+        /// Written by <see cref="PlayerCareerStatsSO.PatchSaveData"/> in EndMatch.
+        /// Default 0 — backwards-compatible with saves predating this field.
+        /// </summary>
+        public int careerCurrencyEarned;
+
+        /// <summary>
+        /// Cumulative match time in seconds across all matches ever played.
+        /// Written by <see cref="PlayerCareerStatsSO.PatchSaveData"/> in EndMatch.
+        /// Default 0 — backwards-compatible with saves predating this field.
+        /// </summary>
+        public float careerPlaytimeSeconds;
     }
 }

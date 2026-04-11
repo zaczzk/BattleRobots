@@ -91,6 +91,12 @@ namespace BattleRobots.Core
                  "Leave null to skip progression tracking (backwards-compatible).")]
         [SerializeField] private PlayerProgressionSO _playerProgression;
 
+        [Header("Career Statistics (optional)")]
+        [Tooltip("SO that accumulates career-wide damage, currency, and playtime totals. " +
+                 "RecordMatch() called in EndMatch(); PatchSaveData() called before Save(). " +
+                 "Leave null to skip career stat tracking (backwards-compatible).")]
+        [SerializeField] private PlayerCareerStatsSO _careerStats;
+
         [Header("Audio")]
         [Tooltip("AudioEvent SO played when the player wins the match.")]
         [SerializeField] private AudioEvent _onWinJingle;
@@ -236,6 +242,9 @@ namespace BattleRobots.Core
                 equippedPartIds = partIds,
             };
 
+            // Update career-wide stat accumulator (damage, currency, playtime).
+            _careerStats?.RecordMatch(record);
+
             // Append to save file — load, mutate, save
             SaveData saveData = SaveSystem.Load();
             saveData.walletBalance = walletSnapshot;
@@ -254,6 +263,9 @@ namespace BattleRobots.Core
                 saveData.playerTotalXP = _playerProgression.TotalXP;
                 saveData.playerLevel   = _playerProgression.CurrentLevel;
             }
+
+            // Persist career-wide totals so they survive the next session.
+            _careerStats?.PatchSaveData(saveData);
 
             SaveSystem.Save(saveData);
 

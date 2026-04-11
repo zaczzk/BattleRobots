@@ -42,6 +42,11 @@ namespace BattleRobots.Core
                  "LoadSnapshot called on startup. Leave null to skip (backwards-compatible).")]
         [SerializeField] private PlayerAchievementsSO _playerAchievements;
 
+        [Header("Career Statistics (optional)")]
+        [Tooltip("Accumulates career-wide damage, currency, and playtime totals. " +
+                 "LoadSnapshot called on startup. Leave null to skip (backwards-compatible).")]
+        [SerializeField] private PlayerCareerStatsSO _careerStats;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -106,6 +111,12 @@ namespace BattleRobots.Core
             // LoadSnapshot is bootstrapper-safe (no events); old saves default to 0/empty.
             _playerAchievements?.LoadSnapshot(
                 save.totalMatchesPlayed, save.totalMatchesWon, save.unlockedAchievementIds);
+
+            // Restore career-wide stat totals.
+            // LoadSnapshot is bootstrapper-safe (no events); old saves default to 0.
+            _careerStats?.LoadSnapshot(
+                save.careerDamageDealt, save.careerDamageTaken,
+                save.careerCurrencyEarned, save.careerPlaytimeSeconds);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

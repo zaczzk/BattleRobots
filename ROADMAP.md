@@ -36,6 +36,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | ID | Task | RICE | Status | DoD |
 |----|------|------|--------|-----|
+| T071 | PlayerCareerStatsSO + CareerStatsController — career-wide stat accumulation | 75 | **Done** | PlayerCareerStatsSO (Core, CreateAssetMenu): TotalDamageDealt/TotalDamageTaken/TotalCurrencyEarned/TotalPlaytimeSeconds; RecordMatch(float,float,int,float) + RecordMatch(MatchRecord) overload; LoadSnapshot silent rehydration; PatchSaveData writes 4 new SaveData fields; Reset silent. SaveData: careerDamageDealt/careerDamageTaken/careerCurrencyEarned/careerPlaytimeSeconds (backwards-compat float/int defaults=0). MatchManager: optional _careerStats field; RecordMatch called after record built in EndMatch; PatchSaveData before SaveSystem.Save(). GameBootstrapper: optional _careerStats field; LoadSnapshot call added. CareerStatsController MB (BattleRobots.UI): optional _playerAchievements/_winStreak/_playerProgression refs for win-rate/streak/level display; _onStatsUpdated VoidGameEvent subscription on OnEnable/OnDisable (cached delegate); Refresh() populates up to 9 optional Text labels; internal static FormatPlaytime reflection-testable. PlayerCareerStatsSOTests (19 tests) + CareerStatsControllerTests (12 tests). Total tests: 781 across 55 files. |
 | T001 | SO Event Channel system (GameEvent<T>, Listener) | 90 | **Done** | Compiles; no Update allocs; unit-testable |
 | T002 | PlayerWallet ScriptableObject | 85 | **Done** | SO mutates via AddFunds/Deduct; fires event |
 | T003 | MatchRecord data class + JSON shape | 85 | **Done** | Serializable; round-trips clean |
@@ -113,7 +114,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Task | Owner | Started | Notes |
 |------|-------|---------|-------|
-| — | — | — | All backlog tasks complete (T001–T070). Test suite: 750 tests across 53 files. Awaiting Editor-session wiring pass. |
+| — | — | — | All backlog tasks complete (T001–T071). Test suite: 781 tests across 55 files. Awaiting Editor-session wiring pass. |
 
 ---
 
@@ -226,14 +227,15 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-10 | PM Agent | Session 30: T068 PlayerProgressionSO + XPRewardCalculator + PlayerLevelController — adds XP-based player levelling to the progression loop. PlayerProgressionSO (Core, CreateAssetMenu): triangular XP threshold formula TotalXPForLevel(N)=50×N×(N−1); CurrentLevel/TotalXP/IsMaxLevel; XpInCurrentLevel/XpRequiredForNextLevel/XpProgressFraction; AddXP guards zero/negative + loops level-up while threshold reached + clamps TotalXP at MaxLevel + fires _onXPGained (IntGameEvent) and _onLevelUp (VoidGameEvent) per level. LoadSnapshot clamps level-0 (old-save default) to 1. Reset silent. XPRewardCalculator static class: CalculateMatchXP(playerWon, durationSeconds, winStreak) = base(100 win/25 loss) + floor(duration/5) + 10×min(streak,5). SaveData extended with playerTotalXP + playerLevel (backwards-compat int fields, default 0; level-0 treated as 1 in LoadSnapshot). GameBootstrapper: _playerProgression optional field + LoadSnapshot call after _winStreak. MatchManager: _playerProgression optional field; XP awarded in EndMatch after streak update using post-match streak value; persisted to SaveData. PlayerLevelController MB (BattleRobots.UI): subscribes _onLevelUp (VoidGameEvent) + _onXPGained (IntGameEvent) on OnEnable; Refresh() populates _levelLabel ("Level N"/"Level MAX"), _xpLabel ("N / M XP"/"MAX"), _xpFillImage.fillAmount; delegates cached in Awake; zero alloc after Awake; no Update; no Physics refs. PlayerProgressionSOTests (30) + XPRewardCalculatorTests (17). Total tasks Done: T001–T068. Total tests: 670 across 49 files. |
 | 2026-04-10 | PM Agent | Session 31: T069 Achievement System — closes the engagement milestone loop. AchievementDefinitionSO (AchievementTrigger enum, 5 types: MatchWon/WinStreak/ReachLevel/TotalMatches/PartUpgraded); AchievementCatalogSO (catalog with duplicate-ID validation); PlayerAchievementsSO (HashSet+List mirror, counters, idempotent Unlock, bootstrapper-safe LoadSnapshot); AchievementManager MB (4 SO event channels, HandleMatchEnded records+evaluates+persists, EvaluateAll() public, PersistAchievements load→mutate→save). SaveData: 3 new backwards-compat fields. GameBootstrapper patched. PlayerAchievementsSOTests (32) + AchievementManagerTests (23) = 55 new tests. Total tasks Done: T001–T069. Total tests: 725 across 51 files. |
 | 2026-04-10 | PM Agent | Session 32: T070 AchievementRowController + AchievementsUIController — closes the UI gap left by T069 (the achievement backend had no player-facing panel). AchievementRowController MB (BattleRobots.UI): Setup(def, isUnlocked, currentProgress) populates _nameText/_descriptionText/_statusText ("UNLOCKED" or "N / M")/_rewardText ("+N" or empty)/_unlockedBadge SetActive; private static FormatProgress(int,int) testable via reflection; no Update; no Physics refs. AchievementsUIController MB (BattleRobots.UI): cached _populateDelegate in Awake; OnEnable/OnDisable subscribe/unsubscribe _onAchievementUnlocked VoidGameEvent; PopulateCatalog() destroys old rows + instantiates one AchievementRowController per catalog entry; private GetCurrentProgress(AchievementTrigger) dispatches to correct runtime SO property; all optional sources null-safe (returns 0); unknown trigger default 0; OnValidate warns on missing refs. AchievementRowControllerTests (10 tests) + AchievementsUIControllerTests (15 tests) = 25 new tests. Total tasks Done: T001–T070. Total tests: 750 across 53 files. |
+| 2026-04-11 | PM Agent | Session 33: T071 PlayerCareerStatsSO + CareerStatsController — fills the gap where players had no career-wide stat view (per-match data in MatchRecord; win counters in PlayerAchievementsSO; but damage/currency/playtime totals were never aggregated). PlayerCareerStatsSO (Core, CreateAssetMenu): TotalDamageDealt/TotalDamageTaken/TotalCurrencyEarned/TotalPlaytimeSeconds; RecordMatch(float,float,int,float) accumulates with negative-clamp + fires _onStatsUpdated (VoidGameEvent); RecordMatch(MatchRecord) convenience overload; LoadSnapshot silent rehydration (negative-clamp, no event); PatchSaveData(SaveData) writes 4 new backwards-compat fields; Reset() silent. SaveData: 4 new fields careerDamageDealt/careerDamageTaken/careerCurrencyEarned/careerPlaytimeSeconds (float/int, default 0, fully backwards-compatible). MatchManager: optional _careerStats field; RecordMatch called just before SaveSystem.Load() in EndMatch; PatchSaveData called before SaveSystem.Save(). GameBootstrapper: optional _careerStats field; LoadSnapshot call added after _playerAchievements rehydration. CareerStatsController MB (BattleRobots.UI): optional refs to _playerAchievements/_winStreak/_playerProgression for win-rate/streak/level; _onStatsUpdated VoidGameEvent subscription; Refresh() drives up to 9 optional Text labels; internal static FormatPlaytime (0s→"0m", 3600s→"1h 0m", reflection-testable); cached delegate; zero alloc after Awake; no Update; no Physics refs. PlayerCareerStatsSOTests (19 tests) + CareerStatsControllerTests (12 tests) = 31 new tests. Total tasks Done: T001–T071. Total tests: 781 across 55 files. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T070 (AchievementsUIController + AchievementRowController). **750 total tests across 53 files.** All 70 backlog items **Done**.
+**Last completed:** T071 (PlayerCareerStatsSO + CareerStatsController). **781 total tests across 55 files.** All 71 backlog items **Done**.
 
-**C# layer status:** Complete and compiles clean. All event channel types tested. Every ScriptableObject in BattleRobots.Core has at least one test file. Newest additions (Session 32): T070 Achievement UI layer — AchievementRowController MB (BattleRobots.UI, Setup(def, isUnlocked, progress) drives one row: name/description/status/reward text + optional badge; private static FormatProgress reflection-testable; 10 tests); AchievementsUIController MB (BattleRobots.UI, PopulateCatalog() instantiates one row per catalog entry, subscribes _onAchievementUnlocked VoidGameEvent for auto-refresh, GetCurrentProgress private reads correct runtime SO per trigger type — MatchWon→TotalMatchesWon/WinStreak→BestStreak/ReachLevel→CurrentLevel/TotalMatches→TotalMatchesPlayed/PartUpgraded→tier sum; all null-safe; 15 tests). Closes the T069 gap where achievement data existed but had no player-facing display.
+**C# layer status:** Complete and compiles clean. All event channel types tested. Every ScriptableObject in BattleRobots.Core has at least one test file. Newest additions (Session 33): T071 Career stats layer — PlayerCareerStatsSO (Core, accumulates TotalDamageDealt/TotalDamageTaken/TotalCurrencyEarned/TotalPlaytimeSeconds; RecordMatch float+MatchRecord overloads; LoadSnapshot/PatchSaveData/Reset; 4 new SaveData fields backwards-compat; 19 tests); CareerStatsController MB (UI, subscribes _onStatsUpdated VoidGameEvent, Refresh() drives 9 optional Text labels, internal static FormatPlaytime reflection-testable; 12 tests). MatchManager patched with optional _careerStats field (RecordMatch + PatchSaveData calls in EndMatch). GameBootstrapper patched with optional _careerStats field (LoadSnapshot on startup).
 
 **Remaining work (Editor-session only — cannot be done by a remote agent):**
 
@@ -244,6 +246,32 @@ The tool will list every null SO reference across all BattleRobots components an
 ### Running the test suite
 Open the project in Unity → Window ▶ General ▶ Test Runner → EditMode tab → Run All.
 All 750 tests should pass without scene setup (they use `ScriptableObject.CreateInstance` and `Application.persistentDataPath`).
+
+### Career Stats wiring (new — T071) ← first priority
+
+1. Create SO asset via Assets ▶ Create ▶ BattleRobots ▶ Core ▶ PlayerCareerStatsSO.
+   One global instance.  Assign a VoidGameEvent SO to `_onStatsUpdated` if you want any
+   UI panel to react in real time (e.g. a profile screen that refreshes after each match).
+
+2. Assign the PlayerCareerStatsSO to:
+   - `GameBootstrapper._careerStats`  — rehydrates from disk on startup.
+   - `MatchManager._careerStats`      — accumulates damage/currency/playtime each EndMatch.
+
+3. For the career stats panel, add `CareerStatsController` MB to any Canvas GameObject and wire:
+   - `_careerStats`           → the PlayerCareerStatsSO asset (required)
+   - `_onStatsUpdated`        → the VoidGameEvent SO from PlayerCareerStatsSO._onStatsUpdated
+   Optional win-rate / streak / level sources:
+   - `_playerAchievements`    → PlayerAchievementsSO asset (enables _matchesPlayedText, _winsText, _winRateText)
+   - `_winStreak`             → WinStreakSO asset (enables _bestStreakText)
+   - `_playerProgression`     → PlayerProgressionSO asset (enables _levelText)
+   Optional Text label refs (each silently skipped if null):
+   - `_matchesPlayedText`, `_winsText`, `_winRateText`
+   - `_damageDealtText`, `_damageTakenText`, `_currencyEarnedText`, `_playtimeText`
+   - `_bestStreakText`, `_levelText`
+
+4. SaveData backwards-compatibility: the four new fields
+   (`careerDamageDealt`, `careerDamageTaken`, `careerCurrencyEarned`, `careerPlaytimeSeconds`)
+   default to 0, so existing save files load cleanly with zero career totals.
 
 ### Achievement System wiring (new — T069) ← first priority
 
