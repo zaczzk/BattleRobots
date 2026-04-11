@@ -47,6 +47,13 @@ namespace BattleRobots.Core
                  "LoadSnapshot called on startup. Leave null to skip (backwards-compatible).")]
         [SerializeField] private PlayerCareerStatsSO _careerStats;
 
+        [Header("Daily Challenge (optional)")]
+        [Tooltip("Runtime SO storing the current daily challenge and completion state. " +
+                 "LoadSnapshot called on startup so DailyChallengeManager.Awake() can " +
+                 "restore the correct challenge via RefreshIfNeeded(). " +
+                 "Leave null to skip (backwards-compatible).")]
+        [SerializeField] private DailyChallengeSO _dailyChallenge;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -117,6 +124,13 @@ namespace BattleRobots.Core
             _careerStats?.LoadSnapshot(
                 save.careerDamageDealt, save.careerDamageTaken,
                 save.careerCurrencyEarned, save.careerPlaytimeSeconds);
+
+            // Restore daily challenge date, pool index, and completion flag.
+            // LoadSnapshot is bootstrapper-safe (no events); old saves default to
+            // empty date / -1 index / false — DailyChallengeManager.Awake then calls
+            // RefreshIfNeeded() which treats the empty date as a new day.
+            _dailyChallenge?.LoadSnapshot(
+                save.dailyChallengeDate, save.dailyChallengeIndex, save.dailyChallengeCompleted);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

@@ -186,5 +186,31 @@ namespace BattleRobots.Core
         /// Default 0 — backwards-compatible with saves predating this field.
         /// </summary>
         public float careerPlaytimeSeconds;
+
+        // ── Daily Challenge (T084) ─────────────────────────────────────────────
+
+        /// <summary>
+        /// UTC date (yyyy-MM-dd) of the last daily-challenge refresh.
+        /// Empty string on saves predating this field — treated as "never refreshed"
+        /// so a new challenge is picked on the next session.
+        /// </summary>
+        public string dailyChallengeDate = "";
+
+        /// <summary>
+        /// Index into <see cref="BattleRobots.Core.DailyChallengeConfig.ChallengePool"/>
+        /// of the challenge selected for <see cref="dailyChallengeDate"/>.
+        /// -1 when no challenge has been selected.
+        /// JsonUtility deserialises missing int fields as 0; the date mismatch logic in
+        /// <see cref="BattleRobots.Core.DailyChallengeSO.RefreshIfNeeded"/> handles this
+        /// safely — a 0 index from an old save is harmless because the date will not
+        /// match today and a fresh selection will be made.
+        /// </summary>
+        public int dailyChallengeIndex = -1;
+
+        /// <summary>
+        /// Whether the daily challenge for <see cref="dailyChallengeDate"/> has been
+        /// completed.  False by default (backwards-compatible).
+        /// </summary>
+        public bool dailyChallengeCompleted;
     }
 }
