@@ -98,6 +98,18 @@ namespace BattleRobots.Physics
             _rechargeTimer = 0f;
         }
 
+        /// <summary>
+        /// Instantly restores shield HP by <paramref name="amount"/> (e.g., from a power-up).
+        /// Delegates directly to <see cref="ShieldSO.Recharge"/>; the recharge delay
+        /// timer is intentionally NOT reset — pickup restoration is independent of
+        /// the auto-recharge cycle.
+        /// Safe to call when <see cref="_shield"/> is null.
+        /// </summary>
+        public void RestoreShield(float amount)
+        {
+            _shield?.Recharge(amount);
+        }
+
         // ── Accessors ─────────────────────────────────────────────────────────
 
         /// <summary>Current shield HP; 0 when no ShieldSO is assigned.</summary>

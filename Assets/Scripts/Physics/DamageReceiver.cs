@@ -81,6 +81,27 @@ namespace BattleRobots.Physics
             TakeDamage(info.amount);
         }
 
+        /// <summary>
+        /// Restores health by <paramref name="amount"/> (e.g., from a power-up pickup).
+        /// Delegates to <see cref="HealthSO.Heal"/>; no-ops when no HealthSO is assigned
+        /// or the robot is already dead. Allocation-free — value type param.
+        /// </summary>
+        public void Heal(float amount)
+        {
+            _health?.Heal(amount);
+        }
+
+        /// <summary>
+        /// Instantly restores shield HP by <paramref name="amount"/> (e.g., from a pickup).
+        /// Delegates to <see cref="ShieldController.RestoreShield"/>; no-ops when no
+        /// ShieldController is assigned. Bypasses the recharge delay timer.
+        /// Allocation-free — value type param.
+        /// </summary>
+        public void RestoreShield(float amount)
+        {
+            _shield?.RestoreShield(amount);
+        }
+
         // ── Accessors ──────────────────────────────────────────────────────────
 
         /// <summary>Convenience passthrough — true if the linked HealthSO reports death.</summary>
