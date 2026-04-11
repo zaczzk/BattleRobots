@@ -114,6 +114,13 @@ namespace BattleRobots.Core
                  "Leave null to record arenaIndex = 0 (backwards-compatible).")]
         [SerializeField] private SelectedArenaSO _selectedArena;
 
+        [Header("Match End Bonuses (optional)")]
+        [Tooltip("Catalogue of performance-bonus conditions evaluated at match end. " +
+                 "Each satisfied condition adds its BonusAmount to the match reward before the " +
+                 "wallet is credited and before the MatchRecord is built. " +
+                 "Leave null to skip bonus evaluation (backwards-compatible).")]
+        [SerializeField] private MatchBonusCatalogSO _bonusCatalog;
+
         [Header("Audio")]
         [Tooltip("AudioEvent SO played when the player wins the match.")]
         [SerializeField] private AudioEvent _onWinJingle;
@@ -242,6 +249,13 @@ namespace BattleRobots.Core
                 ? _matchStatistics.TotalDamageTaken
                 : (_playerHealth != null ? _playerHealth.MaxHealth - _playerHealth.CurrentHealth : 0f);
 
+            // Evaluate performance bonuses (win-only conditions) and add to total reward.
+            // Evaluated after damageDone/damageTaken are known so all condition types are valid.
+            // Null catalog is a no-op (returns 0) — backwards-compatible with existing wiring.
+            int bonusEarned = MatchEndBonusEvaluator.Evaluate(
+                playerWon, elapsed, damageDone, damageTaken, _bonusCatalog);
+            totalReward += bonusEarned;
+
             // Award currency
             if (_playerWallet != null)
                 _playerWallet.AddFunds(totalReward);
@@ -313,7 +327,8 @@ namespace BattleRobots.Core
             else           _onLossJingle?.Raise();
 
             Debug.Log($"[MatchManager] Match ended. PlayerWon={playerWon}, " +
-                      $"Duration={elapsed:F1}s, Reward={totalReward}, Wallet={walletSnapshot}, " +
+                      $"Duration={elapsed:F1}s, Reward={totalReward} (bonus={bonusEarned}), " +
+                      $"Wallet={walletSnapshot}, " +
                       $"Streak={_winStreak?.CurrentStreak ?? 0}, " +
                       $"Level={_playerProgression?.CurrentLevel ?? 1}, " +
                       $"TotalXP={_playerProgression?.TotalXP ?? 0}.");
