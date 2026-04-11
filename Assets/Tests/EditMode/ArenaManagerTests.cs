@@ -280,5 +280,105 @@ namespace BattleRobots.Tests
             Assert.AreEqual(pos0, robot.transform.position,
                 "Second HandleMatchStarted call must reposition the robot.");
         }
+
+        // ── SelectedArenaSO override ──────────────────────────────────────────
+
+        [Test]
+        public void HandleMatchStarted_WithSelectedArena_UsesPresetConfig()
+        {
+            // Inspector _arenaConfig has no spawn points; preset config has one.
+            var presetConfig = ScriptableObject.CreateInstance<ArenaConfig>();
+            var presetPos    = new Vector3(7f, 0f, 0f);
+            SetField(presetConfig, "_spawnPoints",
+                new List<SpawnPointData> { MakeSpawn(presetPos, Vector3.zero) });
+
+            var selectedArena = ScriptableObject.CreateInstance<SelectedArenaSO>();
+            var preset        = new ArenaPresetsConfig.ArenaPreset
+            {
+                displayName = "Override",
+                config      = presetConfig
+            };
+            selectedArena.Select(preset);
+
+            // Assign the override but leave inspector _arenaConfig at the default instance
+            // (no spawn points so positions would stay at origin if it were used).
+            SetField(_manager, "_selectedArena", selectedArena);
+            SetField(_manager, "_arenaConfig",   _arenaConfig); // no spawns on default
+
+            var robot = MakeRobot();
+            SetRobots(new List<GameObject> { robot });
+
+            _manager.HandleMatchStarted();
+
+            Assert.AreEqual(presetPos, robot.transform.position,
+                "With SelectedArenaSO HasSelection=true, ArenaManager must use the preset's config.");
+
+            Object.DestroyImmediate(presetConfig);
+            Object.DestroyImmediate(selectedArena);
+        }
+
+        [Test]
+        public void HandleMatchStarted_SelectedArena_NoSelection_FallsBackToInspectorConfig()
+        {
+            var inspectorPos = new Vector3(3f, 0f, 0f);
+            ConfigureArena(new List<SpawnPointData> { MakeSpawn(inspectorPos, Vector3.zero) });
+
+            // SelectedArenaSO has no selection (Reset or freshly created).
+            var selectedArena = ScriptableObject.CreateInstance<SelectedArenaSO>();
+            SetField(_manager, "_selectedArena", selectedArena);
+
+            var robot = MakeRobot();
+            SetRobots(new List<GameObject> { robot });
+
+            _manager.HandleMatchStarted();
+
+            Assert.AreEqual(inspectorPos, robot.transform.position,
+                "When SelectedArenaSO.HasSelection is false, ArenaManager must fall back to _arenaConfig.");
+
+            Object.DestroyImmediate(selectedArena);
+        }
+
+        [Test]
+        public void HandleMatchStarted_SelectedArena_NullPresetConfig_FallsBackToInspectorConfig()
+        {
+            var inspectorPos = new Vector3(4f, 0f, 0f);
+            ConfigureArena(new List<SpawnPointData> { MakeSpawn(inspectorPos, Vector3.zero) });
+
+            // Preset has HasSelection=true but config is null (incomplete wiring).
+            var selectedArena = ScriptableObject.CreateInstance<SelectedArenaSO>();
+            selectedArena.Select(new ArenaPresetsConfig.ArenaPreset
+            {
+                displayName = "Incomplete",
+                config      = null  // config not wired
+            });
+            SetField(_manager, "_selectedArena", selectedArena);
+
+            var robot = MakeRobot();
+            SetRobots(new List<GameObject> { robot });
+
+            _manager.HandleMatchStarted();
+
+            Assert.AreEqual(inspectorPos, robot.transform.position,
+                "When the selected preset's config is null, ArenaManager must fall back to _arenaConfig.");
+
+            Object.DestroyImmediate(selectedArena);
+        }
+
+        [Test]
+        public void HandleMatchStarted_NullSelectedArena_FallsBackToInspectorConfig()
+        {
+            // Explicit test that null _selectedArena field is handled gracefully.
+            var inspectorPos = new Vector3(2f, 0f, 0f);
+            ConfigureArena(new List<SpawnPointData> { MakeSpawn(inspectorPos, Vector3.zero) });
+            // _selectedArena field not set — remains null by default.
+
+            var robot = MakeRobot();
+            SetRobots(new List<GameObject> { robot });
+
+            _manager.HandleMatchStarted();
+
+            Assert.AreEqual(inspectorPos, robot.transform.position,
+                "Null _selectedArena must be treated as 'no override' — use inspector _arenaConfig.");
+        }
     }
 }

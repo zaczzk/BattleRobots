@@ -107,6 +107,13 @@ namespace BattleRobots.Core
                  "Leave null to skip career stat tracking (backwards-compatible).")]
         [SerializeField] private PlayerCareerStatsSO _careerStats;
 
+        [Header("Arena Selection (optional)")]
+        [Tooltip("Runtime SO written by ArenaSelectionController. " +
+                 "When assigned and HasSelection is true, Current.config.ArenaIndex is written " +
+                 "to the MatchRecord so post-match analytics can identify the arena played. " +
+                 "Leave null to record arenaIndex = 0 (backwards-compatible).")]
+        [SerializeField] private SelectedArenaSO _selectedArena;
+
         [Header("Audio")]
         [Tooltip("AudioEvent SO played when the player wins the match.")]
         [SerializeField] private AudioEvent _onWinJingle;
@@ -246,10 +253,18 @@ namespace BattleRobots.Core
                 ? new List<string>(_playerAssembler.GetEquippedPartIds())
                 : new List<string>();
 
+            // Resolve arena index from SelectedArenaSO when available; default to 0.
+            int arenaIndex = (_selectedArena != null
+                              && _selectedArena.HasSelection
+                              && _selectedArena.Current?.config != null)
+                ? _selectedArena.Current.config.ArenaIndex
+                : 0;
+
             // Build and persist match record
             var record = new MatchRecord
             {
                 timestamp       = DateTime.UtcNow.ToString("o"),
+                arenaIndex      = arenaIndex,
                 playerWon       = playerWon,
                 durationSeconds = elapsed,
                 damageDone      = damageDone,

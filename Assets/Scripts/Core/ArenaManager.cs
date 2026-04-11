@@ -32,8 +32,15 @@ namespace BattleRobots.Core
         // ── Inspector ─────────────────────────────────────────────────────────
 
         [Header("Config")]
-        [Tooltip("ArenaConfig SO that defines ground dimensions, wall height, and spawn points.")]
+        [Tooltip("ArenaConfig SO that defines ground dimensions, wall height, and spawn points. " +
+                 "Used as a fallback when _selectedArena is null or has no selection.")]
         [SerializeField] private ArenaConfig _arenaConfig;
+
+        [Tooltip("Optional runtime SO written by ArenaSelectionController. " +
+                 "When assigned and HasSelection is true, the preset's ArenaConfig overrides " +
+                 "_arenaConfig — no per-session Inspector changes needed. " +
+                 "Leave null to always use the _arenaConfig inspector field (backwards-compatible).")]
+        [SerializeField] private SelectedArenaSO _selectedArena;
 
         [Header("Robots")]
         [Tooltip("Root GameObjects of each combatant, in spawn-slot order (index 0 = player).")]
@@ -48,19 +55,28 @@ namespace BattleRobots.Core
         /// </summary>
         public void HandleMatchStarted()
         {
-            if (_arenaConfig == null)
+            // Resolve active config: prefer SelectedArenaSO preset when available;
+            // fall back to the inspector _arenaConfig field (backwards-compatible).
+            ArenaConfig activeConfig = (_selectedArena != null
+                                        && _selectedArena.HasSelection
+                                        && _selectedArena.Current?.config != null)
+                ? _selectedArena.Current.config
+                : _arenaConfig;
+
+            if (activeConfig == null)
             {
                 Debug.LogError("[ArenaManager] ArenaConfig is not assigned — cannot spawn robots.");
                 return;
             }
 
-            var spawnPoints = _arenaConfig.SpawnPoints;
+            var spawnPoints = activeConfig.SpawnPoints;
 
             if (_robotRoots.Count > spawnPoints.Count)
             {
+                string configName = activeConfig.name;
                 Debug.LogWarning(
-                    $"[ArenaManager] {_robotRoots.Count} robots but only {spawnPoints.Count} spawn points. " +
-                    "Extra robots will not be repositioned.");
+                    $"[ArenaManager] {_robotRoots.Count} robots but only {spawnPoints.Count} spawn points " +
+                    $"in '{configName}'. Extra robots will not be repositioned.");
             }
 
             int count = Mathf.Min(_robotRoots.Count, spawnPoints.Count);
