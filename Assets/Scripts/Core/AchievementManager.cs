@@ -63,6 +63,10 @@ namespace BattleRobots.Core
                  "Leave null to skip credit rewards (prestige-only mode).")]
         [SerializeField] private PlayerWallet _playerWallet;
 
+        [Tooltip("Optional. Enqueues a toast notification when an achievement unlocks. " +
+                 "Leave null to suppress in-game toast notifications.")]
+        [SerializeField] private NotificationQueueSO _notificationQueue;
+
         [Header("Optional Trigger Sources")]
         [Tooltip("Provides BestStreak for the WinStreak trigger. Leave null to skip.")]
         [SerializeField] private WinStreakSO _winStreak;
@@ -233,6 +237,8 @@ namespace BattleRobots.Core
 
             if (def.RewardCredits > 0)
                 _playerWallet?.AddFunds(def.RewardCredits);
+
+            _notificationQueue?.Enqueue(def.DisplayName, def.Description);
 
             Debug.Log($"[AchievementManager] Achievement unlocked: '{def.DisplayName}'. " +
                       $"Reward: {def.RewardCredits} credits.");
