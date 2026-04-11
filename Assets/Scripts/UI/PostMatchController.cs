@@ -75,6 +75,24 @@ namespace BattleRobots.UI
                  "Leave null to hide streak display.")]
         [SerializeField] private WinStreakSO _winStreak;
 
+        [Header("Bonus Display (optional)")]
+        [Tooltip("Displays the total bonus currency earned from performance conditions. " +
+                 "e.g. 'Bonus: +175' or 'Bonus: none'. " +
+                 "Reads BonusEarned from the MatchResultSO blackboard. " +
+                 "Leave null to omit.")]
+        [SerializeField] private Text _bonusEarnedText;
+
+        [Tooltip("Displays a per-condition breakdown of which bonuses were earned or missed. " +
+                 "Requires _bonusCatalog to be assigned. " +
+                 "e.g. '+ Perfect Shield: +100\\n○ Speed Run'. " +
+                 "Leave null to omit.")]
+        [SerializeField] private Text _bonusDetailText;
+
+        [Tooltip("The same MatchBonusCatalogSO assigned to MatchManager._bonusCatalog. " +
+                 "Conditions are re-evaluated here using MatchResultSO data to build the detail breakdown. " +
+                 "Leave null to omit the per-condition breakdown (does not affect _bonusEarnedText).")]
+        [SerializeField] private MatchBonusCatalogSO _bonusCatalog;
+
         [Header("Event Channels — In")]
         [Tooltip("VoidGameEvent raised by MatchManager when the round ends.")]
         [SerializeField] private VoidGameEvent _onMatchEnded;
@@ -149,6 +167,49 @@ namespace BattleRobots.UI
                 _streakText.text = streak > 0
                     ? string.Format("Win Streak: {0}!", streak)
                     : string.Format("Best Streak: {0}", _winStreak.BestStreak);
+            }
+
+            // Bonus earned total (optional — populated from MatchResultSO.BonusEarned)
+            if (_bonusEarnedText != null)
+            {
+                int bonusEarned = _matchResult.BonusEarned;
+                _bonusEarnedText.text = bonusEarned > 0
+                    ? string.Format("Bonus: +{0}", bonusEarned)
+                    : "Bonus: none";
+            }
+
+            // Per-condition bonus breakdown (optional — requires _bonusCatalog)
+            // Conditions are re-evaluated against MatchResultSO data so the display
+            // is always consistent with what MatchManager computed at match end.
+            if (_bonusDetailText != null && _bonusCatalog != null)
+            {
+                var sb         = new System.Text.StringBuilder();
+                var conditions = _bonusCatalog.Conditions;
+                bool firstLine = true;
+                for (int i = 0; i < conditions.Count; i++)
+                {
+                    var cond = conditions[i];
+                    if (cond == null) continue;
+
+                    bool met = MatchEndBonusEvaluator.EvaluateCondition(
+                        cond,
+                        _matchResult.PlayerWon,
+                        _matchResult.DurationSeconds,
+                        _matchResult.DamageDone,
+                        _matchResult.DamageTaken);
+
+                    string condName = string.IsNullOrWhiteSpace(cond.DisplayName)
+                        ? cond.ConditionType.ToString()
+                        : cond.DisplayName;
+
+                    if (!firstLine) sb.Append('\n');
+                    if (met)
+                        sb.AppendFormat("+ {0}: +{1}", condName, cond.BonusAmount);
+                    else
+                        sb.AppendFormat("○ {0}", condName);
+                    firstLine = false;
+                }
+                _bonusDetailText.text = sb.ToString();
             }
 
             Debug.Log($"[PostMatchController] Results shown — " +

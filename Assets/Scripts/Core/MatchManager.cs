@@ -317,7 +317,9 @@ namespace BattleRobots.Core
 
             // Write blackboard SO before raising MatchEnded so PostMatchController
             // reads correct data when its callback fires.
-            _matchResult?.Write(playerWon, elapsed, totalReward, walletSnapshot, damageDone, damageTaken);
+            // bonusEarned is stored separately so the UI can display "Bonus: +N" without
+            // re-evaluating conditions; it is already included in totalReward / currencyEarned.
+            _matchResult?.Write(playerWon, elapsed, totalReward, walletSnapshot, damageDone, damageTaken, bonusEarned);
 
             // Signal other systems
             _onMatchEnded?.Raise();

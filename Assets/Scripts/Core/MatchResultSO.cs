@@ -54,6 +54,16 @@ namespace BattleRobots.Core
         /// </summary>
         public float DamageTaken { get; private set; }
 
+        /// <summary>
+        /// Total bonus currency earned from <see cref="BonusConditionSO"/> conditions
+        /// evaluated at match end.  This amount is already included in
+        /// <see cref="CurrencyEarned"/>; it is stored separately so the post-match UI
+        /// can display "Bonus: +N" without re-evaluating conditions.
+        /// Zero when no <see cref="MatchBonusCatalogSO"/> is assigned to MatchManager,
+        /// or when no conditions were satisfied.
+        /// </summary>
+        public int BonusEarned { get; private set; }
+
         // ── Mutator — called by MatchManager only ─────────────────────────────
 
         /// <summary>
@@ -61,12 +71,12 @@ namespace BattleRobots.Core
         /// Must be called <b>before</b> raising the MatchEnded VoidGameEvent
         /// so that subscribers read up-to-date values.
         ///
-        /// The <paramref name="damageDone"/> and <paramref name="damageTaken"/>
-        /// parameters are optional (default 0) for backwards compatibility with
-        /// callers that do not yet track damage statistics.
+        /// The <paramref name="damageDone"/>, <paramref name="damageTaken"/>, and
+        /// <paramref name="bonusEarned"/> parameters are optional (default 0) for
+        /// backwards compatibility with callers that do not yet track those values.
         /// </summary>
         public void Write(bool playerWon, float durationSeconds, int currencyEarned, int newWalletBalance,
-                          float damageDone = 0f, float damageTaken = 0f)
+                          float damageDone = 0f, float damageTaken = 0f, int bonusEarned = 0)
         {
             PlayerWon        = playerWon;
             DurationSeconds  = durationSeconds;
@@ -74,6 +84,7 @@ namespace BattleRobots.Core
             NewWalletBalance = newWalletBalance;
             DamageDone       = damageDone;
             DamageTaken      = damageTaken;
+            BonusEarned      = bonusEarned;
         }
     }
 }
