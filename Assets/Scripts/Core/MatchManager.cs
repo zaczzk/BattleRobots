@@ -145,6 +145,14 @@ namespace BattleRobots.Core
                  "Leave null to skip score tracking (backwards-compatible).")]
         [SerializeField] private PersonalBestSO _personalBest;
 
+        [Header("Timer Warning (optional)")]
+        [Tooltip("Configures time thresholds that fire VoidGameEvent channels as the match timer " +
+                 "counts down (e.g. at 60 s, 30 s, 10 s). Reset() is called at match start so " +
+                 "each match fires every threshold fresh. Wire MatchTimerWarningController to the " +
+                 "same _onTimerUpdated FloatGameEvent to show a panel overlay at low-time marks. " +
+                 "Leave null to skip timer-warning events (backwards-compatible).")]
+        [SerializeField] private MatchTimerWarningSO _timerWarning;
+
         [Header("Audio")]
         [Tooltip("AudioEvent SO played when the player wins the match.")]
         [SerializeField] private AudioEvent _onWinJingle;
@@ -223,6 +231,9 @@ namespace BattleRobots.Core
 
             // Clear per-match stat accumulator so previous match data does not bleed in.
             _matchStatistics?.Reset();
+
+            // Reset timer-warning SO so every threshold can fire once more for this match.
+            _timerWarning?.Reset();
 
             // Use MatchRewardConfig when assigned; fall back to per-component inspector field.
             _timeRemaining = _rewardConfig != null ? _rewardConfig.RoundDuration : _roundDuration;
