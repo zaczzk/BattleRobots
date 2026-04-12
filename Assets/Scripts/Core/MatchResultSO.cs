@@ -64,6 +64,29 @@ namespace BattleRobots.Core
         /// </summary>
         public int BonusEarned { get; private set; }
 
+        // ── M7 Progression fields (T114) ─────────────────────────────────────
+
+        /// <summary>
+        /// XP awarded to the player this match, as computed by
+        /// <see cref="XPRewardCalculator.CalculateMatchXP"/>.
+        /// Zero when <see cref="MatchManager"/> has no <c>_playerProgression</c> assigned,
+        /// or when using a caller that does not pass the optional parameter.
+        /// </summary>
+        public int XPEarned { get; private set; }
+
+        /// <summary>
+        /// True when the player levelled up at least once during this match's XP award.
+        /// False when no <c>_playerProgression</c> is assigned, or when the XP earned
+        /// was not enough to cross the next level threshold.
+        /// </summary>
+        public bool LeveledUp { get; private set; }
+
+        /// <summary>
+        /// The player's level after XP was applied.
+        /// Defaults to 1 when no <c>_playerProgression</c> is assigned.
+        /// </summary>
+        public int NewLevel { get; private set; }
+
         // ── Mutator — called by MatchManager only ─────────────────────────────
 
         /// <summary>
@@ -71,12 +94,15 @@ namespace BattleRobots.Core
         /// Must be called <b>before</b> raising the MatchEnded VoidGameEvent
         /// so that subscribers read up-to-date values.
         ///
-        /// The <paramref name="damageDone"/>, <paramref name="damageTaken"/>, and
-        /// <paramref name="bonusEarned"/> parameters are optional (default 0) for
-        /// backwards compatibility with callers that do not yet track those values.
+        /// The <paramref name="damageDone"/>, <paramref name="damageTaken"/>,
+        /// <paramref name="bonusEarned"/>, <paramref name="xpEarned"/>,
+        /// <paramref name="leveledUp"/>, and <paramref name="newLevel"/> parameters
+        /// are optional (default 0/false/1) for backwards compatibility with callers
+        /// that do not yet track those values.
         /// </summary>
         public void Write(bool playerWon, float durationSeconds, int currencyEarned, int newWalletBalance,
-                          float damageDone = 0f, float damageTaken = 0f, int bonusEarned = 0)
+                          float damageDone = 0f, float damageTaken = 0f, int bonusEarned = 0,
+                          int xpEarned = 0, bool leveledUp = false, int newLevel = 1)
         {
             PlayerWon        = playerWon;
             DurationSeconds  = durationSeconds;
@@ -85,6 +111,9 @@ namespace BattleRobots.Core
             DamageDone       = damageDone;
             DamageTaken      = damageTaken;
             BonusEarned      = bonusEarned;
+            XPEarned         = xpEarned;
+            LeveledUp        = leveledUp;
+            NewLevel         = newLevel;
         }
     }
 }

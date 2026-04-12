@@ -296,12 +296,18 @@ namespace BattleRobots.Core
             }
 
             // Award XP — uses post-match streak value (0 after a loss, incremented after a win).
+            // Capture level before AddXP so we can detect level-up for the post-match screen.
+            int levelBefore = _playerProgression?.CurrentLevel ?? 1;
+            int xpEarned    = 0;
             if (_playerProgression != null)
             {
-                int xpEarned = XPRewardCalculator.CalculateMatchXP(
+                xpEarned = XPRewardCalculator.CalculateMatchXP(
                     playerWon, elapsed, _winStreak?.CurrentStreak ?? 0);
                 _playerProgression.AddXP(xpEarned);
             }
+            bool leveledUp = _playerProgression != null &&
+                             _playerProgression.CurrentLevel > levelBefore;
+            int newLevel = _playerProgression?.CurrentLevel ?? 1;
 
             // Prefer accumulated per-hit stats from MatchStatisticsSO when available;
             // fall back to the end-of-match health-difference approximation otherwise.
@@ -388,7 +394,10 @@ namespace BattleRobots.Core
             // reads correct data when its callback fires.
             // bonusEarned is stored separately so the UI can display "Bonus: +N" without
             // re-evaluating conditions; it is already included in totalReward / currencyEarned.
-            _matchResult?.Write(playerWon, elapsed, totalReward, walletSnapshot, damageDone, damageTaken, bonusEarned);
+            // xpEarned / leveledUp / newLevel give the post-match screen M7 progression data.
+            _matchResult?.Write(playerWon, elapsed, totalReward, walletSnapshot,
+                                damageDone, damageTaken, bonusEarned,
+                                xpEarned, leveledUp, newLevel);
 
             // Compute and submit match score for personal best tracking.
             // Called AFTER MatchResultSO.Write() so the calculator reads fresh data.
@@ -417,7 +426,7 @@ namespace BattleRobots.Core
                       $"Duration={elapsed:F1}s, Reward={totalReward} (bonus={bonusEarned}), " +
                       $"Wallet={walletSnapshot}, " +
                       $"Streak={_winStreak?.CurrentStreak ?? 0}, " +
-                      $"Level={_playerProgression?.CurrentLevel ?? 1}, " +
+                      $"XP+{xpEarned} Level={newLevel}{(leveledUp ? " (LEVEL UP)" : string.Empty)}, " +
                       $"TotalXP={_playerProgression?.TotalXP ?? 0}.");
         }
 

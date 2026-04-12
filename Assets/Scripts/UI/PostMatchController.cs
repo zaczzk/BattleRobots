@@ -75,6 +75,50 @@ namespace BattleRobots.UI
                  "Leave null to hide streak display.")]
         [SerializeField] private WinStreakSO _winStreak;
 
+        [Header("M7 Progression (optional)")]
+        [Tooltip("Displays XP earned this match, e.g. 'XP: +142'. " +
+                 "Reads XPEarned from MatchResultSO. Leave null to omit.")]
+        [SerializeField] private Text _xpEarnedText;
+
+        [Tooltip("Displays the player's level after this match, e.g. 'Level 5'. " +
+                 "Reads NewLevel from MatchResultSO. Leave null to omit.")]
+        [SerializeField] private Text _levelText;
+
+        [Tooltip("GameObject shown when the player levelled up this match (LeveledUp=true). " +
+                 "Hidden when no level-up occurred. Leave null to omit.")]
+        [SerializeField] private GameObject _levelUpBanner;
+
+        [Header("M7 Tier (optional)")]
+        [Tooltip("Reads current build rating from this SO to compute the player's tier. " +
+                 "Requires _tierConfig to also be assigned. Leave null to omit tier display.")]
+        [SerializeField] private BuildRatingSO _buildRating;
+
+        [Tooltip("Tier threshold config used to resolve the tier display name. " +
+                 "Requires _buildRating to also be assigned. Leave null to omit tier display.")]
+        [SerializeField] private RobotTierConfig _tierConfig;
+
+        [Tooltip("Displays the player's current build tier, e.g. 'Gold'. " +
+                 "Populated from _buildRating + _tierConfig. Leave null to omit.")]
+        [SerializeField] private Text _tierText;
+
+        [Header("M7 Achievement (optional)")]
+        [Tooltip("Runtime SO tracking achievement state. " +
+                 "LastUnlockedId is read to show the most-recently unlocked achievement. " +
+                 "Leave null to omit achievement display.")]
+        [SerializeField] private PlayerAchievementsSO _playerAchievements;
+
+        [Tooltip("Catalog used to resolve the achievement display name from LastUnlockedId. " +
+                 "Leave null to fall back to showing the raw ID string.")]
+        [SerializeField] private AchievementCatalogSO _achievementCatalog;
+
+        [Tooltip("Displays the achievement unlocked this session, e.g. 'Achievement: First Victory'. " +
+                 "Shown only when LastUnlockedId is non-empty. Leave null to omit.")]
+        [SerializeField] private Text _achievementText;
+
+        [Tooltip("GameObject shown when an achievement was unlocked (LastUnlockedId non-empty). " +
+                 "Hidden when no achievement was unlocked. Leave null to omit.")]
+        [SerializeField] private GameObject _achievementBanner;
+
         [Header("Bonus Display (optional)")]
         [Tooltip("Displays the total bonus currency earned from performance conditions. " +
                  "e.g. 'Bonus: +175' or 'Bonus: none'. " +
@@ -210,6 +254,56 @@ namespace BattleRobots.UI
                     firstLine = false;
                 }
                 _bonusDetailText.text = sb.ToString();
+            }
+
+            // ── M7 Progression display ────────────────────────────────────────
+
+            // XP earned this match (optional)
+            if (_xpEarnedText != null)
+                _xpEarnedText.text = string.Format("XP: +{0}", _matchResult.XPEarned);
+
+            // Current level after match (optional)
+            if (_levelText != null)
+                _levelText.text = string.Format("Level {0}", _matchResult.NewLevel);
+
+            // Level-up banner visibility (optional)
+            if (_levelUpBanner != null)
+                _levelUpBanner.SetActive(_matchResult.LeveledUp);
+
+            // ── M7 Tier display ───────────────────────────────────────────────
+
+            if (_tierText != null && _buildRating != null && _tierConfig != null)
+            {
+                RobotTierLevel tier = RobotTierEvaluator.EvaluateTier(_buildRating, _tierConfig);
+                _tierText.text = _tierConfig.GetDisplayName(tier);
+            }
+
+            // ── M7 Achievement display ────────────────────────────────────────
+
+            string lastAchievementId = _playerAchievements?.LastUnlockedId;
+            bool hasAchievement = !string.IsNullOrWhiteSpace(lastAchievementId);
+
+            if (_achievementBanner != null)
+                _achievementBanner.SetActive(hasAchievement);
+
+            if (_achievementText != null && hasAchievement)
+            {
+                // Resolve display name from catalog; fall back to raw ID when catalog absent.
+                string displayName = null;
+                if (_achievementCatalog != null)
+                {
+                    var all = _achievementCatalog.Achievements;
+                    for (int i = 0; i < all.Count; i++)
+                    {
+                        if (all[i] != null && all[i].Id == lastAchievementId)
+                        {
+                            displayName = all[i].DisplayName;
+                            break;
+                        }
+                    }
+                }
+                _achievementText.text = string.Format("Achievement: {0}",
+                    displayName ?? lastAchievementId);
             }
 
             Debug.Log($"[PostMatchController] Results shown — " +
