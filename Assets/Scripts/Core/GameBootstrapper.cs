@@ -13,6 +13,11 @@ namespace BattleRobots.Core
         [Header("Economy")]
         [SerializeField] private PlayerWallet _playerWallet;
 
+        [Tooltip("Named loadout presets saved by the player. LoadSnapshot called on startup to " +
+                 "rehydrate saved presets from SaveData.savedLoadoutPresets. " +
+                 "Leave null to skip (backwards-compatible).")]
+        [SerializeField] private LoadoutPresetManagerSO _loadoutPresets;
+
         [Tooltip("Inventory SO rehydrated from SaveData.unlockedPartIds on startup.")]
         [SerializeField] private PlayerInventory _playerInventory;
 
@@ -141,6 +146,11 @@ namespace BattleRobots.Core
             // Restore all-time best match score.
             // LoadSnapshot is bootstrapper-safe (no events); old saves default to 0.
             _personalBest?.LoadSnapshot(save.personalBestScore);
+
+            // Restore named loadout presets saved by the player.
+            // LoadSnapshot is bootstrapper-safe (no events, defensive deep copy).
+            // Old saves have an empty list by default — presets start fresh.
+            _loadoutPresets?.LoadSnapshot(save.savedLoadoutPresets);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

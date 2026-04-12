@@ -54,6 +54,17 @@ namespace BattleRobots.UI
         [Tooltip("Activated when the player owns this part (badge / 'Owned' overlay).")]
         [SerializeField] private GameObject _ownedBadge;
 
+        [Header("Rarity (optional)")]
+        [Tooltip("Maps part rarity to display name, tint colour, and drop-weight multiplier. " +
+                 "Leave null to skip rarity display in the shop.")]
+        [SerializeField] private PartRarityConfig _rarityConfig;
+
+        [Tooltip("Image tinted by the part's rarity colour. Leave null to skip.")]
+        [SerializeField] private Image _rarityBadge;
+
+        [Tooltip("Text label for the rarity display name (e.g. \"Rare\"). Leave null to skip.")]
+        [SerializeField] private Text _rarityLabel;
+
         // ── Runtime data (injected by ShopCatalogView, not set in prefab) ─────
 
         private ShopManager      _shopManager;
@@ -89,6 +100,15 @@ namespace BattleRobots.UI
             {
                 _thumbnail.sprite  = part.Thumbnail;
                 _thumbnail.enabled = part.Thumbnail != null;
+            }
+
+            // Rarity display — requires _rarityConfig; individual UI refs are optional.
+            if (_rarityConfig != null)
+            {
+                if (_rarityBadge != null)
+                    _rarityBadge.color = _rarityConfig.GetTintColor(part.Rarity);
+                if (_rarityLabel != null)
+                    _rarityLabel.text  = _rarityConfig.GetDisplayName(part.Rarity);
             }
 
             Refresh();

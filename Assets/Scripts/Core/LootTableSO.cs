@@ -147,6 +147,67 @@ namespace BattleRobots.Core
             return null;
         }
 
+        /// <summary>
+        /// Rarity-aware overload of <see cref="RollDrop(int)"/>.
+        ///
+        /// Each entry's base weight is scaled by
+        /// <see cref="PartRarityConfig.GetLootWeightMultiplier"/> before computing
+        /// the weighted-random distribution.  This lets higher-rarity parts appear
+        /// less frequently than their base weight alone would suggest.
+        ///
+        /// Falls back to the base <see cref="RollDrop(int)"/> overload when
+        /// <paramref name="rarityConfig"/> is <c>null</c>.
+        ///
+        /// Only entries with a non-null part and weight &gt; 0 are eligible.
+        /// Returns <c>null</c> when no valid entries exist after weight scaling.
+        /// </summary>
+        /// <param name="seed">
+        /// Integer seed passed to <see cref="System.Random"/> so callers can
+        /// reproduce results in tests.
+        /// </param>
+        /// <param name="rarityConfig">
+        /// Config SO that maps <see cref="PartRarity"/> to weight multipliers.
+        /// Pass <c>null</c> to use unscaled base weights (identical to base overload).
+        /// </param>
+        public PartDefinition RollDrop(int seed, PartRarityConfig rarityConfig)
+        {
+            if (rarityConfig == null) return RollDrop(seed);
+
+            // Compute scaled total weight.
+            float total = 0f;
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                LootEntry e = _entries[i];
+                if (e.part == null || e.weight <= 0f) continue;
+                total += e.weight * rarityConfig.GetLootWeightMultiplier(e.part.Rarity);
+            }
+
+            if (total <= 0f) return null;
+
+            // Walk the scaled cumulative distribution.
+            var   rng        = new System.Random(seed);
+            float roll       = (float)(rng.NextDouble() * total);
+            float cumulative = 0f;
+
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                LootEntry e = _entries[i];
+                if (e.part == null || e.weight <= 0f) continue;
+                cumulative += e.weight * rarityConfig.GetLootWeightMultiplier(e.part.Rarity);
+                if (roll < cumulative)
+                    return e.part;
+            }
+
+            // Floating-point edge: roll == total exactly → return last valid entry.
+            for (int i = _entries.Count - 1; i >= 0; i--)
+            {
+                if (_entries[i].part != null && _entries[i].weight > 0f)
+                    return _entries[i].part;
+            }
+
+            return null;
+        }
+
         // ── Editor validation ─────────────────────────────────────────────────
 
 #if UNITY_EDITOR

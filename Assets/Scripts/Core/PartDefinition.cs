@@ -80,6 +80,13 @@ namespace BattleRobots.Core
                  "by RobotAssembler during match setup. Leave null for stat-only parts.")]
         [SerializeField] private GameObject _prefab;
 
+        // ── Rarity ────────────────────────────────────────────────────────────
+
+        [Header("Rarity")]
+        [Tooltip("Rarity tier of this part. Affects loot-drop weight (via PartRarityConfig) " +
+                 "and shop badge colour.")]
+        [SerializeField] private PartRarity _rarity = PartRarity.Common;
+
         // ── Stats ─────────────────────────────────────────────────────────────
 
         [Header("Combat Stats")]
@@ -96,6 +103,7 @@ namespace BattleRobots.Core
         public int          Cost        => _cost;
         public Sprite       Thumbnail   => _thumbnail;
         public GameObject   Prefab      => _prefab;
+        public PartRarity   Rarity      => _rarity;
 
         /// <summary>
         /// Gameplay-stat contribution of this part.
