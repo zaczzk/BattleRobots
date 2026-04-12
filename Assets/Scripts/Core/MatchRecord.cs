@@ -70,6 +70,27 @@ namespace BattleRobots.Core
     }
 
     /// <summary>
+    /// A named snapshot of the player's equipped-part list, stored as a loadout preset.
+    ///
+    /// Created by <see cref="LoadoutPresetManagerSO.SavePreset"/> and serialised into
+    /// <see cref="SaveData.savedLoadoutPresets"/> via the XOR SaveSystem.
+    ///
+    /// Immutable once created: the name and part-ID list never change after construction.
+    /// </summary>
+    [Serializable]
+    public sealed class SavedLoadoutPreset
+    {
+        /// <summary>Display name chosen by the player (e.g. "Speed Build"). Never null.</summary>
+        public string name = "";
+
+        /// <summary>
+        /// Snapshot of the equipped part IDs at the time the preset was saved.
+        /// May be empty (player saved an empty loadout). Never null.
+        /// </summary>
+        public List<string> partIds = new List<string>();
+    }
+
+    /// <summary>
     /// Top-level save file container. Holds the running wallet balance,
     /// the full match history, and the set of part IDs the player owns.
     /// </summary>
@@ -231,5 +252,16 @@ namespace BattleRobots.Core
         /// Default 0 — backwards-compatible with saves predating this field.
         /// </summary>
         public int personalBestScore;
+
+        // ── Loadout Presets (T103) ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Named loadout presets saved by the player in the pre-match lobby.
+        /// Each entry stores a display name and a snapshot of equipped part IDs.
+        /// Written by <see cref="LoadoutPresetManagerSO"/> via the load→mutate→Save
+        /// round-trip in <see cref="BattleRobots.UI.LoadoutPresetController"/>.
+        /// Initialised to an empty list so saves predating this field load with no presets.
+        /// </summary>
+        public List<SavedLoadoutPreset> savedLoadoutPresets = new List<SavedLoadoutPreset>();
     }
 }
