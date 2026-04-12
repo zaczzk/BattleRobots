@@ -145,6 +145,14 @@ namespace BattleRobots.Core
                  "Leave null to skip score tracking (backwards-compatible).")]
         [SerializeField] private PersonalBestSO _personalBest;
 
+        [Header("Leaderboard (optional)")]
+        [Tooltip("Local top-N match score leaderboard. Submit() is called in EndMatch() just " +
+                 "after the MatchResultSO blackboard is written and the match score is computed, " +
+                 "so the board is updated before _onMatchEnded fires. " +
+                 "TakeSnapshot() persists the updated board to SaveData.leaderboardEntries. " +
+                 "Leave null to skip leaderboard tracking (backwards-compatible).")]
+        [SerializeField] private MatchLeaderboardSO _matchLeaderboard;
+
         [Header("Timer Warning (optional)")]
         [Tooltip("Configures time thresholds that fire VoidGameEvent channels as the match timer " +
                  "counts down (e.g. at 60 s, 30 s, 10 s). Reset() is called at match start so " +
@@ -412,6 +420,15 @@ namespace BattleRobots.Core
             // Persist personal best score so it survives the next session.
             if (_personalBest != null)
                 saveData.personalBestScore = _personalBest.BestScore;
+
+            // Submit to local leaderboard — fired after MatchResultSO is written and the
+            // match score is available, so the board reflects the completed match.
+            // TakeSnapshot() is called immediately so the persisted list is always in sync.
+            if (_matchLeaderboard != null && _matchResult != null)
+            {
+                _matchLeaderboard.Submit(_matchResult, opponentName, arenaIndex);
+                saveData.leaderboardEntries = _matchLeaderboard.TakeSnapshot();
+            }
 
             SaveSystem.Save(saveData);
 

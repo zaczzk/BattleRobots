@@ -71,6 +71,12 @@ namespace BattleRobots.Core
                  "Leave null to skip (parts start at full HP — backwards-compatible).")]
         [SerializeField] private PartConditionRegistry _partConditionRegistry;
 
+        [Header("Leaderboard (optional)")]
+        [Tooltip("Local top-N match score leaderboard. LoadSnapshot called on startup to " +
+                 "rehydrate saved entries from SaveData.leaderboardEntries. " +
+                 "Leave null to skip (leaderboard starts empty — backwards-compatible).")]
+        [SerializeField] private MatchLeaderboardSO _matchLeaderboard;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -162,6 +168,11 @@ namespace BattleRobots.Core
             // LoadSnapshot overrides the full-HP OnEnable default on each matching SO.
             // Old saves have an empty savedPartConditions list — all parts start at full HP.
             _partConditionRegistry?.LoadSnapshot(save.savedPartConditions);
+
+            // Restore local leaderboard entries.
+            // LoadSnapshot is bootstrapper-safe (no events, defensive deep copy, auto-sorts).
+            // Old saves have an empty leaderboardEntries list — board starts empty.
+            _matchLeaderboard?.LoadSnapshot(save.leaderboardEntries);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

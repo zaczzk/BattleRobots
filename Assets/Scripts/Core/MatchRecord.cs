@@ -113,6 +113,41 @@ namespace BattleRobots.Core
     }
 
     /// <summary>
+    /// A single entry in the local match leaderboard, capturing the score and key
+    /// context of the match that produced it.
+    ///
+    /// Stored inside <see cref="SaveData.leaderboardEntries"/> and round-trips cleanly
+    /// through JsonUtility / XOR SaveSystem.
+    ///
+    /// Default values are all-zero / empty so that saves predating this type deserialise
+    /// safely without corrupting the leaderboard list.
+    /// </summary>
+    [Serializable]
+    public sealed class LeaderboardEntry
+    {
+        /// <summary>Numeric score computed by <see cref="MatchScoreCalculator"/>. Always ≥ 0.</summary>
+        public int score;
+
+        /// <summary>True when the player won the match that produced this score.</summary>
+        public bool playerWon;
+
+        /// <summary>
+        /// Display name of the selected opponent profile.
+        /// Empty string when no opponent was selected via the pre-match lobby.
+        /// </summary>
+        public string opponentName = "";
+
+        /// <summary>Zero-based arena index the match was played in.</summary>
+        public int arenaIndex;
+
+        /// <summary>Match duration in seconds.</summary>
+        public float durationSeconds;
+
+        /// <summary>UTC ISO-8601 timestamp of match end (e.g. "2026-04-12T14:32:00Z").</summary>
+        public string timestamp = "";
+    }
+
+    /// <summary>
     /// Top-level save file container. Holds the running wallet balance,
     /// the full match history, and the set of part IDs the player owns.
     /// </summary>
@@ -297,5 +332,17 @@ namespace BattleRobots.Core
         /// all parts at full HP (backwards-compatible).
         /// </summary>
         public List<PartConditionSnapshot> savedPartConditions = new List<PartConditionSnapshot>();
+
+        // ── Leaderboard (T116) ────────────────────────────────────────────────
+
+        /// <summary>
+        /// Top-N match scores for the local leaderboard panel.
+        /// Sorted descending by score; capacity is capped at
+        /// <see cref="MatchLeaderboardSO.MaxEntries"/> at write time.
+        /// Rehydrated into <see cref="MatchLeaderboardSO"/> by <see cref="GameBootstrapper"/>
+        /// on startup via <see cref="MatchLeaderboardSO.LoadSnapshot"/>.
+        /// Initialised to an empty list so saves predating this field load with no entries.
+        /// </summary>
+        public List<LeaderboardEntry> leaderboardEntries = new List<LeaderboardEntry>();
     }
 }
