@@ -29,6 +29,14 @@ namespace BattleRobots.Core
     /// every <see cref="requirements"/> entry must be satisfied for the synergy
     /// to be considered active.
     ///
+    /// ── Numeric bonuses ──────────────────────────────────────────────────────
+    ///   When active, the synergy adds flat health / armor and a percentage speed /
+    ///   damage multiplier bonus to the robot's combat stats (via
+    ///   <see cref="RobotStatsAggregator.ApplySynergies"/>).  Multiple active
+    ///   synergies stack additively.
+    ///     <c>speedMultiplierBonus = 0.15</c> → final speed × 1.15
+    ///     <c>damageMultiplierBonus = 0.10</c> → final damage multiplier × 1.10
+    ///
     /// Stored as a serializable class inside <see cref="PartSynergyConfig._entries"/>
     /// so designers can configure synergies entirely from the Inspector.
     /// </summary>
@@ -44,6 +52,23 @@ namespace BattleRobots.Core
 
         [Tooltip("All conditions that must be met simultaneously for this synergy to activate.")]
         public List<PartSynergyRequirement> requirements = new List<PartSynergyRequirement>();
+
+        [Header("Stat Bonuses (applied via RobotStatsAggregator.ApplySynergies)")]
+        [Tooltip("Flat hit-point bonus added to TotalMaxHealth when this synergy is active. " +
+                 "Multiple active synergies stack additively.")]
+        [Min(0)] public int healthBonus = 0;
+
+        [Tooltip("Additive speed multiplier bonus (0 = no change, 0.15 = +15% speed). " +
+                 "Applied as: EffectiveSpeed × (1 + Σ speedMultiplierBonus).")]
+        [Range(0f, 2f)] public float speedMultiplierBonus = 0f;
+
+        [Tooltip("Additive damage multiplier bonus (0 = no change, 0.10 = +10% damage). " +
+                 "Applied as: EffectiveDamageMultiplier × (1 + Σ damageMultiplierBonus).")]
+        [Range(0f, 2f)] public float damageMultiplierBonus = 0f;
+
+        [Tooltip("Flat armor bonus added to TotalArmorRating when this synergy is active " +
+                 "(clamped to [0, 100] after all bonuses are summed).")]
+        [Range(0, 100)] public int armorBonus = 0;
     }
 
     /// <summary>

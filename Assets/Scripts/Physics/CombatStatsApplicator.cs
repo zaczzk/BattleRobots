@@ -81,6 +81,21 @@ namespace BattleRobots.Physics
                  "Leave null to use unmodified stats (backwards-compatible).")]
         [SerializeField] private SelectedModifierSO _selectedModifier;
 
+        [Header("Build Synergies (optional)")]
+        [Tooltip("Synergy catalog SO. When assigned together with _playerLoadout and _shopCatalog, " +
+                 "active synergy bonuses are evaluated at match start and folded into combat stats " +
+                 "via RobotStatsAggregator.ApplySynergies (after base stats + modifier). " +
+                 "Leave null to skip synergy application (backwards-compatible).")]
+        [SerializeField] private PartSynergyConfig _synergyConfig;
+
+        [Tooltip("Player loadout SO supplying equipped part IDs for synergy evaluation. " +
+                 "Must be assigned alongside _synergyConfig and _shopCatalog.")]
+        [SerializeField] private PlayerLoadout _playerLoadout;
+
+        [Tooltip("Shop catalog SO used to resolve equipped part IDs to PartDefinitions. " +
+                 "Must be assigned alongside _synergyConfig and _playerLoadout.")]
+        [SerializeField] private ShopCatalog _shopCatalog;
+
         // ── Cached delegate ───────────────────────────────────────────────────
 
         private System.Action _onMatchStarted;
@@ -117,7 +132,20 @@ namespace BattleRobots.Physics
                 _robotDefinition,
                 _assembler != null ? _assembler.GetEquippedParts() : null);
 
+            // ── Build synergy bonuses ─────────────────────────────────────────
+            // Apply active synergy stat bonuses on top of the base part stats.
+            // Must happen before health init so health synergy bonuses are included.
+            // Requires all three synergy fields to be assigned; silently skips
+            // when any is null (backwards-compatible).
+            if (_synergyConfig != null && _playerLoadout != null && _shopCatalog != null)
+            {
+                var activeSynergies = _synergyConfig.GetActiveSynergies(
+                    _playerLoadout.EquippedPartIds, _shopCatalog);
+                stats = RobotStatsAggregator.ApplySynergies(stats, activeSynergies);
+            }
+
             // ── Health ────────────────────────────────────────────────────────
+            // Initialised after synergy application so HP bonuses are included.
             if (_health != null)
             {
                 _health.InitForMatch(stats.TotalMaxHealth);
@@ -145,7 +173,8 @@ namespace BattleRobots.Physics
             Debug.Log($"[CombatStatsApplicator] '{name}': HP={stats.TotalMaxHealth} " +
                       $"Speed={stats.EffectiveSpeed * speedMult:F2}(x{speedMult:F2}) " +
                       $"DmgMult={stats.EffectiveDamageMultiplier:F2} " +
-                      $"Armor={modifiedArmor}(x{armorMult:F2})");
+                      $"Armor={modifiedArmor}(x{armorMult:F2}) " +
+                      $"SynergyConfig={(_synergyConfig != null ? "assigned" : "none")}");
         }
 
         // ── Editor validation ─────────────────────────────────────────────────

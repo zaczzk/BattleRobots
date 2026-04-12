@@ -158,5 +158,64 @@ namespace BattleRobots.Core
 
             return new RobotCombatStats(finalHealth, finalSpeed, totalDamageMult, clampedArmor);
         }
+
+        /// <summary>
+        /// Folds the numeric bonuses of every active synergy entry into an existing
+        /// <see cref="RobotCombatStats"/> snapshot and returns an updated snapshot.
+        ///
+        /// ── Stacking rules ───────────────────────────────────────────────────
+        ///   Multiple active synergies stack additively before being applied:
+        ///     TotalMaxHealth           += Σ <see cref="PartSynergyEntry.healthBonus"/>
+        ///     EffectiveSpeed           ×= (1 + Σ <see cref="PartSynergyEntry.speedMultiplierBonus"/>)
+        ///     EffectiveDamageMultiplier×= (1 + Σ <see cref="PartSynergyEntry.damageMultiplierBonus"/>)
+        ///     TotalArmorRating         += Σ <see cref="PartSynergyEntry.armorBonus"/>,
+        ///                                clamped to [0, 100]
+        ///
+        /// ── Null safety ──────────────────────────────────────────────────────
+        ///   • null or empty <paramref name="activeSynergies"/> → returns
+        ///     <paramref name="baseStats"/> unchanged (zero allocation).
+        ///   • null entries inside the collection are skipped.
+        ///
+        /// Called from <see cref="BattleRobots.Physics.CombatStatsApplicator.ApplyStats"/>
+        /// after the base <see cref="Compute"/> call, so the synergy bonuses layer on top
+        /// of part stats and upgrade tiers.
+        /// </summary>
+        /// <param name="baseStats">
+        ///   The combat stats snapshot produced by one of the <see cref="Compute"/>
+        ///   overloads.  Treated as read-only; a new struct is returned.
+        /// </param>
+        /// <param name="activeSynergies">
+        ///   The list returned by
+        ///   <see cref="PartSynergyConfig.GetActiveSynergies"/>.
+        ///   May be null or empty.
+        /// </param>
+        public static RobotCombatStats ApplySynergies(
+            RobotCombatStats                baseStats,
+            IReadOnlyList<PartSynergyEntry> activeSynergies)
+        {
+            if (activeSynergies == null || activeSynergies.Count == 0)
+                return baseStats;
+
+            int   totalHealthBonus = 0;
+            float totalSpeedBonus  = 0f;
+            float totalDamageBonus = 0f;
+            int   totalArmorBonus  = 0;
+
+            foreach (PartSynergyEntry synergy in activeSynergies)
+            {
+                if (synergy == null) continue;
+                totalHealthBonus += synergy.healthBonus;
+                totalSpeedBonus  += synergy.speedMultiplierBonus;
+                totalDamageBonus += synergy.damageMultiplierBonus;
+                totalArmorBonus  += synergy.armorBonus;
+            }
+
+            float finalHealth = baseStats.TotalMaxHealth + totalHealthBonus;
+            float finalSpeed  = baseStats.EffectiveSpeed * (1f + totalSpeedBonus);
+            float finalDamage = baseStats.EffectiveDamageMultiplier * (1f + totalDamageBonus);
+            int   finalArmor  = Mathf.Clamp(baseStats.TotalArmorRating + totalArmorBonus, 0, 100);
+
+            return new RobotCombatStats(finalHealth, finalSpeed, finalDamage, finalArmor);
+        }
     }
 }
