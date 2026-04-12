@@ -148,6 +148,33 @@ namespace BattleRobots.Core
     }
 
     /// <summary>
+    /// Serializable snapshot of the player's all-time single-match career bests for
+    /// persistence across sessions.
+    /// Stored inside <see cref="SaveData.careerHighlights"/> and round-trips cleanly
+    /// through JsonUtility / XOR SaveSystem.
+    ///
+    /// Default values are all-zero meaning "no match played yet".
+    /// </summary>
+    [Serializable]
+    public sealed class CareerHighlightsSnapshot
+    {
+        /// <summary>Highest damage dealt in a single match ever played. 0 = none yet.</summary>
+        public float bestSingleMatchDamage;
+
+        /// <summary>
+        /// Fastest winning match duration in seconds.
+        /// 0 = player has never won a match.
+        /// </summary>
+        public float fastestWinSeconds;
+
+        /// <summary>Highest currency earned in a single match. 0 = none yet.</summary>
+        public int bestSingleMatchCurrency;
+
+        /// <summary>Longest match duration ever played in seconds. 0 = no match played.</summary>
+        public float longestMatchSeconds;
+    }
+
+    /// <summary>
     /// Top-level save file container. Holds the running wallet balance,
     /// the full match history, and the set of part IDs the player owns.
     /// </summary>
@@ -354,5 +381,16 @@ namespace BattleRobots.Core
         /// Initialised to an empty list so saves predating this field load with no history.
         /// </summary>
         public List<int> scoreHistoryScores = new List<int>();
+
+        // ── Career Highlights (T120) ──────────────────────────────────────────
+
+        /// <summary>
+        /// Per-category single-match all-time bests (best damage, fastest win, etc.).
+        /// Rehydrated into <see cref="CareerHighlightsSO"/> by <see cref="GameBootstrapper"/>
+        /// on startup via <see cref="CareerHighlightsSO.LoadSnapshot"/>.
+        /// Default is a fresh instance (all zeros) — backwards-compatible with saves
+        /// predating this field.
+        /// </summary>
+        public CareerHighlightsSnapshot careerHighlights = new CareerHighlightsSnapshot();
     }
 }

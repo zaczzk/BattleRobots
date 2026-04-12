@@ -161,6 +161,14 @@ namespace BattleRobots.Core
                  "Leave null to skip score-history tracking (backwards-compatible).")]
         [SerializeField] private ScoreHistorySO _scoreHistory;
 
+        [Header("Career Highlights (optional)")]
+        [Tooltip("Tracks per-category single-match career bests (best damage, fastest win, etc.). " +
+                 "Update() is called in EndMatch() after MatchResultSO.Write() so all fields " +
+                 "reflect this match's outcome before _onMatchEnded fires. " +
+                 "TakeSnapshot() persists updated records to SaveData.careerHighlights. " +
+                 "Leave null to skip (backwards-compatible).")]
+        [SerializeField] private CareerHighlightsSO _careerHighlights;
+
         [Header("Timer Warning (optional)")]
         [Tooltip("Configures time thresholds that fire VoidGameEvent channels as the match timer " +
                  "counts down (e.g. at 60 s, 30 s, 10 s). Reset() is called at match start so " +
@@ -446,6 +454,15 @@ namespace BattleRobots.Core
                 int historyScore = MatchScoreCalculator.Calculate(_matchResult);
                 _scoreHistory.Record(historyScore);
                 saveData.scoreHistoryScores = _scoreHistory.TakeSnapshot();
+            }
+
+            // Update per-category career highlights (best damage, fastest win, etc.).
+            // Called after MatchResultSO.Write() so all result fields are current.
+            // Update() null-guards _matchResult internally, so no outer guard required.
+            if (_careerHighlights != null)
+            {
+                _careerHighlights.Update(_matchResult);
+                saveData.careerHighlights = _careerHighlights.TakeSnapshot();
             }
 
             SaveSystem.Save(saveData);

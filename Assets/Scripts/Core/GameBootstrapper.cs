@@ -83,6 +83,12 @@ namespace BattleRobots.Core
                  "Leave null to skip (history starts empty — backwards-compatible).")]
         [SerializeField] private ScoreHistorySO _scoreHistory;
 
+        [Header("Career Highlights (optional)")]
+        [Tooltip("Tracks per-category single-match career bests (best damage, fastest win, etc.). " +
+                 "LoadSnapshot called on startup to restore persisted records from " +
+                 "SaveData.careerHighlights. Leave null to skip (backwards-compatible).")]
+        [SerializeField] private CareerHighlightsSO _careerHighlights;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -183,6 +189,11 @@ namespace BattleRobots.Core
             // Restore chronological score history.
             // LoadSnapshot is bootstrapper-safe (no events); old saves default to empty list.
             _scoreHistory?.LoadSnapshot(save.scoreHistoryScores);
+
+            // Restore per-category single-match career bests.
+            // LoadSnapshot is bootstrapper-safe (no events, null-safe); old saves default
+            // to a zero-filled CareerHighlightsSnapshot (all records start at zero).
+            _careerHighlights?.LoadSnapshot(save.careerHighlights);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.
