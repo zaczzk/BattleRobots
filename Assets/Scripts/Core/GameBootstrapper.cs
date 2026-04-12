@@ -77,6 +77,12 @@ namespace BattleRobots.Core
                  "Leave null to skip (leaderboard starts empty — backwards-compatible).")]
         [SerializeField] private MatchLeaderboardSO _matchLeaderboard;
 
+        [Header("Score History (optional)")]
+        [Tooltip("Rolling window of the last N match scores in chronological order. " +
+                 "LoadSnapshot called on startup to rehydrate from SaveData.scoreHistoryScores. " +
+                 "Leave null to skip (history starts empty — backwards-compatible).")]
+        [SerializeField] private ScoreHistorySO _scoreHistory;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -173,6 +179,10 @@ namespace BattleRobots.Core
             // LoadSnapshot is bootstrapper-safe (no events, defensive deep copy, auto-sorts).
             // Old saves have an empty leaderboardEntries list — board starts empty.
             _matchLeaderboard?.LoadSnapshot(save.leaderboardEntries);
+
+            // Restore chronological score history.
+            // LoadSnapshot is bootstrapper-safe (no events); old saves default to empty list.
+            _scoreHistory?.LoadSnapshot(save.scoreHistoryScores);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

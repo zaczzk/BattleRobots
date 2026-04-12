@@ -153,6 +153,14 @@ namespace BattleRobots.Core
                  "Leave null to skip leaderboard tracking (backwards-compatible).")]
         [SerializeField] private MatchLeaderboardSO _matchLeaderboard;
 
+        [Header("Score History (optional)")]
+        [Tooltip("Rolling chronological log of the last N match scores. Record() is called in " +
+                 "EndMatch() after the match score is computed, so the history reflects the " +
+                 "completed match before _onMatchEnded fires. " +
+                 "TakeSnapshot() persists the updated history to SaveData.scoreHistoryScores. " +
+                 "Leave null to skip score-history tracking (backwards-compatible).")]
+        [SerializeField] private ScoreHistorySO _scoreHistory;
+
         [Header("Timer Warning (optional)")]
         [Tooltip("Configures time thresholds that fire VoidGameEvent channels as the match timer " +
                  "counts down (e.g. at 60 s, 30 s, 10 s). Reset() is called at match start so " +
@@ -428,6 +436,16 @@ namespace BattleRobots.Core
             {
                 _matchLeaderboard.Submit(_matchResult, opponentName, arenaIndex);
                 saveData.leaderboardEntries = _matchLeaderboard.TakeSnapshot();
+            }
+
+            // Record match score in the chronological score history.
+            // Called after MatchResultSO is written so MatchScoreCalculator reads fresh data.
+            // Null _matchResult is safe — Record(0) would be misleading so we guard here.
+            if (_scoreHistory != null && _matchResult != null)
+            {
+                int historyScore = MatchScoreCalculator.Calculate(_matchResult);
+                _scoreHistory.Record(historyScore);
+                saveData.scoreHistoryScores = _scoreHistory.TakeSnapshot();
             }
 
             SaveSystem.Save(saveData);

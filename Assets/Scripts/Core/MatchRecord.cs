@@ -344,5 +344,15 @@ namespace BattleRobots.Core
         /// Initialised to an empty list so saves predating this field load with no entries.
         /// </summary>
         public List<LeaderboardEntry> leaderboardEntries = new List<LeaderboardEntry>();
+
+        // ── Score History (T117) ───────────────────────────────────────────────
+
+        /// <summary>
+        /// Chronological rolling window of the last N match scores (oldest first).
+        /// Rehydrated into <see cref="ScoreHistorySO"/> by <see cref="GameBootstrapper"/>
+        /// on startup via <see cref="ScoreHistorySO.LoadSnapshot"/>.
+        /// Initialised to an empty list so saves predating this field load with no history.
+        /// </summary>
+        public List<int> scoreHistoryScores = new List<int>();
     }
 }
