@@ -77,6 +77,10 @@ namespace BattleRobots.UI
         [Tooltip("When clicked, calls ConfirmLoadout(). May also be wired via Inspector button.")]
         [SerializeField] private Button _confirmButton;
 
+        [Tooltip("When assigned, displays validation warnings so the player knows why the " +
+                 "confirm button is blocked. Shows an empty string when the loadout is valid.")]
+        [SerializeField] private Text _validationWarningText;
+
         // ── Inspector — Upgrade System ────────────────────────────────────────
 
         [Header("Upgrade System (optional)")]
@@ -155,6 +159,24 @@ namespace BattleRobots.UI
                     selectedIds.Add(selected.PartId);
             }
 
+            // Validate before committing.
+            LoadoutValidationResult validation = LoadoutValidator.Validate(
+                selectedIds, _robotDefinition, _playerInventory, _shopCatalog);
+
+            if (_validationWarningText != null)
+            {
+                _validationWarningText.text = validation.IsValid
+                    ? string.Empty
+                    : validation.Errors[0];
+            }
+
+            if (!validation.IsValid)
+            {
+                Debug.LogWarning("[LoadoutBuilderController] Loadout is invalid — confirm blocked. " +
+                                 $"First error: {validation.Errors[0]}", this);
+                return;
+            }
+
             // Write runtime state.
             _playerLoadout.SetLoadout(selectedIds);
 
@@ -162,6 +184,9 @@ namespace BattleRobots.UI
             SaveData data = SaveSystem.Load();
             data.loadoutPartIds = selectedIds;
             SaveSystem.Save(data);
+
+            if (_validationWarningText != null)
+                _validationWarningText.text = string.Empty;
 
             Debug.Log($"[LoadoutBuilderController] Loadout confirmed: {selectedIds.Count} part(s) equipped.");
 
