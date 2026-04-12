@@ -43,6 +43,11 @@ namespace BattleRobots.Core
                  "Leave null to disable the loot-drop system entirely.")]
         [SerializeField] private LootTableSO _lootTable;
 
+        [Tooltip("Optional rarity config that scales each entry's base weight by its rarity " +
+                 "multiplier before the cumulative walk.  Leave null to use unscaled weights " +
+                 "(identical to the base RollDrop overload).")]
+        [SerializeField] private PartRarityConfig _rarityConfig;
+
         [Header("Player Data")]
         [Tooltip("Runtime inventory SO — receives the unlocked part on a successful drop. " +
                  "Leave null to skip inventory update (persistence still runs).")]
@@ -117,7 +122,7 @@ namespace BattleRobots.Core
             if (_matchResult == null || !_matchResult.PlayerWon) return;
             if (dropRoll >= _lootTable.WinDropChance)            return;
 
-            PartDefinition drop = _lootTable.RollDrop(lootSeed);
+            PartDefinition drop = _lootTable.RollDrop(lootSeed, _rarityConfig);
             if (drop == null) return;
 
             // Duplicate guard — only reward parts the player doesn't own yet.
