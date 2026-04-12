@@ -28,8 +28,14 @@ namespace BattleRobots.Core
         /// Blackboard written by <see cref="MatchManager"/> before MatchEnded fires.
         /// Passing <c>null</c> returns 0.
         /// </param>
+        /// <param name="maxCombo">
+        /// Optional: highest combo streak achieved during the match
+        /// (read from <see cref="ComboCounterSO.MaxCombo"/>).
+        /// Each combo hit contributes 5 bonus points — e.g. MaxCombo of 10 adds +50.
+        /// Defaults to 0 (backwards-compatible: existing callers unaffected).
+        /// </param>
         /// <returns>Non-negative integer score.</returns>
-        public static int Calculate(MatchResultSO result)
+        public static int Calculate(MatchResultSO result, int maxCombo = 0)
         {
             if (result == null) return 0;
 
@@ -57,6 +63,10 @@ namespace BattleRobots.Core
             // Performance-condition bonus credits triple in score (already included in
             // CurrencyEarned by MatchManager; tripling here rewards skilled play extra).
             score += result.BonusEarned * 3;
+
+            // Combo bonus: 5 points per hit in the best streak achieved this match.
+            // Rewards aggressive, consistent play (MaxCombo of 10 → +50, capped by game length).
+            score += Mathf.Max(0, maxCombo) * 5;
 
             // Clamp to non-negative — heavy damage taken should not produce a negative score.
             return Mathf.Max(0, score);

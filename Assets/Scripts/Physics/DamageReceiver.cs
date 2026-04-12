@@ -46,6 +46,13 @@ namespace BattleRobots.Physics
                  "Leave null to skip status-effect processing (backwards-compatible).")]
         [SerializeField] private StatusEffectController _statusEffectController;
 
+        [Header("Part Health (optional)")]
+        [Tooltip("PartHealthSystem on this robot root. When assigned, each successful hit " +
+                 "also distributes the post-armor damage to a randomly chosen living part " +
+                 "via PartHealthSystem.DistributeDamage(). Leave null to skip part-condition " +
+                 "tracking (backwards-compatible — all existing callers unaffected).")]
+        [SerializeField] private PartHealthSystem _partHealthSystem;
+
         // ── Public API ────────────────────────────────────────────────────────
 
         /// <summary>Current flat damage-reduction rating. Range [0, 100].</summary>
@@ -76,6 +83,7 @@ namespace BattleRobots.Physics
             float afterShield = _shield != null ? _shield.AbsorbDamage(amount) : amount;
             float reduced     = Mathf.Max(0f, afterShield - _armorRating);
             _health.ApplyDamage(reduced);
+            _partHealthSystem?.DistributeDamage(reduced);
         }
 
         /// <summary>
