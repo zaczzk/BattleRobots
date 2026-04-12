@@ -91,6 +91,28 @@ namespace BattleRobots.Core
     }
 
     /// <summary>
+    /// Serializable snapshot of a single part's HP ratio for persistence across sessions.
+    /// Stored inside <see cref="SaveData.savedPartConditions"/> and round-trips through
+    /// JsonUtility / XOR SaveSystem.
+    ///
+    /// <see cref="hpRatio"/> is stored as a ratio in [0, 1] rather than raw HP so that
+    /// changes to a <see cref="PartConditionSO"/> MaxHP inspector value do not produce
+    /// out-of-range HP after a save reload.
+    /// </summary>
+    [Serializable]
+    public sealed class PartConditionSnapshot
+    {
+        /// <summary>
+        /// Part ID that identifies which <see cref="PartConditionSO"/> this snapshot belongs to.
+        /// Matched against registry entries in <see cref="PartConditionRegistry"/>.
+        /// </summary>
+        public string partId = "";
+
+        /// <summary>HP ratio in [0, 1] at the time the snapshot was taken. 1.0 = full health.</summary>
+        public float hpRatio = 1f;
+    }
+
+    /// <summary>
     /// Top-level save file container. Holds the running wallet balance,
     /// the full match history, and the set of part IDs the player owns.
     /// </summary>
@@ -263,5 +285,17 @@ namespace BattleRobots.Core
         /// Initialised to an empty list so saves predating this field load with no presets.
         /// </summary>
         public List<SavedLoadoutPreset> savedLoadoutPresets = new List<SavedLoadoutPreset>();
+
+        // ── Part Durability (T107) ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Per-part HP ratios persisted at the end of each session.
+        /// Restored by <see cref="GameBootstrapper"/> on startup via
+        /// <see cref="PartConditionRegistry.LoadSnapshot"/>, overriding the
+        /// default full-HP state that <see cref="PartConditionSO.OnEnable"/> applies.
+        /// Initialised to an empty list so saves predating this field start with
+        /// all parts at full HP (backwards-compatible).
+        /// </summary>
+        public List<PartConditionSnapshot> savedPartConditions = new List<PartConditionSnapshot>();
     }
 }

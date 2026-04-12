@@ -116,5 +116,22 @@ namespace BattleRobots.Core
             _currentHP = _maxHP;
             _destroyed = false;
         }
+
+        /// <summary>
+        /// Restores HP to <paramref name="hpRatio"/> × MaxHP.
+        /// Called by <see cref="PartConditionRegistry.LoadSnapshot"/> after the SO is
+        /// loaded into memory (<see cref="OnEnable"/> has already set CurrentHP to MaxHP;
+        /// this call overrides it with the persisted value).
+        /// <br/>
+        /// Fires no events — bootstrapper-safe.
+        /// Zero allocation: pure arithmetic.
+        /// </summary>
+        /// <param name="hpRatio">Normalised HP in [0, 1]. Values outside range are clamped.</param>
+        public void LoadSnapshot(float hpRatio)
+        {
+            float clamped = Mathf.Clamp01(hpRatio);
+            _currentHP = _maxHP * clamped;
+            _destroyed = _currentHP <= 0f;
+        }
     }
 }

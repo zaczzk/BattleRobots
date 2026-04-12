@@ -65,6 +65,12 @@ namespace BattleRobots.Core
                  "Leave null to skip (backwards-compatible).")]
         [SerializeField] private PersonalBestSO _personalBest;
 
+        [Header("Part Durability (optional)")]
+        [Tooltip("Registry of all part PartConditionSO assets. LoadSnapshot called on startup " +
+                 "to restore persisted part-HP ratios from SaveData.savedPartConditions. " +
+                 "Leave null to skip (parts start at full HP — backwards-compatible).")]
+        [SerializeField] private PartConditionRegistry _partConditionRegistry;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -151,6 +157,11 @@ namespace BattleRobots.Core
             // LoadSnapshot is bootstrapper-safe (no events, defensive deep copy).
             // Old saves have an empty list by default — presets start fresh.
             _loadoutPresets?.LoadSnapshot(save.savedLoadoutPresets);
+
+            // Restore per-part HP ratios from the previous session.
+            // LoadSnapshot overrides the full-HP OnEnable default on each matching SO.
+            // Old saves have an empty savedPartConditions list — all parts start at full HP.
+            _partConditionRegistry?.LoadSnapshot(save.savedPartConditions);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

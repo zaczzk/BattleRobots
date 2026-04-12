@@ -197,5 +197,54 @@ namespace BattleRobots.Tests
 
             Object.DestroyImmediate(evt);
         }
+
+        // ── LoadSnapshot ─────────────────────────────────────────────────────
+
+        [Test]
+        public void LoadSnapshot_FullRatio_RestoresMaxHP()
+        {
+            _so.TakeDamage(25f); // damage the part first
+            _so.LoadSnapshot(1f);
+
+            Assert.AreEqual(_so.MaxHP, _so.CurrentHP, 0.001f);
+            Assert.IsFalse(_so.IsDestroyed);
+        }
+
+        [Test]
+        public void LoadSnapshot_HalfRatio_SetsHalfHP()
+        {
+            _so.LoadSnapshot(0.5f);
+
+            Assert.AreEqual(_so.MaxHP * 0.5f, _so.CurrentHP, 0.001f);
+            Assert.IsFalse(_so.IsDestroyed);
+        }
+
+        [Test]
+        public void LoadSnapshot_ZeroRatio_SetsDestroyedState()
+        {
+            _so.LoadSnapshot(0f);
+
+            Assert.AreEqual(0f, _so.CurrentHP, 0.001f);
+            Assert.IsTrue(_so.IsDestroyed, "HPRatio 0 should mark part as destroyed.");
+        }
+
+        [Test]
+        public void LoadSnapshot_RatioAboveOne_ClampsToMaxHP()
+        {
+            _so.LoadSnapshot(2f);
+
+            Assert.AreEqual(_so.MaxHP, _so.CurrentHP, 0.001f,
+                "Ratio > 1 must be clamped to MaxHP.");
+        }
+
+        [Test]
+        public void LoadSnapshot_NegativeRatio_ClampsToZeroAndDestroyed()
+        {
+            _so.LoadSnapshot(-0.5f);
+
+            Assert.AreEqual(0f, _so.CurrentHP, 0.001f,
+                "Negative ratio must be clamped to 0.");
+            Assert.IsTrue(_so.IsDestroyed);
+        }
     }
 }
