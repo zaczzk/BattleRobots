@@ -70,6 +70,14 @@ namespace BattleRobots.Physics
         [Tooltip("Raised whenever any effect starts, refreshes, or expires.")]
         [SerializeField] private VoidGameEvent _onEffectsChanged;
 
+        [Header("Display State (optional)")]
+        [Tooltip("Runtime blackboard SO written before each _onEffectsChanged event fires. " +
+                 "Assign a StatusEffectStateSO and wire its _onEffectsChanged field to a " +
+                 "DIFFERENT VoidGameEvent than this controller's _onEffectsChanged to avoid " +
+                 "double-firing. StatusEffectHUDController subscribes to the SO's channel. " +
+                 "Leave null to skip display-state publishing (backwards-compatible).")]
+        [SerializeField] private StatusEffectStateSO _statusDisplay;
+
         // ── Private state ─────────────────────────────────────────────────────
 
         // Fixed-capacity struct array — no GC pressure on the hot path.
@@ -145,6 +153,7 @@ namespace BattleRobots.Physics
 
                 _activeCount = write;
                 RecalculateDerived();
+                PushDisplayState();
                 _onEffectsChanged?.Raise();
             }
             else
@@ -197,6 +206,7 @@ namespace BattleRobots.Physics
                 }
 
                 RecalculateDerived();
+                PushDisplayState();
                 _onEffectsChanged?.Raise();
                 return;
             }
@@ -208,6 +218,7 @@ namespace BattleRobots.Physics
                 _slots[_activeCount].TimeRemaining = effect.DurationSeconds;
                 _activeCount++;
                 RecalculateDerived();
+                PushDisplayState();
                 _onEffectsChanged?.Raise();
             }
         }
@@ -230,6 +241,7 @@ namespace BattleRobots.Physics
 
             _locomotion?.SetStunned(false);
             _locomotion?.SetSlowFactor(1f);
+            PushDisplayState();
             _onEffectsChanged?.Raise();
         }
 
@@ -264,6 +276,53 @@ namespace BattleRobots.Physics
                         break;
                 }
             }
+        }
+
+        /// <summary>
+        /// Writes current per-type active state and remaining times to
+        /// <see cref="_statusDisplay"/> (if assigned), then fires the SO's own
+        /// <c>_onEffectsChanged</c> event so UI subscribers react without
+        /// requiring a reference to this Physics-namespace component.
+        /// Called immediately before the controller's own <c>_onEffectsChanged.Raise()</c>
+        /// so the SO is always up-to-date when the event fires.
+        /// Zero allocation — value-type loop, no LINQ, no boxing.
+        /// </summary>
+        private void PushDisplayState()
+        {
+            if (_statusDisplay == null) return;
+
+            bool  burnActive = false; float burnTime  = 0f;
+            bool  stunActive = false; float stunTime  = 0f;
+            bool  slowActive = false; float slowTime  = 0f;
+            float slowFactor = 1f;
+
+            for (int i = 0; i < _activeCount; i++)
+            {
+                if (_slots[i].Effect == null) continue;
+                switch (_slots[i].Effect.Type)
+                {
+                    case StatusEffectType.Burn:
+                        burnActive = true;
+                        burnTime   = _slots[i].TimeRemaining;
+                        break;
+
+                    case StatusEffectType.Stun:
+                        stunActive = true;
+                        stunTime   = _slots[i].TimeRemaining;
+                        break;
+
+                    case StatusEffectType.Slow:
+                        slowActive = true;
+                        slowTime   = _slots[i].TimeRemaining;
+                        slowFactor = _slots[i].Effect.SlowFactor;
+                        break;
+                }
+            }
+
+            _statusDisplay.UpdateState(
+                burnActive, burnTime,
+                stunActive, stunTime,
+                slowActive, slowTime, slowFactor);
         }
     }
 }
