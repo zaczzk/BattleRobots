@@ -169,6 +169,13 @@ namespace BattleRobots.Core
                  "Leave null to skip (backwards-compatible).")]
         [SerializeField] private CareerHighlightsSO _careerHighlights;
 
+        [Header("Session Summary (optional)")]
+        [Tooltip("Lightweight session-scoped tracker (matches played, wins, currency earned). " +
+                 "RecordMatch() is called in EndMatch() after MatchResultSO.Write() so all result " +
+                 "fields are current when the session counters are updated. " +
+                 "Leave null to skip (backwards-compatible).")]
+        [SerializeField] private SessionSummarySO _sessionSummary;
+
         [Header("Timer Warning (optional)")]
         [Tooltip("Configures time thresholds that fire VoidGameEvent channels as the match timer " +
                  "counts down (e.g. at 60 s, 30 s, 10 s). Reset() is called at match start so " +
@@ -422,6 +429,11 @@ namespace BattleRobots.Core
             _matchResult?.Write(playerWon, elapsed, totalReward, walletSnapshot,
                                 damageDone, damageTaken, bonusEarned,
                                 xpEarned, leveledUp, newLevel);
+
+            // Update session summary (matches played, wins, currency earned this session).
+            // Called after MatchResultSO.Write() so all result fields are current.
+            // Session summary is never persisted — it resets each play session.
+            _sessionSummary?.RecordMatch(_matchResult);
 
             // Compute and submit match score for personal best tracking.
             // Called AFTER MatchResultSO.Write() so the calculator reads fresh data.

@@ -89,6 +89,12 @@ namespace BattleRobots.Core
                  "SaveData.careerHighlights. Leave null to skip (backwards-compatible).")]
         [SerializeField] private CareerHighlightsSO _careerHighlights;
 
+        [Header("Session Summary (optional)")]
+        [Tooltip("Lightweight session-scoped tracker (matches played, wins, currency earned). " +
+                 "Reset() is called in Awake so the summary always starts fresh each run. " +
+                 "Leave null to skip (backwards-compatible).")]
+        [SerializeField] private SessionSummarySO _sessionSummary;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -101,6 +107,9 @@ namespace BattleRobots.Core
         {
             // Ensure only one bootstrapper exists across scene loads.
             DontDestroyOnLoad(gameObject);
+
+            // Reset session summary so it always starts at zero for a new run.
+            _sessionSummary?.Reset();
 
             LoadAndApplySaveData();
 
