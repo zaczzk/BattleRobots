@@ -43,6 +43,15 @@ namespace BattleRobots.Core
                  "at least some compensation. Set to 0 for no consolation (default).")]
         [SerializeField, Min(0)] private int _consolationPrize = 0;
 
+        [Header("Tier Gating (optional)")]
+        [Tooltip("Minimum tier the player's current build must achieve before entry is allowed. " +
+                 "Unranked (0) disables tier gating — any tier may enter.")]
+        [SerializeField] private RobotTierLevel _requiredTier = RobotTierLevel.Unranked;
+
+        [Tooltip("Minimum build-power rating required to enter this tournament. " +
+                 "Set to 0 to disable rating gating.")]
+        [SerializeField, Min(0)] private int _minRating = 0;
+
         // ── Public read-only API ──────────────────────────────────────────────
 
         /// <summary>Number of rounds the player must win (≥ 1).</summary>
@@ -59,6 +68,18 @@ namespace BattleRobots.Core
 
         /// <summary>Credits given on elimination (≥ 0, default 0).</summary>
         public int ConsolationPrize => _consolationPrize;
+
+        /// <summary>
+        /// Minimum <see cref="RobotTierLevel"/> the player's build must reach to enter.
+        /// <see cref="RobotTierLevel.Unranked"/> (the default) disables tier gating.
+        /// </summary>
+        public RobotTierLevel RequiredTier => _requiredTier;
+
+        /// <summary>
+        /// Minimum build-power rating required to enter (≥ 0, default 0).
+        /// 0 disables rating gating.
+        /// </summary>
+        public int MinRating => _minRating;
 
         // ── Editor validation ─────────────────────────────────────────────────
 

@@ -52,6 +52,14 @@ namespace BattleRobots.Core
                  "TournamentManager reads PlayerWon from this SO.")]
         [SerializeField] private MatchResultSO _matchResult;
 
+        [Header("Tier Gating (optional)")]
+        [Tooltip("Build rating SO. When assigned, StartTournament() checks the tier/rating " +
+                 "requirements on _config before proceeding. Leave null to bypass gating.")]
+        [SerializeField] private BuildRatingSO _buildRating;
+
+        [Tooltip("Tier config SO — required when tier gating is in use.")]
+        [SerializeField] private RobotTierConfig _tierConfig;
+
         [Header("Event Channels — In")]
         [Tooltip("Subscribe to the same MatchEnded VoidGameEvent used by MatchManager. " +
                  "Alternatively wire via a VoidGameEventListener on this GameObject.")]
@@ -94,6 +102,16 @@ namespace BattleRobots.Core
         {
             if (_tournament == null) return;
             if (_tournament.IsActive) return;
+
+            // Tier / rating gate — only applied when _buildRating is wired in
+            if (_buildRating != null &&
+                !TournamentGatingEvaluator.IsUnlocked(_config, _buildRating, _tierConfig))
+            {
+                Debug.LogWarning(
+                    $"[TournamentManager] Tournament entry blocked: " +
+                    $"{TournamentGatingEvaluator.GetLockReason(_config, _buildRating, _tierConfig)}");
+                return;
+            }
 
             // Deduct entry fee — may leave wallet negative if designer set a high fee;
             // PlayerWallet.Deduct() clamps to 0 internally, so no crash risk.

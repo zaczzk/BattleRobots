@@ -69,8 +69,25 @@ namespace BattleRobots.UI
 
         [Header("Buttons (optional)")]
         [Tooltip("Button that calls TournamentManager.StartTournament(). " +
-                 "Interactable only when no tournament is active.")]
+                 "Interactable only when no tournament is active and tier/rating requirements are met.")]
         [SerializeField] private Button _enterButton;
+
+        [Header("Tier Gating (optional)")]
+        [Tooltip("Build rating SO — evaluated for tier and rating requirements. " +
+                 "Leave null to skip gating display (Enter button enabled whenever inactive).")]
+        [SerializeField] private Core.BuildRatingSO _buildRating;
+
+        [Tooltip("Tier config SO — resolves tier display names. " +
+                 "Leave null to fall back to enum names.")]
+        [SerializeField] private Core.RobotTierConfig _tierConfig;
+
+        [Tooltip("IntGameEvent raised by BuildRatingSO when the rating changes — " +
+                 "triggers Refresh() so the lock state updates live.")]
+        [SerializeField] private Core.IntGameEvent _onRatingChanged;
+
+        [Tooltip("Text label shown only when the tournament is locked by tier/rating requirements. " +
+                 "Hidden when unlocked or while a tournament is already active.")]
+        [SerializeField] private Text _lockReasonText;
 
         // ── Cached delegates ──────────────────────────────────────────────────
 
@@ -78,13 +95,16 @@ namespace BattleRobots.UI
         private Action      _refreshDelegate;
         // UnityAction for Button.onClick (UnityEvent<> API)
         private UnityAction _onEnterClickedDelegate;
+        // System.Action<int> for IntGameEvent.RegisterCallback (rating-changed channel)
+        private Action<int> _onRatingChangedDelegate;
 
         // ── Lifecycle ─────────────────────────────────────────────────────────
 
         private void Awake()
         {
-            _refreshDelegate       = Refresh;
+            _refreshDelegate        = Refresh;
             _onEnterClickedDelegate = OnEnterClicked;
+            _onRatingChangedDelegate = _ => Refresh();
 
             _enterButton?.onClick.AddListener(_onEnterClickedDelegate);
         }
@@ -94,6 +114,7 @@ namespace BattleRobots.UI
             _onTournamentStarted?.RegisterCallback(_refreshDelegate);
             _onRoundAdvanced?.RegisterCallback(_refreshDelegate);
             _onTournamentEnded?.RegisterCallback(_refreshDelegate);
+            _onRatingChanged?.RegisterCallback(_onRatingChangedDelegate);
 
             Refresh();
         }
@@ -103,6 +124,7 @@ namespace BattleRobots.UI
             _onTournamentStarted?.UnregisterCallback(_refreshDelegate);
             _onRoundAdvanced?.UnregisterCallback(_refreshDelegate);
             _onTournamentEnded?.UnregisterCallback(_refreshDelegate);
+            _onRatingChanged?.UnregisterCallback(_onRatingChangedDelegate);
         }
 
         // ── Private helpers ───────────────────────────────────────────────────
@@ -155,9 +177,23 @@ namespace BattleRobots.UI
                     _statusText.text = "Not Active";
             }
 
-            // Enter button is only interactable when no tournament is running
+            // Tier / rating gate — null _buildRating → treat as unlocked (backwards-compat)
+            bool isUnlocked = Core.TournamentGatingEvaluator.IsUnlocked(
+                _config, _buildRating, _tierConfig);
+
+            // Enter button: interactable only when inactive AND requirements met
             if (_enterButton != null)
-                _enterButton.interactable = !active;
+                _enterButton.interactable = !active && isUnlocked;
+
+            // Lock-reason label: shown only when not active and requirements not met
+            if (_lockReasonText != null)
+            {
+                bool showLock = !active && !isUnlocked;
+                _lockReasonText.gameObject.SetActive(showLock);
+                if (showLock)
+                    _lockReasonText.text = Core.TournamentGatingEvaluator.GetLockReason(
+                        _config, _buildRating, _tierConfig);
+            }
         }
 
         private void OnEnterClicked()
