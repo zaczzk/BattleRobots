@@ -392,5 +392,16 @@ namespace BattleRobots.Core
         /// predating this field.
         /// </summary>
         public CareerHighlightsSnapshot careerHighlights = new CareerHighlightsSnapshot();
+
+        // ── Prestige (T123) ───────────────────────────────────────────────────
+
+        /// <summary>
+        /// Number of times the player has prestiged (voluntarily reset to Level 1 after
+        /// reaching max level in exchange for a permanent rank badge).
+        /// Rehydrated into <see cref="PrestigeSystemSO"/> by <see cref="GameBootstrapper"/>
+        /// on startup via <see cref="PrestigeSystemSO.LoadSnapshot"/>.
+        /// Default 0 — backwards-compatible with saves predating this field.
+        /// </summary>
+        public int prestigeCount;
     }
 }

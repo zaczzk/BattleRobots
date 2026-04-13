@@ -95,6 +95,13 @@ namespace BattleRobots.Core
                  "Leave null to skip (backwards-compatible).")]
         [SerializeField] private SessionSummarySO _sessionSummary;
 
+        [Header("Prestige (optional)")]
+        [Tooltip("Tracks how many times the player has prestiged (reset progression at max level " +
+                 "in exchange for a permanent rank badge). LoadSnapshot called on startup to " +
+                 "restore the persisted prestige count from SaveData.prestigeCount. " +
+                 "Leave null to skip (backwards-compatible).")]
+        [SerializeField] private PrestigeSystemSO _prestigeSystem;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -203,6 +210,10 @@ namespace BattleRobots.Core
             // LoadSnapshot is bootstrapper-safe (no events, null-safe); old saves default
             // to a zero-filled CareerHighlightsSnapshot (all records start at zero).
             _careerHighlights?.LoadSnapshot(save.careerHighlights);
+
+            // Restore prestige count.
+            // LoadSnapshot is bootstrapper-safe (no events); old saves default to 0.
+            _prestigeSystem?.LoadSnapshot(save.prestigeCount);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.
