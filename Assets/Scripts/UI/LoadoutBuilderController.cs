@@ -108,6 +108,19 @@ namespace BattleRobots.UI
         [Tooltip("Displays TotalArmorRating after part contributions.")]
         [SerializeField] private Text _armorText;
 
+        // ── Inspector — Weapon Preview ────────────────────────────────────────
+
+        [Header("Weapon Preview (optional)")]
+        [Tooltip("Catalog that maps PartIds to WeaponPartSO assets. " +
+                 "When assigned together with _weaponTypeText, the stats preview shows " +
+                 "the equipped weapon's DamageType alongside the other combat stats.")]
+        [SerializeField] private WeaponPartCatalogSO _weaponCatalog;
+
+        [Tooltip("Displays the equipped weapon's DamageType (e.g. 'Type: Energy'). " +
+                 "Shows 'Type: —' when no weapon part is found in the catalog. " +
+                 "No-op when null.")]
+        [SerializeField] private Text _weaponTypeText;
+
         // ── Runtime ───────────────────────────────────────────────────────────
 
         private readonly List<LoadoutSlotController> _rows = new List<LoadoutSlotController>();
@@ -342,12 +355,15 @@ namespace BattleRobots.UI
         /// Computes and displays live <see cref="RobotCombatStats"/> based on the current
         /// row selections.  All text writes happen in this cold-path method only.
         /// No-ops if <see cref="_robotDefinition"/> is null or all preview Texts are null.
+        /// Also updates the weapon-type label when <c>_weaponCatalog</c> and
+        /// <c>_weaponTypeText</c> are both assigned.
         /// </summary>
         private void RefreshStatsPreview()
         {
             if (_robotDefinition == null) return;
             if (_healthText == null && _speedText == null &&
-                _damageText == null && _armorText == null) return;
+                _damageText == null && _armorText == null &&
+                _weaponTypeText == null) return;
 
             // Collect currently selected PartDefinitions from all rows.
             var selectedParts = new List<PartDefinition>(_rows.Count);
@@ -373,6 +389,42 @@ namespace BattleRobots.UI
                 _damageText.text = $"Dmg×: {stats.EffectiveDamageMultiplier:F2}";
             if (_armorText  != null)
                 _armorText.text  = $"Armor: {stats.TotalArmorRating}";
+
+            // Weapon type label (optional — only written when both fields are assigned).
+            if (_weaponTypeText != null)
+            {
+                IReadOnlyList<string> ids = _playerLoadout != null
+                    ? _playerLoadout.EquippedPartIds
+                    : null;
+                _weaponTypeText.text = ResolveWeaponTypeLabel(ids, _weaponCatalog);
+            }
+        }
+
+        /// <summary>
+        /// Resolves the weapon DamageType label from a loadout part-ID list and a catalog.
+        ///
+        /// Iterates <paramref name="equippedIds"/> and returns <c>"Type: {DamageType}"</c>
+        /// for the first ID that resolves to a <see cref="WeaponPartSO"/> in
+        /// <paramref name="catalog"/>.
+        /// Returns <c>"Type: —"</c> when either argument is null, the list is empty,
+        /// or no equipped ID matches a catalog entry.
+        ///
+        /// Internal visibility allows direct invocation from the EditMode test suite
+        /// without a running GameObject or Canvas setup.
+        /// Zero allocation — iterates IReadOnlyList by index.
+        /// </summary>
+        private static string ResolveWeaponTypeLabel(
+            IReadOnlyList<string> equippedIds, WeaponPartCatalogSO catalog)
+        {
+            if (equippedIds == null || catalog == null) return "Type: \u2014";
+
+            for (int i = 0; i < equippedIds.Count; i++)
+            {
+                WeaponPartSO wp = catalog.Lookup(equippedIds[i]);
+                if (wp != null) return $"Type: {wp.WeaponDamageType}";
+            }
+
+            return "Type: \u2014";
         }
 
         // ── Editor validation ─────────────────────────────────────────────────
