@@ -43,17 +43,29 @@ namespace BattleRobots.Core
         /// </summary>
         public StatusEffectSO statusEffect;
 
+        /// <summary>
+        /// Elemental type of the incoming damage.
+        /// Used by <see cref="DamageResistanceConfig.ApplyResistance"/> to select the
+        /// correct resistance fraction before damage is applied to <see cref="HealthSO"/>.
+        /// Defaults to <see cref="DamageType.Physical"/> for all legacy callers that
+        /// do not specify a type — fully backward-compatible.
+        /// </summary>
+        public DamageType damageType;
+
         public DamageInfo(float amount, string sourceId = "", Vector3 hitPoint = default(Vector3),
-                          StatusEffectSO statusEffect = null)
+                          StatusEffectSO statusEffect = null,
+                          DamageType damageType = DamageType.Physical)
         {
             this.amount       = amount;
             this.sourceId     = sourceId ?? string.Empty;
             this.hitPoint     = hitPoint;
             this.statusEffect = statusEffect;
+            this.damageType   = damageType;
         }
 
         public override string ToString() =>
             $"DamageInfo(amount={amount:F1}, source='{sourceId}', hitPoint={hitPoint}" +
+            $", type={damageType}" +
             (statusEffect != null ? $", effect={statusEffect.DisplayName}" : "") + ")";
     }
 }

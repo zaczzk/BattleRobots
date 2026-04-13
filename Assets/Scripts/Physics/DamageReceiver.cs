@@ -53,6 +53,13 @@ namespace BattleRobots.Physics
                  "tracking (backwards-compatible — all existing callers unaffected).")]
         [SerializeField] private PartHealthSystem _partHealthSystem;
 
+        [Header("Damage Resistance (optional)")]
+        [Tooltip("When assigned, the elemental type carried by TakeDamage(DamageInfo) is used " +
+                 "to reduce the incoming amount before it enters the crit → shield → armor " +
+                 "pipeline. Leave null to skip type-based resistance (backwards-compatible — " +
+                 "all existing callers unaffected).")]
+        [SerializeField] private DamageResistanceConfig _resistanceConfig;
+
         [Header("Critical Hits (optional)")]
         [Tooltip("When assigned, each TakeDamage call rolls for a critical hit. " +
                  "A crit multiplies the raw incoming amount (before shield/armor reduction), " +
@@ -102,21 +109,38 @@ namespace BattleRobots.Physics
         /// Called by a DamageGameEventListener component wired in the Inspector,
         /// or directly from code when the full damage context is needed.
         ///
+        /// When <see cref="_resistanceConfig"/> is assigned the raw
+        /// <see cref="DamageInfo.amount"/> is reduced by the resistance fraction for
+        /// <see cref="DamageInfo.damageType"/> before proceeding to the crit → shield →
+        /// armor → HealthSO pipeline. This is the only pipeline stage that reads the
+        /// damage type; callers that pass a float amount bypass this reduction.
+        ///
         /// When <paramref name="info"/>.<see cref="DamageInfo.statusEffect"/> is non-null,
         /// the effect is automatically routed to the optional
         /// <see cref="_statusEffectController"/> so that a single hit can deal damage
         /// and apply a Burn / Stun / Slow simultaneously.
         ///
-        /// No allocation — DamageInfo is a struct; StatusEffectSO is a cached reference.
+        /// No allocation — DamageInfo is a struct; all fields are value or reference types.
         /// </summary>
         public void TakeDamage(DamageInfo info)
         {
-            TakeDamage(info.amount);
+            // Apply elemental resistance before the rest of the pipeline.
+            float effective = _resistanceConfig != null
+                ? _resistanceConfig.ApplyResistance(info.amount, info.damageType)
+                : info.amount;
+
+            TakeDamage(effective);
 
             // Route optional status effect carried in the damage payload.
             if (info.statusEffect != null)
                 _statusEffectController?.ApplyEffect(info.statusEffect);
         }
+
+        /// <summary>
+        /// The optional <see cref="DamageResistanceConfig"/> currently assigned.
+        /// Exposed for diagnostics and tests. Null when resistance is not configured.
+        /// </summary>
+        public DamageResistanceConfig ResistanceConfig => _resistanceConfig;
 
         /// <summary>
         /// Directly apply a status effect to this robot without dealing damage.
