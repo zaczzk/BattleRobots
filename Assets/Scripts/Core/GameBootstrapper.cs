@@ -102,6 +102,13 @@ namespace BattleRobots.Core
                  "Leave null to skip (backwards-compatible).")]
         [SerializeField] private PrestigeSystemSO _prestigeSystem;
 
+        [Header("Tutorial (optional)")]
+        [Tooltip("Tracks which tutorial steps the player has completed and whether the tutorial " +
+                 "is fully done. LoadSnapshot called on startup to restore the persisted state " +
+                 "from SaveData.tutorialComplete and SaveData.completedTutorialStepIds. " +
+                 "Leave null to skip (backwards-compatible — tutorial not shown).")]
+        [SerializeField] private TutorialProgressSO _tutorialProgress;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -214,6 +221,11 @@ namespace BattleRobots.Core
             // Restore prestige count.
             // LoadSnapshot is bootstrapper-safe (no events); old saves default to 0.
             _prestigeSystem?.LoadSnapshot(save.prestigeCount);
+
+            // Restore tutorial completion state and individually completed step IDs.
+            // LoadSnapshot is bootstrapper-safe (no events); old saves default to
+            // false / empty — players on old saves will see the tutorial once.
+            _tutorialProgress?.LoadSnapshot(save.tutorialComplete, save.completedTutorialStepIds);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

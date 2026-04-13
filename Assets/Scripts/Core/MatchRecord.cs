@@ -403,5 +403,24 @@ namespace BattleRobots.Core
         /// Default 0 — backwards-compatible with saves predating this field.
         /// </summary>
         public int prestigeCount;
+
+        // ── Tutorial Progress (T126) ──────────────────────────────────────────
+
+        /// <summary>
+        /// Whether the player has completed or explicitly skipped the tutorial.
+        /// Rehydrated into <see cref="TutorialProgressSO"/> by <see cref="GameBootstrapper"/>
+        /// on startup via <see cref="TutorialProgressSO.LoadSnapshot"/>.
+        /// Default false — new players see the tutorial; backwards-compatible with saves
+        /// predating this field (existing players also see it once, then it persists as true).
+        /// </summary>
+        public bool tutorialComplete;
+
+        /// <summary>
+        /// Step IDs that the player has individually acknowledged during the tutorial.
+        /// Rehydrated into <see cref="TutorialProgressSO"/> by <see cref="GameBootstrapper"/>
+        /// on startup via <see cref="TutorialProgressSO.LoadSnapshot"/>.
+        /// Initialised to an empty list so saves predating this field load with no completed steps.
+        /// </summary>
+        public List<string> completedTutorialStepIds = new List<string>();
     }
 }
