@@ -45,6 +45,13 @@ namespace BattleRobots.Physics
                  "or a VoidGameEventListener response.")]
         [SerializeField] private bool _isActive = true;
 
+        [Header("Status Effect (optional)")]
+        [Tooltip("When assigned, TriggerStatusEffect is called on the target robot's " +
+                 "DamageReceiver each time a damage tick fires. Pairs this zone with a " +
+                 "StatusEffectSO (e.g. Burn for Lava, Slow for Acid) so robots accumulate " +
+                 "persistent effects while inside the hazard. Leave null for damage-only zones.")]
+        [SerializeField] private HazardZoneStatusEffectConfig _statusEffectConfig;
+
         [Header("Events (optional)")]
         [Tooltip("Raised each time a damage tick fires. Wire an AudioManager or VFX handler " +
                  "to play a sizzle/spark effect without coupling to this component.")]
@@ -100,6 +107,11 @@ namespace BattleRobots.Physics
                 var info = new DamageInfo(_config.DamagePerTick, _config.DamageSourceId);
                 dr.TakeDamage(info);
                 _onHazardTriggered?.Raise();
+
+                // Apply optional status effect per tick (e.g. Burn on Lava, Slow on Acid).
+                // Null-guarded: safe when _statusEffectConfig or its StatusEffect is unassigned.
+                if (_statusEffectConfig?.StatusEffect != null)
+                    dr.TriggerStatusEffect(_statusEffectConfig.StatusEffect);
             }
 
             _accumulators[targetId] = acc;
