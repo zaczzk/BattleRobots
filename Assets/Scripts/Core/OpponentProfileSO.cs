@@ -50,6 +50,17 @@ namespace BattleRobots.Core
                  "Reserved for future stat-driven builds; not applied at runtime in this release.")]
         [SerializeField] private RobotDefinition _robotDefinition;
 
+        [Header("Damage Profile (optional)")]
+        [Tooltip("Damage resistance config for this opponent's robot. " +
+                 "Used by TypeMatchupAdvisorController to compute pre-match type-matchup effectiveness. " +
+                 "Leave null for no resistance — all damage types pass through at full strength.")]
+        [SerializeField] private DamageResistanceConfig _damageResistanceConfig;
+
+        [Tooltip("Damage vulnerability config for this opponent's robot. " +
+                 "Combined with _damageResistanceConfig to display effective/resisted/neutral matchup hints. " +
+                 "Leave null for no vulnerability — no type amplification.")]
+        [SerializeField] private DamageVulnerabilityConfig _damageVulnerabilityConfig;
+
         // ── Public API (immutable at runtime) ─────────────────────────────────
 
         /// <summary>Name shown in the opponent-selection UI and saved to the MatchRecord.</summary>
@@ -75,6 +86,23 @@ namespace BattleRobots.Core
         /// Reserved for future stat-driven enemy builds; not applied at runtime currently.
         /// </summary>
         public RobotDefinition RobotDefinition => _robotDefinition;
+
+        /// <summary>
+        /// Optional damage resistance config for this opponent's robot.
+        /// Read by <see cref="BattleRobots.UI.TypeMatchupAdvisorController"/> to compute
+        /// pre-match type-matchup effectiveness hints.
+        /// Null means no resistance — all damage types pass through at full strength.
+        /// </summary>
+        public DamageResistanceConfig OpponentResistance => _damageResistanceConfig;
+
+        /// <summary>
+        /// Optional damage vulnerability config for this opponent's robot.
+        /// Combined with <see cref="OpponentResistance"/> by
+        /// <see cref="BattleRobots.UI.TypeMatchupAdvisorController"/> to classify the
+        /// matchup as Effective / Resisted / Neutral.
+        /// Null means no vulnerability — no type amplification.
+        /// </summary>
+        public DamageVulnerabilityConfig OpponentVulnerability => _damageVulnerabilityConfig;
 
         // ── Editor validation ─────────────────────────────────────────────────
 
