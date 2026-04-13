@@ -422,5 +422,17 @@ namespace BattleRobots.Core
         /// Initialised to an empty list so saves predating this field load with no completed steps.
         /// </summary>
         public List<string> completedTutorialStepIds = new List<string>();
+
+        // ── Tutorial Tooltips (T128) ──────────────────────────────────────────
+
+        /// <summary>
+        /// Unity tags of UI panels for which the first-visit tooltip has already been
+        /// shown and dismissed by the player.
+        /// Written by <see cref="BattleRobots.UI.TutorialTooltipController"/> via the
+        /// load→mutate→Save pattern when the player dismisses a tooltip.
+        /// Initialised to an empty list so saves predating this field treat every panel
+        /// as unvisited (tooltip shows once on the first run — backwards-compatible).
+        /// </summary>
+        public List<string> seenTooltipPanelTags = new List<string>();
     }
 }
