@@ -189,5 +189,38 @@ namespace BattleRobots.Tests
             Assert.AreEqual(1660, score);
             Object.DestroyImmediate(r);
         }
+
+        // ── maxCombo bonus ────────────────────────────────────────────────────
+
+        [Test]
+        public void MaxCombo_Zero_AddsNoBonus()
+        {
+            // Loss base = 100; maxCombo=0 → no bonus → 100
+            var r = MakeResult(playerWon: false, durationSecs: 0f);
+            int score = MatchScoreCalculator.Calculate(r, maxCombo: 0);
+            Assert.AreEqual(100, score);
+            Object.DestroyImmediate(r);
+        }
+
+        [Test]
+        public void MaxCombo_Ten_AddsFiftyPoints()
+        {
+            // Loss base = 100; maxCombo=10 → +50 → 150
+            var r = MakeResult(playerWon: false, durationSecs: 0f);
+            int score = MatchScoreCalculator.Calculate(r, maxCombo: 10);
+            Assert.AreEqual(150, score);
+            Object.DestroyImmediate(r);
+        }
+
+        [Test]
+        public void MaxCombo_Negative_ClampedToZero_AddsNoBonus()
+        {
+            // Negative maxCombo must be clamped — should not subtract from score.
+            // Loss base = 100; maxCombo=-5 → clamped to 0 → 100
+            var r = MakeResult(playerWon: false, durationSecs: 0f);
+            int score = MatchScoreCalculator.Calculate(r, maxCombo: -5);
+            Assert.AreEqual(100, score);
+            Object.DestroyImmediate(r);
+        }
     }
 }

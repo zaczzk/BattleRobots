@@ -176,6 +176,13 @@ namespace BattleRobots.Core
                  "Leave null to skip (backwards-compatible).")]
         [SerializeField] private SessionSummarySO _sessionSummary;
 
+        [Header("Combo Counter (optional)")]
+        [Tooltip("Runtime SO that tracks the player's hit combo streak during a match. " +
+                 "MaxCombo is read in EndMatch() and passed to MatchScoreCalculator.Calculate() " +
+                 "to award +5 points per hit in the best streak (e.g. MaxCombo=10 → +50 score). " +
+                 "Leave null to skip combo scoring (backwards-compatible: maxCombo defaults to 0).")]
+        [SerializeField] private ComboCounterSO _comboCounter;
+
         [Header("Timer Warning (optional)")]
         [Tooltip("Configures time thresholds that fire VoidGameEvent channels as the match timer " +
                  "counts down (e.g. at 60 s, 30 s, 10 s). Reset() is called at match start so " +
@@ -441,7 +448,8 @@ namespace BattleRobots.Core
             // updated PersonalBestSO.CurrentScore / BestScore / IsNewBest.
             if (_personalBest != null)
             {
-                int matchScore = MatchScoreCalculator.Calculate(_matchResult);
+                int matchScore = MatchScoreCalculator.Calculate(_matchResult,
+                    _comboCounter != null ? _comboCounter.MaxCombo : 0);
                 _personalBest.Submit(matchScore);
             }
 
@@ -463,7 +471,8 @@ namespace BattleRobots.Core
             // Null _matchResult is safe — Record(0) would be misleading so we guard here.
             if (_scoreHistory != null && _matchResult != null)
             {
-                int historyScore = MatchScoreCalculator.Calculate(_matchResult);
+                int historyScore = MatchScoreCalculator.Calculate(_matchResult,
+                    _comboCounter != null ? _comboCounter.MaxCombo : 0);
                 _scoreHistory.Record(historyScore);
                 saveData.scoreHistoryScores = _scoreHistory.TakeSnapshot();
             }
