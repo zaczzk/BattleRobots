@@ -109,6 +109,12 @@ namespace BattleRobots.Core
                  "Leave null to skip (backwards-compatible — tutorial not shown).")]
         [SerializeField] private TutorialProgressSO _tutorialProgress;
 
+        [Header("Wave Survival (optional)")]
+        [Tooltip("Tracks the player's all-time best survival wave. LoadSnapshot called on startup " +
+                 "to restore the persisted best-wave count from SaveData.survivalBestWave. " +
+                 "Leave null to skip (backwards-compatible).")]
+        [SerializeField] private WaveManagerSO _waveManager;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -226,6 +232,10 @@ namespace BattleRobots.Core
             // LoadSnapshot is bootstrapper-safe (no events); old saves default to
             // false / empty — players on old saves will see the tutorial once.
             _tutorialProgress?.LoadSnapshot(save.tutorialComplete, save.completedTutorialStepIds);
+
+            // Restore the player's all-time best survival wave.
+            // LoadSnapshot is bootstrapper-safe (no events); old saves default to 0.
+            _waveManager?.LoadSnapshot(save.survivalBestWave);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

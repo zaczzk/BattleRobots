@@ -434,5 +434,15 @@ namespace BattleRobots.Core
         /// as unvisited (tooltip shows once on the first run — backwards-compatible).
         /// </summary>
         public List<string> seenTooltipPanelTags = new List<string>();
+
+        // ── Wave Survival (T131) ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Highest survival wave the player has ever reached across all sessions.
+        /// Rehydrated into <see cref="WaveManagerSO"/> by <see cref="GameBootstrapper"/>
+        /// on startup via <see cref="WaveManagerSO.LoadSnapshot"/>.
+        /// Default 0 — backwards-compatible with saves predating this field.
+        /// </summary>
+        public int survivalBestWave;
     }
 }
