@@ -133,6 +133,15 @@ namespace BattleRobots.Core
         public float TakeSnapshot() => _currentEnergy;
 
         /// <summary>
+        /// Overrides the passive recharge rate at runtime (e.g., from PassiveEffectApplier).
+        /// Values below 0 are clamped to 0. Does NOT raise any events — passive configuration only.
+        /// </summary>
+        public void SetRechargeRate(float rate)
+        {
+            _rechargeRate = Mathf.Max(0f, rate);
+        }
+
+        /// <summary>
         /// Resets energy to MaxEnergy and raises <c>_onEnergyChanged</c>.
         /// Use at match start if the pool was partially consumed in a previous session.
         /// </summary>
