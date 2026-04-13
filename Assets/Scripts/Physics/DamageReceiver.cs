@@ -60,6 +60,14 @@ namespace BattleRobots.Physics
                  "all existing callers unaffected).")]
         [SerializeField] private DamageResistanceConfig _resistanceConfig;
 
+        [Header("Damage Vulnerability (optional)")]
+        [Tooltip("When assigned, the elemental type carried by TakeDamage(DamageInfo) is used " +
+                 "to amplify the incoming amount AFTER resistance is applied. A multiplier " +
+                 "greater than 1 means this robot takes extra damage from that type. " +
+                 "Effective damage = raw × (1−resistance) × vulnerabilityMultiplier. " +
+                 "Leave null to skip type-based vulnerability (backwards-compatible).")]
+        [SerializeField] private DamageVulnerabilityConfig _vulnerabilityConfig;
+
         [Header("Critical Hits (optional)")]
         [Tooltip("When assigned, each TakeDamage call rolls for a critical hit. " +
                  "A crit multiplies the raw incoming amount (before shield/armor reduction), " +
@@ -124,10 +132,14 @@ namespace BattleRobots.Physics
         /// </summary>
         public void TakeDamage(DamageInfo info)
         {
-            // Apply elemental resistance before the rest of the pipeline.
+            // 1. Apply elemental resistance (reduces damage).
             float effective = _resistanceConfig != null
                 ? _resistanceConfig.ApplyResistance(info.amount, info.damageType)
                 : info.amount;
+
+            // 2. Apply elemental vulnerability (amplifies damage, applied after resistance).
+            if (_vulnerabilityConfig != null)
+                effective = _vulnerabilityConfig.ApplyVulnerability(effective, info.damageType);
 
             TakeDamage(effective);
 
@@ -141,6 +153,12 @@ namespace BattleRobots.Physics
         /// Exposed for diagnostics and tests. Null when resistance is not configured.
         /// </summary>
         public DamageResistanceConfig ResistanceConfig => _resistanceConfig;
+
+        /// <summary>
+        /// The optional <see cref="DamageVulnerabilityConfig"/> currently assigned.
+        /// Exposed for diagnostics and tests. Null when vulnerability is not configured.
+        /// </summary>
+        public DamageVulnerabilityConfig VulnerabilityConfig => _vulnerabilityConfig;
 
         /// <summary>
         /// Directly apply a status effect to this robot without dealing damage.
