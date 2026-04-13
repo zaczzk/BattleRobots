@@ -53,6 +53,14 @@ namespace BattleRobots.Physics
                  "tracking (backwards-compatible — all existing callers unaffected).")]
         [SerializeField] private PartHealthSystem _partHealthSystem;
 
+        [Header("Critical Hits (optional)")]
+        [Tooltip("When assigned, each TakeDamage call rolls for a critical hit. " +
+                 "A crit multiplies the raw incoming amount (before shield/armor reduction), " +
+                 "fires the config's _onCriticalHit event, and then proceeds through the " +
+                 "normal shield → armor → HealthSO pipeline. Leave null to disable crits " +
+                 "(backwards-compatible — all existing callers unaffected).")]
+        [SerializeField] private CriticalHitConfig _critConfig;
+
         // ── Public API ────────────────────────────────────────────────────────
 
         /// <summary>Current flat damage-reduction rating. Range [0, 100].</summary>
@@ -69,7 +77,8 @@ namespace BattleRobots.Physics
 
         /// <summary>
         /// Apply a raw damage amount (e.g. from a collision callback or projectile hit).
-        /// Applies flat armor reduction before forwarding to HealthSO.
+        /// Rolls for a critical hit (if <see cref="_critConfig"/> is assigned), then
+        /// applies shield → armor reduction before forwarding to HealthSO.
         /// No allocation — value type param.
         /// </summary>
         public void TakeDamage(float amount)
@@ -79,8 +88,10 @@ namespace BattleRobots.Physics
                 Debug.LogWarning($"[DamageReceiver] '{name}' has no HealthSO assigned.", this);
                 return;
             }
+            // Critical hit roll — multiplies raw amount before shield/armor pipeline.
+            float critted     = CriticalHitConfig.ComputeCritDamage(amount, _critConfig, out _);
             // Shield absorbs first; any leftover proceeds to armor + HealthSO.
-            float afterShield = _shield != null ? _shield.AbsorbDamage(amount) : amount;
+            float afterShield = _shield != null ? _shield.AbsorbDamage(critted) : critted;
             float reduced     = Mathf.Max(0f, afterShield - _armorRating);
             _health.ApplyDamage(reduced);
             _partHealthSystem?.DistributeDamage(reduced);
