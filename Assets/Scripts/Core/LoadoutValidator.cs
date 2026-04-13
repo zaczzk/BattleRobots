@@ -61,10 +61,13 @@ namespace BattleRobots.Core
     ///      catalog (only checked when <paramref name="catalog"/> is non-null).
     ///   3. <b>Ownership</b> — every equipped part ID must be owned by the player
     ///      (only checked when <paramref name="inventory"/> is non-null).
-    ///   4. <b>Slot coverage</b> — every unique <see cref="PartCategory"/> required
-    ///      by <see cref="RobotDefinition.Slots"/> must have at least one equipped
-    ///      part in that category (only checked when <paramref name="catalog"/> is
-    ///      non-null, since category lookup requires the catalog).
+    ///   4. <b>Slot coverage</b> — every unique non-Weapon <see cref="PartCategory"/>
+    ///      required by <see cref="RobotDefinition.Slots"/> must have at least one
+    ///      equipped part in that category (only checked when <paramref name="catalog"/>
+    ///      is non-null, since category lookup requires the catalog).
+    ///   5. <b>Exactly-one-Weapon</b> — when the robot definition requires a Weapon
+    ///      slot and the catalog is provided, exactly one Weapon-category part must be
+    ///      equipped.  0 or 2+ weapon parts each produce a distinct error message.
     ///
     /// ── Partial validation ────────────────────────────────────────────────────
     ///   Passing <c>null</c> for <paramref name="catalog"/> disables rules 2 and 4.
@@ -152,6 +155,7 @@ namespace BattleRobots.Core
             // ── Validate each equipped part ───────────────────────────────────
 
             var coveredCategories = new HashSet<PartCategory>();
+            int weaponCount = 0;
 
             for (int i = 0; i < equippedIds.Count; i++)
             {
@@ -161,7 +165,11 @@ namespace BattleRobots.Core
                 if (catalogLookup != null)
                 {
                     if (catalogLookup.TryGetValue(id, out PartDefinition def))
+                    {
                         coveredCategories.Add(def.Category);
+                        if (def.Category == PartCategory.Weapon)
+                            weaponCount++;
+                    }
                     else
                         errors.Add($"Part not found in catalog: '{id}'.");
                 }
@@ -171,15 +179,29 @@ namespace BattleRobots.Core
                     errors.Add($"Part not owned: '{id}'.");
             }
 
-            // ── Slot coverage check ───────────────────────────────────────────
+            // ── Slot coverage check (non-Weapon categories) ───────────────────
+            // The Weapon category is handled separately by the exactly-one check.
 
             if (catalog != null)
             {
                 foreach (PartCategory required in requiredCategories)
                 {
+                    if (required == PartCategory.Weapon) continue;
                     if (!coveredCategories.Contains(required))
                         errors.Add($"No {required} part equipped.");
                 }
+            }
+
+            // ── Exactly-one-Weapon check ──────────────────────────────────────
+            // Enforced only when the robot definition includes a Weapon slot and
+            // the catalog is available for category resolution.
+
+            if (catalogLookup != null && requiredCategories.Contains(PartCategory.Weapon)
+                && weaponCount != 1)
+            {
+                errors.Add(weaponCount == 0
+                    ? "Exactly one Weapon part required (none equipped)."
+                    : $"Exactly one Weapon part required (found {weaponCount}).");
             }
 
             return errors.Count == 0

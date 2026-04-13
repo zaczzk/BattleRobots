@@ -13,7 +13,7 @@ namespace BattleRobots.Physics
     ///   Awake     → caches _fireDelegate (Action).
     ///   OnEnable  → subscribes _onFireEvent → HandleFire.
     ///   OnDisable → unsubscribes (zero-alloc after Awake).
-    ///   HandleFire → builds DamageInfo(_weaponPart.BaseDamage, _sourceId,
+    ///   HandleFire → builds DamageInfo(_weaponPart.BaseDamage + _damageBonus, _sourceId,
     ///                Vector3.zero, null, _weaponPart.WeaponDamageType) and raises
     ///                _outDamageEvent.  No-ops when either field is null.
     ///
@@ -59,6 +59,13 @@ namespace BattleRobots.Physics
 
         private Action _fireDelegate;
 
+        /// <summary>
+        /// Runtime flat damage bonus accumulated by <see cref="AddDamageBonus"/>.
+        /// Added to <see cref="WeaponPartSO.BaseDamage"/> on each fire.
+        /// Not serialised — starts at zero and is cleared by <see cref="ResetDamageBonus"/>.
+        /// </summary>
+        private float _damageBonus;
+
         // ── Lifecycle ─────────────────────────────────────────────────────────
 
         private void Awake()
@@ -83,7 +90,7 @@ namespace BattleRobots.Physics
             if (_weaponPart == null || _outDamageEvent == null) return;
 
             _outDamageEvent.Raise(new DamageInfo(
-                _weaponPart.BaseDamage,
+                _weaponPart.BaseDamage + _damageBonus,
                 _sourceId,
                 Vector3.zero,
                 null,
@@ -112,5 +119,31 @@ namespace BattleRobots.Physics
 
         /// <summary>The currently assigned weapon part. May be null.</summary>
         public WeaponPartSO WeaponPart => _weaponPart;
+
+        /// <summary>
+        /// Current accumulated runtime damage bonus (not serialised).
+        /// Added to <see cref="WeaponPartSO.BaseDamage"/> on each fire.
+        /// </summary>
+        public float DamageBonus => _damageBonus;
+
+        /// <summary>
+        /// Accumulates a flat damage bonus applied to every subsequent fire.
+        /// Negative values are ignored (clamped to zero contribution).
+        /// Zero-allocation — arithmetic only.
+        /// </summary>
+        public void AddDamageBonus(float bonus)
+        {
+            if (bonus > 0f)
+                _damageBonus += bonus;
+        }
+
+        /// <summary>
+        /// Clears the accumulated runtime damage bonus back to zero.
+        /// Call at match end (or match start before re-applying bonuses) to prevent stacking.
+        /// </summary>
+        public void ResetDamageBonus()
+        {
+            _damageBonus = 0f;
+        }
     }
 }
