@@ -89,6 +89,12 @@ namespace BattleRobots.Core
                  "SaveData.careerHighlights. Leave null to skip (backwards-compatible).")]
         [SerializeField] private CareerHighlightsSO _careerHighlights;
 
+        [Header("Match Damage History (optional)")]
+        [Tooltip("Rolling ring-buffer of per-type damage totals from the last N matches. " +
+                 "LoadSnapshot called on startup to rehydrate from " +
+                 "SaveData.damageHistoryEntries. Leave null to skip (backwards-compatible).")]
+        [SerializeField] private MatchDamageHistorySO _matchDamageHistory;
+
         [Header("Session Summary (optional)")]
         [Tooltip("Lightweight session-scoped tracker (matches played, wins, currency earned). " +
                  "Reset() is called in Awake so the summary always starts fresh each run. " +
@@ -223,6 +229,10 @@ namespace BattleRobots.Core
             // LoadSnapshot is bootstrapper-safe (no events, null-safe); old saves default
             // to a zero-filled CareerHighlightsSnapshot (all records start at zero).
             _careerHighlights?.LoadSnapshot(save.careerHighlights);
+
+            // Restore per-type damage history ring buffer.
+            // LoadSnapshot is bootstrapper-safe (no events); old saves default to empty list.
+            _matchDamageHistory?.LoadSnapshot(save.damageHistoryEntries);
 
             // Restore prestige count.
             // LoadSnapshot is bootstrapper-safe (no events); old saves default to 0.

@@ -169,6 +169,21 @@ namespace BattleRobots.Core
                  "Leave null to skip (backwards-compatible).")]
         [SerializeField] private CareerHighlightsSO _careerHighlights;
 
+        [Header("Match Damage History (optional)")]
+        [Tooltip("Rolling ring-buffer of per-type damage totals from the last N matches. " +
+                 "AddEntry(_matchStatistics) is called in EndMatch() so the ring always " +
+                 "reflects the just-completed match before _onMatchEnded fires. " +
+                 "TakeSnapshot() persists the updated ring to SaveData.damageHistoryEntries. " +
+                 "Leave null to skip damage-history tracking (backwards-compatible).")]
+        [SerializeField] private MatchDamageHistorySO _matchDamageHistory;
+
+        [Header("Match Damage History (optional)")]
+        [Tooltip("Rolling ring-buffer that persists per-type damage totals from the last N matches. " +
+                 "AddEntry(_matchStatistics) is called in EndMatch() when both fields are non-null; " +
+                 "TakeSnapshot() persists the updated ring to SaveData.damageHistoryEntries. " +
+                 "Leave null to skip (backwards-compatible).")]
+        [SerializeField] private MatchDamageHistorySO _matchDamageHistory;
+
         [Header("Session Summary (optional)")]
         [Tooltip("Lightweight session-scoped tracker (matches played, wins, currency earned). " +
                  "RecordMatch() is called in EndMatch() after MatchResultSO.Write() so all result " +
@@ -484,6 +499,14 @@ namespace BattleRobots.Core
             {
                 _careerHighlights.Update(_matchResult);
                 saveData.careerHighlights = _careerHighlights.TakeSnapshot();
+            }
+
+            // Append per-type damage totals to the rolling history ring buffer.
+            // Requires both _matchDamageHistory and _matchStatistics to be assigned.
+            if (_matchDamageHistory != null && _matchStatistics != null)
+            {
+                _matchDamageHistory.AddEntry(_matchStatistics);
+                saveData.damageHistoryEntries = _matchDamageHistory.TakeSnapshot();
             }
 
             SaveSystem.Save(saveData);

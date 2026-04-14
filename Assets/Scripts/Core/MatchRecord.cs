@@ -444,5 +444,38 @@ namespace BattleRobots.Core
         /// Default 0 — backwards-compatible with saves predating this field.
         /// </summary>
         public int survivalBestWave;
+
+        // ── Match Damage History (T177) ───────────────────────────────────────
+
+        /// <summary>
+        /// Rolling window of per-type damage totals from the last N completed matches.
+        /// Rehydrated into <see cref="MatchDamageHistorySO"/> by <see cref="GameBootstrapper"/>
+        /// on startup via <see cref="MatchDamageHistorySO.LoadSnapshot"/>.
+        /// Initialised to an empty list so saves predating this field start with no history.
+        /// </summary>
+        public List<MatchDamageHistoryEntry> damageHistoryEntries = new List<MatchDamageHistoryEntry>();
+    }
+
+    /// <summary>
+    /// Serializable snapshot of per-type damage dealt in a single completed match.
+    /// Stored inside <see cref="SaveData.damageHistoryEntries"/> and round-trips cleanly
+    /// through JsonUtility / XOR SaveSystem.
+    ///
+    /// Default values are all 0f so saves predating this type deserialise safely.
+    /// </summary>
+    [Serializable]
+    public sealed class MatchDamageHistoryEntry
+    {
+        /// <summary>Total Physical damage dealt by the player in this match. ≥ 0.</summary>
+        public float physicalDamage;
+
+        /// <summary>Total Energy damage dealt by the player in this match. ≥ 0.</summary>
+        public float energyDamage;
+
+        /// <summary>Total Thermal damage dealt by the player in this match. ≥ 0.</summary>
+        public float thermalDamage;
+
+        /// <summary>Total Shock damage dealt by the player in this match. ≥ 0.</summary>
+        public float shockDamage;
     }
 }
