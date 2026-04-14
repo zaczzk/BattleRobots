@@ -40,9 +40,17 @@ namespace BattleRobots.Core
         /// Passing <c>null</c> skips multiplication (backwards-compatible).
         /// Assigned by <see cref="MatchManager"/> when a prestige bonus is active.
         /// </param>
+        /// <param name="combinedBonus">
+        /// Optional <see cref="CombinedBonusCalculatorSO"/> applied as a second multiplicative
+        /// pass after <paramref name="scoreMultiplier"/>: <c>Mathf.RoundToInt(clamped × FinalMultiplier)</c>.
+        /// Passing <c>null</c> skips this pass (backwards-compatible).
+        /// Use when both prestige-tier and mastery-tier multipliers should be combined
+        /// before final score output.
+        /// </param>
         /// <returns>Non-negative integer score.</returns>
         public static int Calculate(MatchResultSO result, int maxCombo = 0,
-                                    ScoreMultiplierSO scoreMultiplier = null)
+                                    ScoreMultiplierSO scoreMultiplier = null,
+                                    CombinedBonusCalculatorSO combinedBonus = null)
         {
             if (result == null) return 0;
 
@@ -82,6 +90,11 @@ namespace BattleRobots.Core
             // Multiplier is already clamped to [0.01, 10] by ScoreMultiplierSO.SetMultiplier.
             if (scoreMultiplier != null)
                 clamped = Mathf.RoundToInt(clamped * scoreMultiplier.Multiplier);
+
+            // Apply optional combined bonus (prestige × mastery aggregate).
+            // FinalMultiplier is clamped to [0.01, 10] by CombinedBonusCalculatorSO.
+            if (combinedBonus != null)
+                clamped = Mathf.RoundToInt(clamped * combinedBonus.FinalMultiplier);
 
             return clamped;
         }
