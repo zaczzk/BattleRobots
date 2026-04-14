@@ -68,10 +68,18 @@ namespace BattleRobots.Core
     ///   5. <b>Exactly-one-Weapon</b> — when the robot definition requires a Weapon
     ///      slot and the catalog is provided, exactly one Weapon-category part must be
     ///      equipped.  0 or 2+ weapon parts each produce a distinct error message.
+    ///   6. <b>Weapon type unlock</b> — when <paramref name="unlockConfig"/>,
+    ///      <paramref name="prestige"/>, and <paramref name="weaponCatalog"/> are all
+    ///      non-null, every equipped Weapon-category part must have a
+    ///      <see cref="DamageType"/> that meets the player's current prestige rank
+    ///      requirement.  A human-readable lock reason is added per locked type.
+    ///      Rule is skipped (backwards-compatible) when any of the three is null.
     ///
     /// ── Partial validation ────────────────────────────────────────────────────
     ///   Passing <c>null</c> for <paramref name="catalog"/> disables rules 2 and 4.
     ///   Passing <c>null</c> for <paramref name="inventory"/> disables rule 3.
+    ///   Passing <c>null</c> for any of <paramref name="unlockConfig"/>,
+    ///   <paramref name="prestige"/>, or <paramref name="weaponCatalog"/> disables rule 6.
     ///   This lets callers run the subset of checks their context supports.
     ///
     /// ── Architecture notes ────────────────────────────────────────────────────
@@ -81,10 +89,24 @@ namespace BattleRobots.Core
     /// </summary>
     public static class LoadoutValidator
     {
-        // ── Primary validation overload ───────────────────────────────────────
+        // ── Primary validation overloads ──────────────────────────────────────
 
         /// <summary>
-        /// Validates a raw list of equipped part IDs.
+        /// Validates a raw list of equipped part IDs (rules 1–5 only).
+        /// Backwards-compatible entry point — no weapon-type unlock check.
+        /// </summary>
+        public static LoadoutValidationResult Validate(
+            IReadOnlyList<string> equippedIds,
+            RobotDefinition       robotDef,
+            PlayerInventory       inventory,
+            ShopCatalog           catalog)
+        {
+            return Validate(equippedIds, robotDef, inventory, catalog,
+                            unlockConfig: null, prestige: null, weaponCatalog: null);
+        }
+
+        /// <summary>
+        /// Validates a raw list of equipped part IDs (rules 1–6).
         ///
         /// <para>Rules are applied in the order listed in the class summary.
         /// All violations are collected before returning so the caller can
@@ -104,11 +126,27 @@ namespace BattleRobots.Core
         /// <param name="catalog">
         /// Optional — when non-null, catalog membership and slot coverage are verified.
         /// </param>
+        /// <param name="unlockConfig">
+        /// Optional — prestige requirements per weapon <see cref="DamageType"/>.
+        /// When non-null (along with <paramref name="prestige"/> and
+        /// <paramref name="weaponCatalog"/>), rule 6 is enforced.
+        /// </param>
+        /// <param name="prestige">
+        /// Optional — player's current prestige state. Null is treated as count 0 by
+        /// <see cref="WeaponTypeUnlockEvaluator"/> when rule 6 runs.
+        /// </param>
+        /// <param name="weaponCatalog">
+        /// Optional — catalog that maps part IDs to <see cref="WeaponPartSO"/> assets
+        /// for <see cref="DamageType"/> resolution in rule 6.
+        /// </param>
         public static LoadoutValidationResult Validate(
-            IReadOnlyList<string> equippedIds,
-            RobotDefinition       robotDef,
-            PlayerInventory       inventory,
-            ShopCatalog           catalog)
+            IReadOnlyList<string>  equippedIds,
+            RobotDefinition        robotDef,
+            PlayerInventory        inventory,
+            ShopCatalog            catalog,
+            WeaponTypeUnlockConfig unlockConfig,
+            PrestigeSystemSO       prestige,
+            WeaponPartCatalogSO    weaponCatalog)
         {
             // ── Null guards ───────────────────────────────────────────────────
 
@@ -204,18 +242,46 @@ namespace BattleRobots.Core
                     : $"Exactly one Weapon part required (found {weaponCount}).");
             }
 
+            // ── Rule 6: Weapon type unlock check ─────────────────────────────
+            // Skipped when any of the three optional params is null.
+
+            if (unlockConfig != null && weaponCatalog != null)
+            {
+                for (int i = 0; i < equippedIds.Count; i++)
+                {
+                    string id = equippedIds[i];
+
+                    // Only check parts identified as Weapon-category by the catalog.
+                    if (catalogLookup == null) continue;
+                    if (!catalogLookup.TryGetValue(id, out PartDefinition def)) continue;
+                    if (def.Category != PartCategory.Weapon) continue;
+
+                    // Resolve the weapon's DamageType via the weapon catalog.
+                    WeaponPartSO weaponPart = weaponCatalog.Lookup(id);
+                    if (weaponPart == null) continue; // Unknown type → skip (no error)
+
+                    DamageType weaponType = weaponPart.WeaponDamageType;
+                    if (!WeaponTypeUnlockEvaluator.IsTypeUnlocked(unlockConfig, prestige, weaponType))
+                    {
+                        string reason = WeaponTypeUnlockEvaluator.GetLockReason(
+                            unlockConfig, prestige, weaponType);
+                        errors.Add($"Weapon '{def.DisplayName}' ({weaponType}) is locked: {reason}");
+                    }
+                }
+            }
+
             return errors.Count == 0
                 ? LoadoutValidationResult.Valid
                 : LoadoutValidationResult.Invalid(errors);
         }
 
-        // ── Convenience overload for PlayerLoadout SO ─────────────────────────
+        // ── Convenience overloads for PlayerLoadout SO ────────────────────────
 
         /// <summary>
-        /// Validates a <see cref="PlayerLoadout"/> SO.
+        /// Validates a <see cref="PlayerLoadout"/> SO (rules 1–5 only).
+        /// Backwards-compatible entry point — no weapon-type unlock check.
         /// Returns an invalid result immediately when <paramref name="loadout"/>
-        /// is <c>null</c>; otherwise delegates to
-        /// <see cref="Validate(IReadOnlyList{string}, RobotDefinition, PlayerInventory, ShopCatalog)"/>.
+        /// is <c>null</c>; otherwise delegates to the raw-list overload.
         /// </summary>
         public static LoadoutValidationResult Validate(
             PlayerLoadout   loadout,
@@ -228,6 +294,28 @@ namespace BattleRobots.Core
                     new List<string> { "No player loadout assigned." });
 
             return Validate(loadout.EquippedPartIds, robotDef, inventory, catalog);
+        }
+
+        /// <summary>
+        /// Validates a <see cref="PlayerLoadout"/> SO (rules 1–6).
+        /// Returns an invalid result immediately when <paramref name="loadout"/>
+        /// is <c>null</c>; otherwise delegates to the extended raw-list overload.
+        /// </summary>
+        public static LoadoutValidationResult Validate(
+            PlayerLoadout          loadout,
+            RobotDefinition        robotDef,
+            PlayerInventory        inventory,
+            ShopCatalog            catalog,
+            WeaponTypeUnlockConfig unlockConfig,
+            PrestigeSystemSO       prestige,
+            WeaponPartCatalogSO    weaponCatalog)
+        {
+            if (loadout == null)
+                return LoadoutValidationResult.Invalid(
+                    new List<string> { "No player loadout assigned." });
+
+            return Validate(loadout.EquippedPartIds, robotDef, inventory, catalog,
+                            unlockConfig, prestige, weaponCatalog);
         }
     }
 }
