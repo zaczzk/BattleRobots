@@ -56,7 +56,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | M31 | Score Multiplier Integration &amp; Prestige Stats UI (MatchScoreCalculator ScoreMultiplierSO param, MatchManager _scoreMultiplier field, PrestigeStatsController read-only panel) | Sprint 31 | **Done** |
 | M32 | Bonus Aggregation &amp; Career Depth (CombinedBonusCalculatorSO, ScoreMultiplierHUDController, MasteryProgressMilestoneSO + Controller, PrestigeHistorySO + PostPrestigeHistoryController) | Sprint 32 | **Done** |
 | M33 | Career Dashboard &amp; Milestone Rewards (CombinedBonusHUDController, MilestoneRewardCatalogSO + MilestoneRewardApplier, CareerSummaryController) | Sprint 33 | **Done** |
-| M34 | Reward Feedback &amp; Streak Visualization (MilestoneRewardNotificationController, WinStreakDisplayController, CurrencyEarnedFlashController) | Sprint 34 | **In Progress** |
+| M34 | Reward Feedback &amp; Streak Visualization (MilestoneRewardNotificationController, WinStreakDisplayController, CurrencyEarnedFlashController) | Sprint 34 | **Done** |
+| M35 | Match Rating &amp; Trend Feedback (MatchRatingController, StreakBonusNotificationController, MatchScoreTrendController, DailyChallengeCountdownController) | Sprint 35 | **Done** |
 
 ---
 
@@ -278,6 +279,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | M32 | PM Agent | 2026-04-14 | T190 CombinedBonusCalculatorSO+MatchScoreCalculator 4th param (14 tests) + T191 ScoreMultiplierHUDController (14 tests) + T192 MasteryProgressMilestoneSO+MasteryProgressMilestoneController (18 tests) + T193 PrestigeHistorySO+PostPrestigeHistoryController (18 tests). 64 new tests. 3368 total tests across 253 test files. M32 complete. |
 | M33 | PM Agent | 2026-04-14 | T194 CombinedBonusHUDController (14 tests) + T195 MilestoneRewardCatalogSO+MilestoneRewardApplier (18 tests) + T196 CareerSummaryController (14 tests). 46 new tests. 3414 total tests across 256 test files. M33 complete. |
 | M34 | PM Agent | 2026-04-14 | T197 MilestoneRewardNotificationController (14 tests) + T198 WinStreakDisplayController (12 tests) + T199 CurrencyEarnedFlashController (12 tests). 38 new tests. 3452 total tests across 261 test files. M34 complete. |
+| M35 | PM Agent | 2026-04-14 | T200 MatchRatingController (14 tests) + T201 StreakBonusNotificationController (12 tests) + T202 MatchScoreTrendController (12 tests) + T203 DailyChallengeCountdownController (10 tests). 48 new tests. 3500 total tests across 265 test files. M35 complete. |
 
 ---
 
@@ -539,17 +541,18 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | 2026-04-13 | PM Agent | Session 50: M20 Damage Vulnerability & Type Effectiveness Feedback — T156 DamageVulnerabilityConfig SO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Combat/DamageVulnerabilityConfig"): per-type vulnerability multipliers [Range(1f,3f)] for Physical/Energy/Thermal/Shock; GetMultiplier(type) switch, 1f for unknown; ApplyVulnerability(raw,type) = Mathf.Max(0,raw×multiplier), 0 for raw≤0; OnValidate clamps all. 14 new tests. T157 DamageReceiver patched: new optional _vulnerabilityConfig field; TakeDamage(DamageInfo) applies vulnerability AFTER resistance — effective = ApplyResistance then ApplyVulnerability; TakeDamage(float) unchanged; VulnerabilityConfig property exposed. 10 new tests. T158 EffectivenessOutcome enum (Effective/Resisted/Neutral) + DamageTypeEffectivenessConfig SO (Core, "BattleRobots/UI/DamageTypeEffectivenessConfig"): thresholds, label strings, colors, _displayDuration; GetOutcome/GetLabel/GetColor; OnValidate. DamageTypeEffectivenessHUDController MB (BattleRobots.UI, DisallowMultipleComponent): optional configs+channel+UI refs; Awake caches delegate; OnEnable/OnDisable subscribe/unsubscribe; OnDamageTaken computes combinedRatio=(1-resistance)×vulnerability, shows outcome banner; Tick auto-hides; Update drives Tick; DisplayTimer/EffectivenessConfig public. 20 new tests. Total: 44 new tests. 2828 tests across 209 test files. T001–T158 Done. M1–M20 complete. |
 | 2026-04-14 | PM Agent | Session 51: M33 Career Dashboard & Milestone Rewards — T194 CombinedBonusHUDController (BattleRobots.UI, DisallowMultipleComponent): reads CombinedBonusCalculatorSO; shows "Prestige ×N.NN" / "Mastery ×N.NN" / "Total ×N.NN" labels; subscribes _onPrestige + _onMasteryUnlocked; all refs optional; zero alloc after Awake. 14 new tests. T195 MilestoneRewardCatalogSO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Combat/MilestoneRewardCatalog"): float[] rewards indexed by milestone number; GetReward(index) → 0f when OOB/null; Count/RewardLabel properties; OnValidate warns empty. MilestoneRewardApplier (BattleRobots.Physics, DisallowMultipleComponent): subscribes _onMatchEnded; per-type cleared-count snapshot in OnEnable; CheckMilestones grants PlayerWallet.AddFunds(RoundToInt(reward)) for newly-cleared milestones, raises _onRewardGranted per award; int[] _previousClearedCounts pre-allocated in Awake; zero alloc after init. 18 new tests. T196 CareerSummaryController (BattleRobots.UI, DisallowMultipleComponent): aggregates PrestigeSystemSO (rank+count), DamageTypeMasterySO (mastered count N/4), CombinedBonusCalculatorSO (×N.NN), PrestigeHistorySO (event count) into single overview panel; subscribes _onPrestige + _onMasteryUnlocked; all refs optional; zero alloc after Awake. 14 new tests. **46 new tests. 3414 total tests across 256 test files. T001–T196 Done. M1–M33 complete.** |
 | 2026-04-14 | PM Agent | Session 52: M34 Reward Feedback & Streak Visualization — T197 MilestoneRewardNotificationController (BattleRobots.UI, DisallowMultipleComponent): subscribes _onRewardGranted (VoidGameEvent from MilestoneRewardApplier); reads MilestoneRewardCatalogSO.RewardLabel for banner headline "{label} Reached!"; optional _notificationQueue NotificationQueueSO forwards toast to global queue; Tick-based auto-hide (Update→Tick(dt)); _displayDuration 2f default; all refs optional; zero alloc after Awake. 14 new EditMode tests. T198 WinStreakDisplayController (BattleRobots.UI, DisallowMultipleComponent): reads WinStreakSO; shows "Streak: N" (_currentStreakText) and "Best: N" (_bestStreakText); activates optional _streakBadge when CurrentStreak ≥ _notableStreakThreshold (default 3); subscribes _onStreakChanged; Refresh null-safe (em-dash fallback + badge hidden when null); all refs optional; zero alloc after Awake. 12 new EditMode tests. T199 CurrencyEarnedFlashController (BattleRobots.UI, DisallowMultipleComponent): subscribes _onMatchEnded; reads MatchResultSO.CurrencyEarned; skips flash when earned ≤ 0; shows "+N credits" label; optional _notificationQueue forward; Tick-based auto-hide; _flashDuration 2f default; all refs optional; zero alloc after Awake. 12 new EditMode tests. **38 new tests. 3452 total tests across 261 test files. T001–T199 Done. M1–M34 complete.** |
+| 2026-04-14 | PM Agent | Session 53: M35 Match Rating & Trend Feedback — T200 MatchRatingController (BattleRobots.UI, DisallowMultipleComponent): subscribes _onMatchEnded; reads MatchResultSO (PlayerWon/DamageDone/DamageTaken) + optional PersonalBestSO (IsNewBest); computes 1–5 star rating (base 1 + win + efficiency≥0.5 + newBest + win&&newBest); updates _ratingLabel "N / 5" + optional Image[] _starImages with filled/empty sprites; _ratingPanel hidden on OnEnable, shown on match end; ComputeStars() internal for test access; all refs optional; zero alloc after Awake. 14 new EditMode tests. T201 StreakBonusNotificationController (BattleRobots.UI, DisallowMultipleComponent): subscribes _onStreakChanged; snapshots _previousStreak on OnEnable; compares new streak to previous + calls WinStreakMilestoneSO.HasMilestoneAtStreak to determine notification eligibility (guards against loss-driven resets); shows "N Win Streak! Bonus unlocked!" banner; optional NotificationQueueSO forward; Tick-based auto-hide (Update→Tick(dt)); _displayDuration 2f default; all refs optional; zero alloc after Awake. 12 new EditMode tests. T202 MatchScoreTrendController (BattleRobots.UI, DisallowMultipleComponent): subscribes _onHistoryUpdated; reads ScoreHistorySO.TrendDelta; shows "↑ Improving" / "↓ Declining" / "↔ Steady" or em-dash when history null/count<2; _trendPanel hidden when insufficient data; no Update; Refresh public; all refs optional; zero alloc after Awake. 12 new EditMode tests. T203 DailyChallengeCountdownController (BattleRobots.UI, DisallowMultipleComponent): subscribes _onMatchEnded; reads DailyChallengeSO.IsCompleted; shows "Challenge complete!" when done or "Resets in Xh Ym" (SecondsUntilMidnightUtc() static helper) otherwise; _countdownPanel hidden when challenge null; Refresh public; all refs optional; zero alloc after Awake. 10 new EditMode tests. **48 new tests. 3500 total tests across 265 test files. T001–T203 Done. M1–M35 complete.** |
 | 2026-04-12 | PM Agent | Session 48: T117 ScoreHistorySO + ScoreHistoryController — chronological rolling score-history window for M8 Competitive Depth. ScoreHistorySO (Core, CreateAssetMenu "BattleRobots/Core/ScoreHistory"): _maxEntries [Range(5,50)] default 20; optional _onHistoryUpdated VoidGameEvent; runtime _scores List<int> (not serialized); Scores IReadOnlyList (chronological); AverageScore float (safe-division, 0f when empty); TrendDelta int (last−first, 0 when <2 entries); Record(score) appends + evicts front + fires event; LoadSnapshot — null→clear, keeps tail (most-recent) up to MaxEntries, bootstrapper-safe; TakeSnapshot shallow copy; Reset silent. ScoreHistoryController MB (BattleRobots.UI, DisallowMultipleComponent): optional _scoreHistory, _onHistoryUpdated (In), _averageText, _trendText, _listContainer, _barPrefab; Awake caches delegate; OnEnable subscribes+Refresh; OnDisable unsubscribes; Refresh: null-history→fallback "Avg: —"/"±0"; sets "Avg: N" + FormatTrend(TrendDelta); destroys old bars; per-score bar: Texts[0]=score, Sliders[0]=Clamp01(score/1000); FormatTrend internal static "+N ↑"/"-N ↓"/"±0". SaveData.scoreHistoryScores List<int> added (backwards-compat empty default). GameBootstrapper patched: _scoreHistory field + LoadSnapshot. MatchManager patched: _scoreHistory field + Record(matchScore) + TakeSnapshot in EndMatch. 20 new EditMode tests: ScoreHistorySOTests (14) + ScoreHistoryControllerTests (6). Total: 2038 tests across 158 files. |
 
 ---
 
 ## Session Handoff
 
-**Last completed:** T199 (CurrencyEarnedFlashController; 12 EditMode tests). **3452 total tests across 261 test files.** T001–T199 Done. M1–M34 complete.
+**Last completed:** T203 (DailyChallengeCountdownController; 10 EditMode tests). **3500 total tests across 265 test files.** T001–T203 Done. M1–M35 complete.
 
-**M34 Reward Feedback &amp; Streak Visualization — ALL TASKS COMPLETE (T197–T199).**
+**M35 Match Rating &amp; Trend Feedback — ALL TASKS COMPLETE (T200–T203).**
 
-**Next milestone (M35):** Suggested directions: (a) MatchRatingController — UI MB that computes a star rating (1–5) from MatchResultSO fields (win/loss, score vs personal best, damage efficiency) and displays filled/empty star sprites; subscribes _onMatchEnded; (b) StreakBonusNotificationController — UI MB subscribing WinStreakSO._onStreakChanged; shows "N Win Streak! Bonus unlocked!" when crossing a milestone (e.g. 3/5/10); Tick auto-hide; optional NotificationQueueSO forward; (c) MatchScoreTrendController — reads ScoreHistorySO TrendDelta to show "↑ Improving" / "↓ Declining" / "↔ Steady" trend indicator; updates on _onHistoryUpdated; all refs optional; (d) DailyChallengeCountdownController — UI MB showing time remaining until daily challenge resets (midnight UTC); subscribes _onMatchEnded to refresh; formats "Resets in Xh Ym" or "Challenge refreshed!".
+**Next milestone (M36):** Suggested directions: (a) MatchStreakSummaryController — post-match panel aggregating WinStreakSO.CurrentStreak + BestStreak, MatchRatingController.CurrentStars, and last score trend into a single end-of-session summary card; subscribes _onMatchEnded; (b) AchievementProgressHUDController — live in-match progress bar showing progress toward the nearest incomplete AchievementDefinitionSO condition; subscribes _onMatchEnded to refresh; (c) LoadoutHistorySO + LoadoutHistoryController — rolling ring-buffer of last N equipped loadout snapshots (part IDs + match result); allows "last used loadout" quick-restore in LoadoutBuilderController; (d) RankBadgeController — reads PrestigeSystemSO rank and maps it to one of N badge sprites via a RankBadgeConfig SO; refreshes on _onPrestige.
 
 **MilestoneRewardNotificationController wiring (T197) — Editor-session steps:**
 1. Add `MilestoneRewardNotificationController` to a persistent HUD GameObject.
@@ -581,6 +584,46 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
    - `_notificationQueue` → optional NotificationQueueSO for global queue forwarding.
    - `_flashDuration`     → seconds visible (default 2).
 2. Play-test: complete a match with currency earned → "+N credits" banner flashes; auto-hides after 2 s; winning with 0 currency skips banner.
+
+**MatchRatingController wiring (T200) — Editor-session steps:**
+1. Add `MatchRatingController` to the post-match panel.
+   - `_matchResult`          → shared MatchResultSO blackboard.
+   - `_personalBest`         → shared PersonalBestSO (optional; omit if PB not tracked).
+   - `_onMatchEnded`         → same VoidGameEvent as MatchManager raises at match end.
+   - `_ratingPanel`          → root rating panel (hidden on entry; shown after match).
+   - `_ratingLabel`          → Text child receiving "N / 5".
+   - `_starImages`           → array of 5 Image components (index 0 = 1st star).
+   - `_filledStarSprite`     → sprite for earned stars.
+   - `_emptyStarSprite`      → sprite for unearned stars.
+   - `_efficiencyThreshold`  → efficiency ratio for +1 star (default 0.5).
+2. Play-test: win with good efficiency and a new personal best → 5 stars; lose with no PB → 1 star.
+
+**StreakBonusNotificationController wiring (T201) — Editor-session steps:**
+1. Add `StreakBonusNotificationController` to a persistent HUD GameObject.
+   - `_winStreak`           → shared WinStreakSO asset.
+   - `_milestoneConfig`     → shared WinStreakMilestoneSO with configured streak milestones.
+   - `_onStreakChanged`      → same VoidGameEvent as WinStreakSO raises.
+   - `_notificationPanel`   → banner root panel (starts inactive).
+   - `_notificationLabel`   → Text child for "N Win Streak! Bonus unlocked!".
+   - `_notificationQueue`   → optional NotificationQueueSO.
+   - `_displayDuration`     → seconds visible (default 2).
+2. Play-test: reach a configured milestone streak → banner fires; non-milestone streak counts → no banner.
+
+**MatchScoreTrendController wiring (T202) — Editor-session steps:**
+1. Add `MatchScoreTrendController` to the post-match or stats panel.
+   - `_scoreHistory`       → shared ScoreHistorySO asset.
+   - `_onHistoryUpdated`   → same VoidGameEvent that ScoreHistorySO fires on Record().
+   - `_trendLabel`         → Text receiving "↑ Improving", "↓ Declining", "↔ Steady", or "—".
+   - `_trendPanel`         → optional container (hidden when data is insufficient).
+2. Play-test: play 2+ matches with increasing scores → "↑ Improving"; decreasing → "↓ Declining".
+
+**DailyChallengeCountdownController wiring (T203) — Editor-session steps:**
+1. Add `DailyChallengeCountdownController` to the main menu or pre-match panel.
+   - `_challenge`         → shared DailyChallengeSO asset.
+   - `_onMatchEnded`      → same VoidGameEvent as MatchManager raises at match end.
+   - `_countdownLabel`    → Text receiving "Resets in Xh Ym" or "Challenge complete!".
+   - `_countdownPanel`    → optional container (hidden when _challenge is null).
+2. Play-test: open panel before midnight UTC → shows remaining hours/minutes; complete daily challenge → label switches to "Challenge complete!".
 
 **CombinedBonusCalculatorSO wiring (T190) — Editor-session steps:**
 1. Create a `CombinedBonusCalculator` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Core ▶ CombinedBonusCalculator.
