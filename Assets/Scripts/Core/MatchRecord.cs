@@ -444,5 +444,26 @@ namespace BattleRobots.Core
         /// Default 0 — backwards-compatible with saves predating this field.
         /// </summary>
         public int survivalBestWave;
+
+        // ── Damage Type Mastery (T179) ────────────────────────────────────────
+
+        /// <summary>
+        /// Cumulative per-type damage accumulators for the mastery system.
+        /// Rehydrated into <see cref="DamageTypeMasterySO"/> by <see cref="GameBootstrapper"/>.
+        /// Default 0 — backwards-compatible with saves predating this field.
+        /// </summary>
+        public float masteryPhysicalAccum;
+        public float masteryEnergyAccum;
+        public float masteryThermalAccum;
+        public float masteryShockAccum;
+
+        /// <summary>
+        /// Whether each damage type mastery has been unlocked.
+        /// Default false — backwards-compatible with saves predating this field.
+        /// </summary>
+        public bool masteryPhysicalDone;
+        public bool masteryEnergyDone;
+        public bool masteryThermalDone;
+        public bool masteryShockDone;
     }
 }

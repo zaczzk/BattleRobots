@@ -115,6 +115,11 @@ namespace BattleRobots.Core
                  "Leave null to skip (backwards-compatible).")]
         [SerializeField] private WaveManagerSO _waveManager;
 
+        [Header("Damage Type Mastery (optional — T179)")]
+        [Tooltip("Cumulative cross-session mastery SO. LoadSnapshot called on startup to restore " +
+                 "per-type accumulators and mastery flags from SaveData. Leave null to skip.")]
+        [SerializeField] private DamageTypeMasterySO _masterySystem;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -236,6 +241,14 @@ namespace BattleRobots.Core
             // Restore the player's all-time best survival wave.
             // LoadSnapshot is bootstrapper-safe (no events); old saves default to 0.
             _waveManager?.LoadSnapshot(save.survivalBestWave);
+
+            // Restore cumulative damage-type mastery accumulators and flags (T179).
+            // LoadSnapshot is bootstrapper-safe (no events); old saves default to 0/false.
+            _masterySystem?.LoadSnapshot(
+                save.masteryPhysicalAccum, save.masteryEnergyAccum,
+                save.masteryThermalAccum,  save.masteryShockAccum,
+                save.masteryPhysicalDone,  save.masteryEnergyDone,
+                save.masteryThermalDone,   save.masteryShockDone);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

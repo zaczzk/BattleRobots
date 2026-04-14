@@ -191,6 +191,12 @@ namespace BattleRobots.Core
                  "Leave null to skip timer-warning events (backwards-compatible).")]
         [SerializeField] private MatchTimerWarningSO _timerWarning;
 
+        [Header("Damage Type Mastery (optional — T179)")]
+        [Tooltip("Cumulative cross-session mastery SO. AddDealtFromStats() is called in EndMatch() " +
+                 "to accumulate per-type damage for the session. TakeSnapshot() then persists to " +
+                 "SaveData. Leave null to skip mastery tracking (backwards-compatible).")]
+        [SerializeField] private DamageTypeMasterySO _masterySystem;
+
         [Header("Audio")]
         [Tooltip("AudioEvent SO played when the player wins the match.")]
         [SerializeField] private AudioEvent _onWinJingle;
@@ -484,6 +490,18 @@ namespace BattleRobots.Core
             {
                 _careerHighlights.Update(_matchResult);
                 saveData.careerHighlights = _careerHighlights.TakeSnapshot();
+            }
+
+            // Accumulate per-type damage into the cross-session mastery system (T179).
+            // AddDealtFromStats is a no-op when stats is null; TakeSnapshot is allocation-free.
+            if (_masterySystem != null && _matchStatistics != null)
+            {
+                _masterySystem.AddDealtFromStats(_matchStatistics);
+                _masterySystem.TakeSnapshot(
+                    out saveData.masteryPhysicalAccum, out saveData.masteryEnergyAccum,
+                    out saveData.masteryThermalAccum,  out saveData.masteryShockAccum,
+                    out saveData.masteryPhysicalDone,  out saveData.masteryEnergyDone,
+                    out saveData.masteryThermalDone,   out saveData.masteryShockDone);
             }
 
             SaveSystem.Save(saveData);
