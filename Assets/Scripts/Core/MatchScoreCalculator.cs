@@ -34,8 +34,15 @@ namespace BattleRobots.Core
         /// Each combo hit contributes 5 bonus points — e.g. MaxCombo of 10 adds +50.
         /// Defaults to 0 (backwards-compatible: existing callers unaffected).
         /// </param>
+        /// <param name="scoreMultiplier">
+        /// Optional runtime <see cref="ScoreMultiplierSO"/> applied to the final clamped
+        /// score as <c>Mathf.RoundToInt(clamped × Multiplier)</c>.
+        /// Passing <c>null</c> skips multiplication (backwards-compatible).
+        /// Assigned by <see cref="MatchManager"/> when a prestige bonus is active.
+        /// </param>
         /// <returns>Non-negative integer score.</returns>
-        public static int Calculate(MatchResultSO result, int maxCombo = 0)
+        public static int Calculate(MatchResultSO result, int maxCombo = 0,
+                                    ScoreMultiplierSO scoreMultiplier = null)
         {
             if (result == null) return 0;
 
@@ -69,7 +76,14 @@ namespace BattleRobots.Core
             score += Mathf.Max(0, maxCombo) * 5;
 
             // Clamp to non-negative — heavy damage taken should not produce a negative score.
-            return Mathf.Max(0, score);
+            int clamped = Mathf.Max(0, score);
+
+            // Apply optional prestige / mastery score multiplier.
+            // Multiplier is already clamped to [0.01, 10] by ScoreMultiplierSO.SetMultiplier.
+            if (scoreMultiplier != null)
+                clamped = Mathf.RoundToInt(clamped * scoreMultiplier.Multiplier);
+
+            return clamped;
         }
     }
 }

@@ -197,6 +197,13 @@ namespace BattleRobots.Core
                  "SaveData. Leave null to skip mastery tracking (backwards-compatible).")]
         [SerializeField] private DamageTypeMasterySO _masterySystem;
 
+        [Header("Score Multiplier (optional — T188)")]
+        [Tooltip("Runtime SO whose Multiplier is applied to the final match score in EndMatch() " +
+                 "when submitting to PersonalBestSO and recording in ScoreHistorySO. " +
+                 "PrestigeRewardBonusApplier writes to this SO at match start and resets at match end. " +
+                 "Leave null to skip multiplier scaling (backwards-compatible; score calculated as normal).")]
+        [SerializeField] private ScoreMultiplierSO _scoreMultiplier;
+
         [Header("Audio")]
         [Tooltip("AudioEvent SO played when the player wins the match.")]
         [SerializeField] private AudioEvent _onWinJingle;
@@ -455,7 +462,8 @@ namespace BattleRobots.Core
             if (_personalBest != null)
             {
                 int matchScore = MatchScoreCalculator.Calculate(_matchResult,
-                    _comboCounter != null ? _comboCounter.MaxCombo : 0);
+                    _comboCounter != null ? _comboCounter.MaxCombo : 0,
+                    _scoreMultiplier);
                 _personalBest.Submit(matchScore);
             }
 
@@ -478,7 +486,8 @@ namespace BattleRobots.Core
             if (_scoreHistory != null && _matchResult != null)
             {
                 int historyScore = MatchScoreCalculator.Calculate(_matchResult,
-                    _comboCounter != null ? _comboCounter.MaxCombo : 0);
+                    _comboCounter != null ? _comboCounter.MaxCombo : 0,
+                    _scoreMultiplier);
                 _scoreHistory.Record(historyScore);
                 saveData.scoreHistoryScores = _scoreHistory.TakeSnapshot();
             }
