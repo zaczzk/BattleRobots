@@ -274,6 +274,9 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T217 | RobotHealthBarController — in-match HUD health bar reading HealthSO; subscribes _onHealthChanged FloatGameEvent; shows _healthBar Slider (health ratio), _healthLabel "current/max", _criticalOverlay when ratio ≤ _criticalThreshold (default 0.25); optional _robotNameLabel + _robotName; _healthPanel hidden when HealthSO null; Refresh() public; zero alloc after Awake | 82 | **Done** | RobotHealthBarController MB (BattleRobots.UI, DisallowMultipleComponent): optional _healthSO HealthSO (Data); optional _onHealthChanged FloatGameEvent (In); optional _healthBar Slider + _healthLabel Text + _criticalOverlay + _healthPanel + _robotNameLabel Text (UI); _robotName string; _criticalThreshold [Range(0.01f,0.5f)] default 0.25f. Awake caches _healthDelegate=OnHealthChanged. OnEnable subscribes+Refresh(). OnDisable unsubscribes+hides panel. OnHealthChanged: calls Refresh(). Refresh(): null SO→hide panel+hide overlay; else show panel; ratio=CurrentHealth/MaxHealth; bar.value=ratio; label="current/max"; overlay.SetActive(ratio≤threshold); nameLabel.text=_robotName. HealthSO/CriticalThreshold/RobotName public. 14 new tests. 3696 total tests across 282 test files. |
 | T218 | WeaponCooldownSO + WeaponCooldownHUDController — runtime SO tracking weapon cooldown state; MaxCooldown [Min(0f)] default 2f; RemainingCooldown/CooldownRatio/IsOnCooldown; StartCooldown sets remaining=max; Tick decrements, fires _onCooldownChanged VoidGameEvent, fires _onCooldownComplete once at zero; WeaponCooldownHUDController MB (BattleRobots.UI, DisallowMultipleComponent) subscribes _onCooldownChanged; drives _cooldownBar Slider + _cooldownLabel Text ("N.Ns") + _readyLabel Text + _cooldownOverlay; Update ticks SO; zero alloc after Awake | 80 | **Done** | WeaponCooldownSO SO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Combat/WeaponCooldown"): _maxCooldown [Min(0f)] default 2f; _onCooldownChanged VoidGameEvent; _onCooldownComplete VoidGameEvent; runtime _remainingCooldown float + _completed bool. OnEnable: zero remaining+completed=true (ready state). StartCooldown(): remaining=max+completed=false+raise changed. Tick(dt): !IsOnCooldown→return; decrement clamped 0; raise changed; ≤0&&!completed→completed=true+raise complete. CooldownRatio=Clamp01(remaining/max); IsOnCooldown=remaining>0. WeaponCooldownHUDController MB (BattleRobots.UI, DisallowMultipleComponent): optional _cooldownSO + _onCooldownChanged + _cooldownBar Slider + _cooldownLabel Text + _readyLabel Text + _cooldownOverlay. Awake caches _refreshDelegate. OnEnable subscribes+Refresh(). OnDisable unsubscribes+hides overlay. Update: _cooldownSO?.Tick(dt). Refresh(): onCooldown=SO!=null&&IsOnCooldown; bar.value=CooldownRatio; label="N.Fs"/empty; readyLabel.SetActive(!onCooldown); overlay.SetActive(onCooldown). CooldownSO public. 8 SO tests + 8 controller tests = 16 new tests. 3712 total tests across 283 test files. |
 | T219 | PartDurabilityTrackerSO + PartDurabilityHUDController — runtime SO tracking per-part durability; AddPart(id,max)/ApplyDamage(id,amount)/GetDurability/GetMaxDurability/GetDurabilityRatio/IsDestroyed/Reset()/Clear(); fires _onDurabilityChanged VoidGameEvent; PartDurabilityHUDController MB (BattleRobots.UI, DisallowMultipleComponent) subscribes channel; rebuilds _rowContainer rows (Texts[0]=partId, Sliders[0]=ratio) via _rowPrefab; _emptyLabel shown when no parts; zero alloc after Awake | 78 | **Done** | PartDurabilityTrackerSO SO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Core/PartDurabilityTracker"): private Entry struct {float max; float current}; Dictionary<string,Entry> _parts; _onDurabilityChanged VoidGameEvent. OnEnable: _parts.Clear(). AddPart(id,max): clamp max≥1; _parts[id]={max,max}; raise event. ApplyDamage(id,amt): null/empty or ≤0→return; !TryGetValue→return; decrement clamped 0; raise event. GetDurability/GetMaxDurability/GetDurabilityRatio/IsDestroyed: dictionary lookup, 0/false for unknown. Reset(): restore all to max; raise event. Clear(): clear dict; raise event. GetPartIds()→IEnumerable<string>. PartCount int. PartDurabilityHUDController MB (BattleRobots.UI, DisallowMultipleComponent): optional _tracker + _onDurabilityChanged + _rowContainer Transform + _rowPrefab + _emptyLabel. Awake caches _refreshDelegate. OnEnable subscribes+Refresh(). OnDisable unsubscribes. Refresh(): hasParts=tracker!=null&&PartCount>0; emptyLabel.SetActive(!hasParts); null container→return; destroy stale children; null tracker/prefab→return; foreach partId: Instantiate row; Texts[0]=partId; Sliders[0]=ratio. Tracker public. 10 SO tests + 8 controller tests = 18 new tests. 3730 total tests across 283 test files. T001–T219 Done. M1–M39 complete. |
+| T220 | ComboCounterHUDController — in-match HUD visualising the player's combo streak; subscribes _onComboChanged VoidGameEvent; reads ComboCounterSO (HitCount/MaxCombo/ComboMultiplier/ComboWindowRatio/IsComboActive); Update drives Tick; _comboPanel shown only when combo is active; _comboCountLabel "N hits"/em-dash; _multiplierLabel "×N.N"; _maxComboLabel "Best: N"; _windowBar Slider = ComboWindowRatio; zero alloc after Awake | 82 | **Done** | ComboCounterHUDController MB (BattleRobots.UI, DisallowMultipleComponent): optional _comboCounter ComboCounterSO (Data); optional _onComboChanged VoidGameEvent (In); optional _comboPanel + _comboCountLabel Text + _multiplierLabel Text + _maxComboLabel Text + _windowBar Slider (UI). Awake caches _refreshDelegate. OnEnable subscribes+Refresh(). OnDisable unsubscribes+hides _comboPanel. Update: _comboCounter?.Tick(Time.deltaTime). Refresh(): isActive=_comboCounter!=null&&IsComboActive; panel.SetActive(isActive); countLabel=isActive?"N hits":em-dash; multiplierLabel="×{M:F1}"; maxComboLabel="Best: N"; windowBar.value=ComboWindowRatio(0 when null). ComboCounter public. 12 new EditMode tests (ComboCounterHUDControllerTests). 3742 total tests across 284 test files. |
+| T221 | AbilityChargeSO + AbilityChargeHUDController — charge-up ability bar; SO tracks CurrentCharge/ChargeRatio/IsFullyCharged; AddCharge(damageDealt) accumulates damage×chargePerDamage, fires _onChargeChanged + _onFullyCharged (once per fill); Activate() discharges when full + fires _onActivated + _onChargeChanged; Reset fires _onChargeChanged; HUDController subscribes _onChargeChanged; _chargeBar Slider = ChargeRatio; _chargeLabel "READY!"/"N%"; _readyOverlay shown when full; zero alloc after Awake | 80 | **Done** | AbilityChargeSO SO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Combat/AbilityCharge"): _maxCharge [Min(1f)] default 100f; _chargePerDamage [Min(0f)] default 1f; _onChargeChanged + _onFullyCharged + _onActivated VoidGameEvent. OnEnable: _currentCharge=0+_fullyChargedFired=false. AddCharge(dmg): ≤0→return; old=IsFullyCharged; charge+=dmg×rate clamped max; raise changed; if newly full && !_fullyChargedFired: flag=true+raise fullyCharged. Activate(): !IsFullyCharged→return; charge=0+flag=false; raise activated+changed. Reset(): charge=0+flag=false; raise changed. AbilityChargeHUDController MB (BattleRobots.UI, DisallowMultipleComponent): optional _chargeSO AbilityChargeSO + _onChargeChanged VoidGameEvent + _chargeBar Slider + _chargeLabel Text + _readyOverlay. Awake caches _refreshDelegate. OnEnable subscribes+Refresh(). OnDisable unsubscribes+hides overlay. Refresh(): isReady=SO!=null&&IsFullyCharged; bar.value=ratio; label="READY!" or "N%"; overlay.SetActive(isReady). ChargeSO public. 8 SO tests + 6 controller tests = 14 new EditMode tests (AbilityChargeTests). 3756 total tests across 285 test files. |
+| T222 | InMatchObjectiveSO + InMatchObjectiveController — SO-driven objective tracker; _objectiveTitle + _targetCount [Min(1)] default 1; CurrentCount/IsComplete/Progress [0,1]; Increment(): no-op when complete, fires _onProgressChanged, fires _onObjectiveComplete when CurrentCount==TargetCount; Reset fires _onProgressChanged; Controller subscribes _onProgressChanged; _objectivePanel hidden when null; _titleLabel/"N / M" _progressLabel/_progressBar Slider/_completeLabel shown when complete; zero alloc after Awake | 78 | **Done** | InMatchObjectiveSO SO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Core/InMatchObjective"): _objectiveTitle string default "Objective" (fallback on empty); _targetCount [Min(1)] default 1; _onProgressChanged + _onObjectiveComplete VoidGameEvent. OnEnable: _currentCount=0. Increment(): IsComplete→return; count++; raise changed; IsComplete→raise complete. Reset(): count=0; raise changed. Progress=Clamp01(count/target). InMatchObjectiveController MB (BattleRobots.UI, DisallowMultipleComponent): optional _objective InMatchObjectiveSO + _onProgressChanged VoidGameEvent + _objectivePanel + _titleLabel Text + _progressLabel Text + _progressBar Slider + _completeLabel Text. Awake caches _refreshDelegate. OnEnable subscribes+Refresh(). OnDisable unsubscribes. Refresh(): null→hide panel; else show panel; title; "N / M" progress; bar.value; completeLabel.SetActive(IsComplete). Objective public. 8 SO tests + 6 controller tests = 14 new EditMode tests (InMatchObjectiveTests). 3770 total tests across 286 test files. T001–T222 Done. M1–M40 complete. |
 | T091 | MatchModifierSO + MatchModifierCatalogSO + SelectedModifierSO + MatchModifierSelectionController — pre-match rule modifier system | 90 | **Done** | MatchModifierType enum (6 values: Standard/DoubleRewards/ExtendedTime/ShortTime/FragileArmor/Overdrive). MatchModifierSO SO (Core, CreateAssetMenu "BattleRobots/Match/MatchModifier"): DisplayName/Description; RewardMultiplier float ≥0.1 (default 1.0); TimeMultiplier float ≥0.1 (default 1.0); ArmorMultiplier float ≥0 (default 1.0); SpeedMultiplier float ≥0.1 (default 1.0); OnValidate clamps all multipliers to minimums + warns empty DisplayName. MatchModifierCatalogSO SO (Core, CreateAssetMenu "BattleRobots/Match/MatchModifierCatalog"): immutable IReadOnlyList<MatchModifierSO>; OnValidate warns null entries. SelectedModifierSO (Core, CreateAssetMenu "BattleRobots/Match/SelectedModifier"): mutable runtime SO; Select(modifier) sets Current+HasSelection+fires VoidGameEvent; Reset() clears silently; CurrentDisplayName → "Standard" fallback when unset/null. MatchModifierSelectionController MB (BattleRobots.UI): mirrors DifficultySelectionController pattern — prev/next wrap-around, optional _nameLabel+_descriptionLabel Text labels, ApplySelection on OnEnable, cached UnityAction delegates, no Update, no Physics refs. MatchManager patched: optional _selectedModifier field; HandleMatchStarted multiplies _timeRemaining by Current.TimeMultiplier after base duration resolved; caches _activeRoundDuration (post-modifier) to fix elapsed computation bug when time multiplier != 1; EndMatch applies Current.RewardMultiplier to totalReward after streak bonus (streak × modifier stacking). CombatStatsApplicator patched: optional _selectedModifier field; ApplyStats() scales base speed by Current.SpeedMultiplier and armor rating by Current.ArmorMultiplier (Mathf.Clamp [0,100]) before pushing to locomotion/DamageReceiver. All integrations fully null-safe; backwards-compatible (null _selectedModifier = multipliers all 1). MatchModifierSOTests (13 tests): 7 fresh-instance defaults; MatchModifierType_HasExactlySixValues; AllModifierTypes_CanBeAssignedAndRead; 4 reflection round-trips. MatchModifierCatalogSOTests (6 tests): not-null/empty/IReadOnlyList; count 1/2; insertion order. SelectedModifierSOTests (14 tests): 3 fresh-instance defaults; Select 8 paths (state/event/null/idempotent); Reset 3 paths (clears+silent). MatchModifierSelectionControllerTests (16 tests): initial index=0; NextModifier null/empty/increment/wrap/cycle; PreviousModifier null/empty/wrap/decrement; NextThenPrev returns start; SO write verification (next/prev); null SO no-throw. Total tests: 1292 across 97 files. |
 
 ---
@@ -304,6 +307,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | M37 | PM Agent | 2026-04-14 | T208 AchievementUnlockNotificationController (14 tests) + T209 PrestigeProgressHUDController (14 tests) + T210 MatchHistoryDetailController (14 tests) + T211 LoadoutCompareController (12 tests). 54 new tests. 3610 total tests across 274 test files. M37 complete. |
 | M38 | PM Agent | 2026-04-14 | T212 BuildGradeConfig+BuildGradeController (14 tests) + T213 CareerInsightsBannerController (12 tests) + T214 MatchReplaySummarySO+MatchReplaySummaryController (16 tests) + T215 PartSynergyAdvisorController (14 tests). 56 new tests. 3666 total tests across 279 test files. M38 complete. |
 | M39 | PM Agent | 2026-04-14 | T216 MatchTimerSO+MatchTimerController (16 tests) + T217 RobotHealthBarController (14 tests) + T218 WeaponCooldownSO+WeaponCooldownHUDController (16 tests) + T219 PartDurabilityTrackerSO+PartDurabilityHUDController (18 tests). 64 new tests. 3730 total tests across 283 test files. M39 complete. |
+| M40 | PM Agent | 2026-04-14 | T220 ComboCounterHUDController (12 tests) + T221 AbilityChargeSO+AbilityChargeHUDController (14 tests) + T222 InMatchObjectiveSO+InMatchObjectiveController (14 tests). 40 new tests. 3770 total tests across 286 test files. M40 complete. |
 
 ---
 
@@ -455,6 +459,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 | Date | Agent | Summary |
 |------|-------|---------|
+| 2026-04-14 | PM Agent | Session 66: M40 In-Match HUD Layer II — T220 ComboCounterHUDController (BattleRobots.UI, DisallowMultipleComponent): reads ComboCounterSO (HitCount/MaxCombo/ComboMultiplier/ComboWindowRatio/IsComboActive); Update ticks SO; subscribes _onComboChanged; _comboPanel hidden when inactive; _comboCountLabel "N hits"/em-dash; _multiplierLabel "×N.N"; _maxComboLabel "Best: N"; _windowBar Slider=ComboWindowRatio; OnDisable hides panel; all refs optional; zero alloc after Awake. 12 new EditMode tests (ComboCounterHUDControllerTests). T221 AbilityChargeSO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Combat/AbilityCharge"): _maxCharge 100f/_chargePerDamage 1f; AddCharge(dmg)→charge+=dmg×rate clamped max+fires _onChargeChanged+fires _onFullyCharged once per fill; Activate()→fully charged only: charge=0+fires _onActivated+_onChargeChanged; Reset fires _onChargeChanged; ChargeRatio/IsFullyCharged. AbilityChargeHUDController MB (BattleRobots.UI): subscribes _onChargeChanged; _chargeBar Slider=ChargeRatio; _chargeLabel "READY!"/"N%"; _readyOverlay shown when full; OnDisable hides overlay. 14 new EditMode tests (AbilityChargeTests: 8 SO + 6 controller). T222 InMatchObjectiveSO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Core/InMatchObjective"): _objectiveTitle/"Objective" fallback; _targetCount [Min(1)] default 1; Increment() no-op-when-complete+fires _onProgressChanged+fires _onObjectiveComplete once; Reset fires _onProgressChanged; IsComplete/Progress [0,1]. InMatchObjectiveController MB (BattleRobots.UI): subscribes _onProgressChanged; _objectivePanel hidden when null; _titleLabel/"N / M" _progressLabel/_progressBar/_completeLabel shown when complete; all refs optional; zero alloc after Awake. 14 new EditMode tests (InMatchObjectiveTests: 8 SO + 6 controller). **40 new tests. 3770 total tests across 286 test files. T001–T222 Done. M1–M40 complete.** |
 | 2026-04-14 | PM Agent | Session 65: T212–T215 — M38 Post-Match Grade, Career Insights &amp; Synergy Advisor. T212 BuildGradeConfig SO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Core/BuildGradeConfig"): _sThreshold/_aThreshold/_bThreshold/_cThreshold [Min(1)] defaults 4/3/2/1; per-grade advice strings; GetGrade(float)→"S"/"A"/"B"/"C"/"D"; GetAdvice(string)→per-grade advice (fallback=D); OnValidate clamps S≥A≥B≥C≥1. BuildGradeController MB (BattleRobots.UI, DisallowMultipleComponent): reads PlayerPartUpgrades+PlayerLoadout; ComputeAverageTier() sums GetTier/count (0 when null/empty); subscribes _onMatchEnded; Refresh sets _gradeLabel/_adviceLabel + activates _gradePanel; all refs optional; zero alloc after Awake. 14 new EditMode tests (BuildGradeTests). T213 CareerInsightsBannerController MB (BattleRobots.UI, DisallowMultipleComponent): snapshots _prevBestStreak/_prevPrestigeCount/_prevMasteredCount on OnEnable; on _onMatchEnded compares new vs prev state with priority prestige&gt;mastery&gt;streak; ShowBanner(msg) activates panel + sets timer; Tick(dt) auto-hides; OnDisable hides+resets; all refs optional; zero alloc after Awake. 12 new EditMode tests (CareerInsightsBannerControllerTests). T214 MatchReplayEventEntry [Serializable] struct (Core): DamageType/float/bool/double fields. MatchReplaySummarySO SO (Core, CreateAssetMenu "BattleRobots/Core/MatchReplaySummary"): ring buffer _maxEvents default 50; AddEvent writes at _head, evicts oldest; GetEntry(indexFromNewest) newest-first; Clear zeros buffer; _onEventAdded optional. MatchReplaySummaryController MB (UI): subscribes _onMatchEnded→Refresh; _emptyLabel toggle; rebuild rows "P: +N"/"E: -N" + type name; null-safe; Summary public. 16 new EditMode tests (MatchReplaySummaryTests). T215 PartSynergyAdvisorController MB (BattleRobots.UI, DisallowMultipleComponent): extends PartSynergyHUDController concept by surfacing both active AND inactive synergies; uses existing PartSynergyConfig.GetActiveSynergies+Entries; active rows: displayName+bonusDescription; inactive rows: displayName+"(inactive)" (reference-compared vs active list); _activeSynergyCountLabel="Active: N"; _totalSynergyCountLabel="Total: N"; _noActiveSynergiesLabel when zero active; subscribes _onLoadoutChanged; all refs optional; zero alloc after Awake. 14 new EditMode tests (PartSynergyAdvisorControllerTests). **56 new tests. 3666 total tests across 279 test files. T001–T215 Done. M1–M38 complete.** |
 | 2026-04-14 | PM Agent | Session 64: T208–T211 — M37 Notification &amp; Comparison Layer. T208 AchievementUnlockNotificationController MB (BattleRobots.UI, DisallowMultipleComponent): subscribes _onAchievementUnlocked; reads PlayerAchievementsSO.LastUnlockedId; linear-scan FindDefinition in AchievementCatalogSO; ShowNotification sets name/reward labels + activates panel + starts _displayTimer=_displayDuration; Tick(float dt) decrements timer and hides panel on expiry; OnDisable resets timer+hides panel; all refs optional; zero alloc after Awake. 14 new EditMode tests (AchievementUnlockNotificationControllerTests). T209 PrestigeProgressHUDController MB (BattleRobots.UI, DisallowMultipleComponent): shows level progress toward next prestige; optional _progression PlayerProgressionSO + _prestigeSystem PrestigeSystemSO; subscribes both _onLevelUp + _onPrestige; Refresh: _levelLabel="Level N / Max"; _xpProgressBar=XpProgressFraction; _statusLabel: IsMaxPrestige→"Legend", IsMaxLevel&amp;&amp;!max→"Prestige Ready!", else empty; panel hidden when either SO null; Progression/PrestigeSystem public. 14 new EditMode tests (PrestigeProgressHUDControllerTests). T210 MatchHistoryDetailController MB (BattleRobots.UI, DisallowMultipleComponent): expanded post-match card; subscribes _onMatchEnded→Refresh; reads MatchStatisticsSO per-type labels ("Physical: N"/"Energy: N"/"Thermal: N"/"Shock: N" using Mathf.RoundToInt); reads LoadoutHistorySO.GetLatest() for _partCountLabel="N parts equipped" and _outcomeLabel="WIN"/"LOSS"; panel hidden when both data refs null; OnEnable hides panel; MatchStatistics/LoadoutHistory public. 14 new EditMode tests (MatchHistoryDetailControllerTests). T211 LoadoutCompareController MB (BattleRobots.UI, DisallowMultipleComponent): side-by-side current-vs-history comparison; subscribes _onLoadoutChanged→Refresh; currentCount=EquippedPartIds.Count; historyCount=GetLatest().partIds.Length; delta=current-history; _partDeltaLabel: "+N"/"-N"/"Same"; win rate: count winning entries across all history, "Win Rate: N%"; panel hidden when loadout null or history empty; CurrentLoadout/LoadoutHistory public. 12 new EditMode tests (LoadoutCompareControllerTests). **54 new tests. 3610 total tests across 274 test files.** T001–T211 Done. M1–M37 complete. |
 | 2026-04-14 | PM Agent | Session 63: T204–T207 — M36 Session Depth &amp; Identity. T204 MatchStreakSummaryController MB (BattleRobots.UI, DisallowMultipleComponent): post-match summary card aggregating WinStreakSO.CurrentStreak/BestStreak, MatchRatingController.CurrentStars, ScoreHistorySO.TrendDelta; subscribes _onMatchEnded; Refresh() sets "Streak: N"/"Best: N"/"N / 5 ★" labels + trend arrow (↑/↓/↔/em-dash); activates _summaryPanel; all refs optional; zero alloc after Awake. 12 new EditMode tests. T205 AchievementProgressHUDController MB (BattleRobots.UI, DisallowMultipleComponent): live HUD for nearest incomplete achievement; FindNextIncomplete scans AchievementCatalogSO for first entry HasUnlocked=false; GetCurrentProgress(def) routes by TriggerType (MatchWon→TotalMatchesWon, WinStreak→BestStreak, ReachLevel→CurrentLevel, TotalMatches→TotalMatchesPlayed); sets name label, "N / target" progress label, Slider ratio; hides panel when null refs or all complete ("All Complete!" label); subscribes _onMatchEnded; zero alloc after Awake. 14 new EditMode tests. T206 LoadoutHistoryEntry struct (Core): string[] partIds + bool playerWon + double timestamp. LoadoutHistorySO SO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Core/LoadoutHistory"): ring buffer _maxHistory default 5; AddEntry copies partIds to new array; GetEntry(indexFromNewest)/GetLatest()/Clear(); runtime-only buffer init in OnEnable. LoadoutHistoryController MB (BattleRobots.UI): subscribes _onMatchEnded→OnMatchEnded():AddEntry+Refresh; row list newest-first (texts[0]="N parts", texts[1]="WIN"/"LOSS"); _emptyLabel toggle; RestoreLatest(): SetLoadout+save-system persist; History/PlayerLoadout public. 18 new EditMode tests. T207 RankBadgeEntry class (Core): rankLabel string + badgeSprite Sprite. RankBadgeConfig SO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Core/RankBadgeConfig"): _badgeEntries List<RankBadgeEntry>; Count; GetBadge(label)→Sprite? (null on mismatch/null input); OnValidate warns empty. RankBadgeController MB (BattleRobots.UI, DisallowMultipleComponent): reads GetRankLabel() fallback "None"; sets _rankLabel.text + _badgeImage.sprite; activates _panel; subscribes _onPrestige; all refs optional. 12 new EditMode tests. **56 new tests. 3556 total tests across 270 test files.** T001–T207 Done. M1–M36 complete. |
@@ -576,270 +581,56 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 ## Session Handoff
 
-**Last completed:** T219 (PartDurabilityTrackerSO + PartDurabilityHUDController; 18 EditMode tests). **3730 total tests across 283 test files.** T001–T219 Done. M1–M39 complete.
+**Last completed:** T222 (InMatchObjectiveSO + InMatchObjectiveController; 14 EditMode tests). **3770 total tests across 286 test files.** T001–T222 Done. M1–M40 complete.
 
-**M39 In-Match HUD Layer — ALL TASKS COMPLETE (T216–T219).**
-- T216: `MatchTimerSO` (Core SO: countdown timer with Start/Stop/Tick/Reset; FloatGameEvent _onTimerUpdated + VoidGameEvent _onTimerExpired) + `MatchTimerController` (UI MB: MM:SS label, warning colour below threshold). 16 tests.
-- T217: `RobotHealthBarController` (UI MB: health bar Slider + "current/max" label + critical overlay + robot name label; reads HealthSO). 14 tests.
-- T218: `WeaponCooldownSO` (Core SO: cooldown state machine with Tick; _onCooldownChanged + _onCooldownComplete) + `WeaponCooldownHUDController` (UI MB: bar + countdown label + ready label + overlay; Update ticks SO). 16 tests.
-- T219: `PartDurabilityTrackerSO` (Core SO: Dictionary per-part durability; AddPart/ApplyDamage/Reset/Clear) + `PartDurabilityHUDController` (UI MB: row list with part ID + durability bar; empty-label state). 18 tests.
+**M40 In-Match HUD Layer II — ALL TASKS COMPLETE (T220–T222).**
+- T220: `ComboCounterHUDController` (UI MB: reads ComboCounterSO; Update ticks combo window; _comboPanel hidden when inactive; _comboCountLabel/×N.N multiplier/Best:N max/window bar Slider). 12 tests.
+- T221: `AbilityChargeSO` (Core SO: charge+=damage×rate; IsFullyCharged; _onFullyCharged once per fill; Activate discharges) + `AbilityChargeHUDController` (UI MB: bar=ChargeRatio; "READY!"/N% label; _readyOverlay). 14 tests.
+- T222: `InMatchObjectiveSO` (Core SO: TargetCount/CurrentCount/IsComplete/Progress; Increment no-op after complete; fires _onObjectiveComplete) + `InMatchObjectiveController` (UI MB: panel/title/progress "N / M"/bar/complete label). 14 tests.
 
-**Next milestone (M40):** Suggested directions: (a) `InMatchObjectiveController` — SO-driven objective tracker (e.g. "Destroy N parts", "Survive N seconds") with HUD panel; (b) `RobotStatusEffectHUDController` — per-active-status-effect icon row reading a `StatusEffectRegistrySO`; (c) `ArenaHazardWarningController` — proximity-to-hazard banner driven by `HazardZoneSO` list and player transform distance; (d) `ComboCounterHUDController` — overlay counter tied to `ComboScoringSO` showing current combo multiplier with a timed reset; (e) `AbilityChargeHUDController` — charge-up ability bar reading `AbilityChargeSO` that fills via damage-dealt events and discharges on activation.
+**Next milestone (M41):** Suggested directions: (a) `RobotStatusEffectHUDController` — per-active-status-effect icon row reading a `StatusEffectRegistrySO` or `StatusEffectStateSO`; (b) `ArenaHazardWarningController` — proximity-to-hazard banner driven by `HazardZoneSO` list; (c) `MatchPhaseController` — SO-driven match phase tracker (PreMatch/Active/PostMatch) with HUD phase label and phase-change VoidGameEvent; (d) `TeamScoreSO` + `TeamScoreHUDController` — team vs team score tracking with timed animations; (e) `ObjectiveProgressListController` — multi-objective list HUD showing all active `InMatchObjectiveSO` instances with completion badges.
 
-**MatchStreakSummaryController wiring (T204) — Editor-session steps:**
-1. Add `MatchStreakSummaryController` to the post-match panel or end-of-session canvas.
-   - `_winStreak`          → shared WinStreakSO asset.
-   - `_matchRating`        → the MatchRatingController MB on the same canvas.
-   - `_scoreHistory`       → shared ScoreHistorySO asset.
-   - `_onMatchEnded`       → same VoidGameEvent as MatchManager raises at match end.
-   - `_summaryPanel`       → root panel (can start inactive).
-   - `_currentStreakText`  → Text for "Streak: N".
-   - `_bestStreakText`     → Text for "Best: N".
-   - `_starsText`          → Text for "N / 5 ★".
-   - `_trendLabel`         → Text for trend arrow.
-2. Play-test: end a match → panel appears with current streak, best streak, star rating, and trend arrow.
+**ComboCounterHUDController wiring (T220) — Editor-session steps:**
+1. Add `ComboCounterHUDController` to the in-match HUD canvas.
+   - `_comboCounter`    → shared ComboCounterSO asset.
+   - `_onComboChanged`  → same VoidGameEvent raised by ComboCounterSO.
+   - `_comboPanel`      → root panel (can start inactive — hidden until first hit).
+   - `_comboCountLabel` → Text for "N hits".
+   - `_multiplierLabel` → Text for "×1.2".
+   - `_maxComboLabel`   → Text for "Best: N".
+   - `_windowBar`       → Slider for combo window countdown.
+2. Wire ComboCounterSO.Reset() to the MatchStarted VoidGameEvent listener.
+3. Wire ComboCounterSO.RecordHit() from a DamageGameEventListener on confirmed player hit.
+4. Play-test: hit 5 times → panel appears with "5 hits", "×1.1", "Best: 5".
 
-**AchievementProgressHUDController wiring (T205) — Editor-session steps:**
-1. Add `AchievementProgressHUDController` to the in-match HUD or pre-match overlay.
-   - `_catalog`              → shared AchievementCatalogSO asset.
-   - `_playerAchievements`   → shared PlayerAchievementsSO runtime SO.
-   - `_winStreak`            → shared WinStreakSO (for WinStreak-trigger achievements).
-   - `_progression`          → shared PlayerProgressionSO (for ReachLevel-trigger achievements).
-   - `_onMatchEnded`         → same VoidGameEvent as MatchManager raises.
-   - `_panel`                → root HUD panel.
-   - `_achievementNameLabel` → Text for achievement display name.
-   - `_progressLabel`        → Text for "N / target".
-   - `_progressBar`          → Slider for progress ratio.
-2. Play-test: incomplete achievement shows progress; completing all achievements hides panel with "All Complete!".
+**AbilityChargeHUDController wiring (T221) — Editor-session steps:**
+1. Create an `AbilityCharge` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Combat ▶ AbilityCharge.
+   - Set `_maxCharge` (default 100).
+   - Set `_chargePerDamage` (default 1 = 1 charge per damage point dealt).
+   - Wire `_onFullyCharged` → audio/VFX event.
+2. Add `AbilityChargeHUDController` to the in-match HUD.
+   - `_chargeSO`        → the AbilityChargeSO asset above.
+   - `_onChargeChanged` → VoidGameEvent on AbilityChargeSO.
+   - `_chargeBar`       → Slider (0=empty, 1=full).
+   - `_chargeLabel`     → Text ("READY!" or "N%").
+   - `_readyOverlay`    → panel/glow shown when fully charged.
+3. Wire AbilityChargeSO.AddCharge() from a damage-dealt event (pass damage amount).
+4. Wire AbilityChargeSO.Activate() to the player's ability input action.
+5. Wire AbilityChargeSO.Reset() to MatchStarted event.
 
-**LoadoutHistoryController wiring (T206) — Editor-session steps:**
-1. Create a `LoadoutHistory` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Core ▶ LoadoutHistory.
-   - Set `_maxHistory` to the number of snapshots to retain (default 5).
-2. Add `LoadoutHistoryController` to a panel on the loadout/career screen.
-   - `_history`       → the LoadoutHistorySO asset created above.
-   - `_playerLoadout` → shared PlayerLoadout SO.
-   - `_matchResult`   → shared MatchResultSO blackboard.
-   - `_onMatchEnded`  → same VoidGameEvent as MatchManager raises.
-   - `_listContainer` → Transform parent for row GameObjects.
-   - `_rowPrefab`     → prefab with ≥ 2 Text children (part count, WIN/LOSS).
-   - `_emptyLabel`    → GameObject shown when history is empty.
-   - `_restoreButton` → Button that calls RestoreLatest().
-3. Play-test: play 3 matches → 3 rows appear newest-first; press Restore → loadout restores.
-
-**RankBadgeController wiring (T207) — Editor-session steps:**
-1. Create a `RankBadgeConfig` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Core ▶ RankBadgeConfig.
-   - Populate `_badgeEntries` with (rankLabel, badgeSprite) pairs matching GetRankLabel() outputs
-     ("None", "Bronze I"…"Bronze III", "Silver I"…"Silver III", "Gold I"…"Gold III", "Legend").
-2. Add `RankBadgeController` to any career or main-menu panel.
-   - `_prestigeSystem` → shared PrestigeSystemSO asset.
-   - `_badgeConfig`    → the RankBadgeConfig SO created above.
-   - `_onPrestige`     → same VoidGameEvent raised by PrestigeSystemSO.Prestige().
-   - `_badgeImage`     → Image component for the badge sprite.
-   - `_rankLabel`      → Text showing the rank label.
-   - `_panel`          → optional container activated on Refresh.
-3. Play-test: prestige once → badge updates to Bronze I sprite and label.
-
-**AchievementUnlockNotificationController wiring (T208) — Editor-session steps:**
-1. Add `AchievementUnlockNotificationController` to a persistent HUD GameObject.
-   - `_playerAchievements`    → shared PlayerAchievementsSO runtime SO.
-   - `_catalog`               → shared AchievementCatalogSO asset.
-   - `_onAchievementUnlocked` → same VoidGameEvent as PlayerAchievementsSO._onAchievementUnlocked.
-   - `_notificationPanel`     → banner root panel (starts inactive).
-   - `_achievementNameLabel`  → Text child for the achievement display name.
-   - `_rewardLabel`           → optional Text child for "+N credits".
-   - `_displayDuration`       → seconds visible (default 3).
-2. Play-test: unlock a new achievement → banner appears showing name and reward; auto-hides after 3 s.
-
-**PrestigeProgressHUDController wiring (T209) — Editor-session steps:**
-1. Add `PrestigeProgressHUDController` to the career or in-match HUD.
-   - `_progression`    → shared PlayerProgressionSO asset.
-   - `_prestigeSystem` → shared PrestigeSystemSO asset.
-   - `_onLevelUp`      → same VoidGameEvent as PlayerProgressionSO._onLevelUp.
-   - `_onPrestige`     → same VoidGameEvent as PrestigeSystemSO._onPrestige.
-   - `_panel`          → root HUD panel.
-   - `_levelLabel`     → Text for "Level N / Max".
-   - `_statusLabel`    → Text for "Prestige Ready!" / "Legend" / empty.
-   - `_xpProgressBar`  → Slider fill bar for XP progress within the current level.
-2. Play-test: gain XP → bar fills; reach max level → "Prestige Ready!" shown; prestige → bar resets.
-
-**MatchHistoryDetailController wiring (T210) — Editor-session steps:**
-1. Add `MatchHistoryDetailController` to the post-match or career panel.
-   - `_matchStatistics`     → shared MatchStatisticsSO (filled by DamageGameEventListeners during the match).
-   - `_loadoutHistory`      → shared LoadoutHistorySO ring-buffer (filled by LoadoutHistoryController).
-   - `_onMatchEnded`        → same VoidGameEvent as MatchManager raises at match end.
-   - `_detailPanel`         → root panel (starts inactive; shown after each match).
-   - `_outcomeLabel`        → Text for "WIN" or "LOSS".
-   - `_partCountLabel`      → Text for "N parts equipped".
-   - `_physicalDamageLabel` → Text for "Physical: N".
-   - `_energyDamageLabel`   → Text for "Energy: N".
-   - `_thermalDamageLabel`  → Text for "Thermal: N".
-   - `_shockDamageLabel`    → Text for "Shock: N".
-2. Play-test: end a match → panel shows per-type damage amounts and latest loadout snapshot.
-
-**LoadoutCompareController wiring (T211) — Editor-session steps:**
-1. Add `LoadoutCompareController` to the loadout or career screen.
-   - `_currentLoadout`   → shared PlayerLoadout SO.
-   - `_loadoutHistory`   → shared LoadoutHistorySO ring-buffer.
-   - `_onLoadoutChanged` → same VoidGameEvent as PlayerLoadout._onLoadoutChanged.
-   - `_comparePanel`     → root compare panel.
-   - `_currentPartsLabel`→ Text for "Current: N parts".
-   - `_historyPartsLabel`→ Text for "Previous: N parts".
-   - `_partDeltaLabel`   → Text for "+N" / "-N" / "Same".
-   - `_winRateLabel`     → Text for "Win Rate: N%".
-2. Play-test: change loadout → delta label updates; play several matches → win-rate label reflects results.
-
-**MilestoneRewardNotificationController wiring (T197) — Editor-session steps:**
-1. Add `MilestoneRewardNotificationController` to a persistent HUD GameObject.
-   - `_catalog`           → the shared MilestoneRewardCatalogSO (provides label text).
-   - `_onRewardGranted`   → same VoidGameEvent as MilestoneRewardApplier._onRewardGranted.
-   - `_notificationPanel` → banner root panel (starts inactive).
-   - `_rewardLabel`       → Text child for "{label} Reached!" headline.
-   - `_rewardAmountText`  → optional secondary Text for "+N" amount (can be left null).
-   - `_notificationQueue` → optional NotificationQueueSO for global queue forwarding.
-   - `_displayDuration`   → seconds visible (default 2).
-2. Play-test: clear a new mastery milestone in a match → banner appears; auto-hides after 2 s.
-
-**WinStreakDisplayController wiring (T198) — Editor-session steps:**
-1. Add `WinStreakDisplayController` to the in-match HUD or post-match panel.
-   - `_winStreak`               → shared WinStreakSO asset.
-   - `_onStreakChanged`          → same VoidGameEvent as WinStreakSO._onStreakChanged.
-   - `_currentStreakText`        → Text label showing "Streak: N".
-   - `_bestStreakText`           → Text label showing "Best: N".
-   - `_streakBadge`             → optional GameObject shown when CurrentStreak ≥ threshold.
-   - `_notableStreakThreshold`   → minimum streak to show badge (default 3).
-2. Play-test: win 3 consecutive matches → badge appears; lose one → badge hides; best label never decreases.
-
-**CurrencyEarnedFlashController wiring (T199) — Editor-session steps:**
-1. Add `CurrencyEarnedFlashController` to a persistent HUD GameObject.
-   - `_matchResult`       → shared MatchResultSO blackboard SO.
-   - `_onMatchEnded`      → same VoidGameEvent as MatchManager raises at match end.
-   - `_flashPanel`        → banner root panel (starts inactive).
-   - `_currencyLabel`     → Text child receiving "+N credits".
-   - `_notificationQueue` → optional NotificationQueueSO for global queue forwarding.
-   - `_flashDuration`     → seconds visible (default 2).
-2. Play-test: complete a match with currency earned → "+N credits" banner flashes; auto-hides after 2 s; winning with 0 currency skips banner.
-
-**MatchRatingController wiring (T200) — Editor-session steps:**
-1. Add `MatchRatingController` to the post-match panel.
-   - `_matchResult`          → shared MatchResultSO blackboard.
-   - `_personalBest`         → shared PersonalBestSO (optional; omit if PB not tracked).
-   - `_onMatchEnded`         → same VoidGameEvent as MatchManager raises at match end.
-   - `_ratingPanel`          → root rating panel (hidden on entry; shown after match).
-   - `_ratingLabel`          → Text child receiving "N / 5".
-   - `_starImages`           → array of 5 Image components (index 0 = 1st star).
-   - `_filledStarSprite`     → sprite for earned stars.
-   - `_emptyStarSprite`      → sprite for unearned stars.
-   - `_efficiencyThreshold`  → efficiency ratio for +1 star (default 0.5).
-2. Play-test: win with good efficiency and a new personal best → 5 stars; lose with no PB → 1 star.
-
-**StreakBonusNotificationController wiring (T201) — Editor-session steps:**
-1. Add `StreakBonusNotificationController` to a persistent HUD GameObject.
-   - `_winStreak`           → shared WinStreakSO asset.
-   - `_milestoneConfig`     → shared WinStreakMilestoneSO with configured streak milestones.
-   - `_onStreakChanged`      → same VoidGameEvent as WinStreakSO raises.
-   - `_notificationPanel`   → banner root panel (starts inactive).
-   - `_notificationLabel`   → Text child for "N Win Streak! Bonus unlocked!".
-   - `_notificationQueue`   → optional NotificationQueueSO.
-   - `_displayDuration`     → seconds visible (default 2).
-2. Play-test: reach a configured milestone streak → banner fires; non-milestone streak counts → no banner.
-
-**MatchScoreTrendController wiring (T202) — Editor-session steps:**
-1. Add `MatchScoreTrendController` to the post-match or stats panel.
-   - `_scoreHistory`       → shared ScoreHistorySO asset.
-   - `_onHistoryUpdated`   → same VoidGameEvent that ScoreHistorySO fires on Record().
-   - `_trendLabel`         → Text receiving "↑ Improving", "↓ Declining", "↔ Steady", or "—".
-   - `_trendPanel`         → optional container (hidden when data is insufficient).
-2. Play-test: play 2+ matches with increasing scores → "↑ Improving"; decreasing → "↓ Declining".
-
-**DailyChallengeCountdownController wiring (T203) — Editor-session steps:**
-1. Add `DailyChallengeCountdownController` to the main menu or pre-match panel.
-   - `_challenge`         → shared DailyChallengeSO asset.
-   - `_onMatchEnded`      → same VoidGameEvent as MatchManager raises at match end.
-   - `_countdownLabel`    → Text receiving "Resets in Xh Ym" or "Challenge complete!".
-   - `_countdownPanel`    → optional container (hidden when _challenge is null).
-2. Play-test: open panel before midnight UTC → shows remaining hours/minutes; complete daily challenge → label switches to "Challenge complete!".
-
-**CombinedBonusCalculatorSO wiring (T190) — Editor-session steps:**
-1. Create a `CombinedBonusCalculator` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Core ▶ CombinedBonusCalculator.
-   - `_scoreMultiplier`      → shared ScoreMultiplierSO (prestige-tier multiplier).
-   - `_masteryBonusCatalog`  → shared MasteryBonusCatalogSO (mastery-tier bonuses).
-   - `_mastery`              → shared DamageTypeMasterySO (live mastery state).
-2. Assign to MatchManager's optional `_combinedBonus` field (if MatchManager is patched) or pass directly in code.
-3. Play-test: FinalMultiplier = prestige × mastery total; at Legend prestige + all types mastered → maximum compounded score.
-
-**ScoreMultiplierHUDController wiring (T191) — Editor-session steps:**
-1. Add `ScoreMultiplierHUDController` to the in-match HUD or career stats canvas.
-   - `_scoreMultiplier`  → shared ScoreMultiplierSO.
-   - `_rewardCatalog`    → shared PrestigeRewardCatalogSO.
-   - `_prestigeSystem`   → shared PrestigeSystemSO.
-   - `_onPrestige`       → same VoidGameEvent as PrestigeSystemSO._onPrestige.
-   - `_multiplierLabel`  → Text displaying "xN.NN".
-   - `_rewardLabel`      → Text displaying the active prestige reward name.
-   - `_panel`            → Root panel (activated on Refresh).
-2. Play-test: prestige → label updates to reflect new multiplier and reward name.
-
-**MasteryProgressMilestoneController wiring (T192) — Editor-session steps:**
-1. Create a `MasteryProgressMilestone` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Combat ▶ MasteryProgressMilestone.
-   - Populate each `_physical/energy/thermal/shockMilestones` array with ascending thresholds (e.g. [500, 1000, 5000]).
-2. Add `MasteryProgressMilestoneController` to the career stats panel.
-   - `_milestoneSO`          → the MasteryProgressMilestone asset.
-   - `_mastery`              → shared DamageTypeMasterySO.
-   - `_onMasteryUnlocked`    → same VoidGameEvent as DamageTypeMasterySO._onMasteryUnlocked.
-   - `_onMatchEnded`         → shared match-ended VoidGameEvent.
-   - Assign optional Text labels and Slider bars per type.
-3. Play-test: accumulate damage → "0/3 | Next: 500" → "1/3 | Next: 1000" → ... → "3/3 DONE".
-
-**PostPrestigeHistoryController wiring (T193) — Editor-session steps:**
-1. Create a `PrestigeHistory` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Core ▶ PrestigeHistory.
-   - Set `_maxHistory` (default 10) to retain the last N prestige events.
-2. Add `PostPrestigeHistoryController` to a career/prestige screen panel.
-   - `_history`         → the PrestigeHistory SO.
-   - `_prestigeSystem`  → shared PrestigeSystemSO.
-   - `_onPrestige`      → same VoidGameEvent as PrestigeSystemSO._onPrestige.
-   - `_listContainer`   → Scroll view content Transform.
-   - `_rowPrefab`       → Prefab with ≥2 child Texts: [0] rank label, [1] "Prestige N".
-   - `_emptyLabel`      → GameObject shown when history is empty.
-3. Play-test: prestige repeatedly → history list grows (newest first); exceeding MaxHistory evicts oldest.
-
-**WeaponMasteryBonusApplier wiring (T180) — Editor-session steps:**
-1. Create a `WeaponMasteryBonus` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Combat ▶ WeaponMasteryBonus.
-   - Set `_flatDamageBonus` (e.g. 15) — the bonus added per fire when the type is mastered.
-2. Add `WeaponMasteryBonusApplier` to the player robot root.
-   - `_bonusSO`           → the WeaponMasteryBonus asset.
-   - `_mastery`           → shared DamageTypeMasterySO.
-   - `_weaponController`  → the robot's WeaponAttachmentController.
-   - `_onMatchStarted`    → shared match-start VoidGameEvent.
-   - `_onMatchEnded`      → shared match-end VoidGameEvent.
-3. Play-test: master a type (accumulate ≥ threshold) then start a match with that weapon equipped → DamageBonus increases on WeaponAttachmentController; end match → bonus resets.
-
-**PrestigeRewardCatalogSO + PrestigeRewardController wiring (T181) — Editor-session steps:**
-1. Create a `PrestigeRewardCatalog` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Core ▶ PrestigeRewardCatalog.
-   - Populate `_rewards` array: each entry has `rank` (1–10), `label` (e.g. "Bronze Frame Skin"), `bonusMultiplier` (e.g. 1.25).
-2. Add `PrestigeRewardController` to the prestige info panel.
-   - `_catalog`            → the PrestigeRewardCatalog asset.
-   - `_prestigeSystem`     → shared PrestigeSystemSO.
-   - `_onPrestige`         → same VoidGameEvent as PrestigeSystemSO._onPrestige.
-   - `_rewardLabel`        → Text for reward name.
-   - `_multiplierLabel`    → Text for multiplier (shows "x1.25").
-   - `_rankLabel`          → Text for rank required (shows "At Prestige 2").
-   - `_noMoreRewardsPanel` → Panel shown when all rewards collected.
-3. Play-test: at prestige 0 → shows rank 1 reward; after each prestige → panel advances to next reward; at max → shows no-more-rewards panel.
-
-**DamageHistoryHUDController wiring (T182) — Editor-session steps:**
-1. Ensure a `MatchDamageHistory` SO exists (created for T178).
-2. Add `DamageHistoryHUDController` to the in-match HUD or a career stats panel.
-   - `_history`            → the MatchDamageHistory SO.
-   - `_onHistoryUpdated`   → VoidGameEvent raised when AddEntry is called (wire from PostMatchDamageHistoryController._onMatchEnded or a custom channel).
-   - Assign optional `_physicalAvgText` … `_shockAvgText` Text labels.
-   - Assign optional `_physicalBar` … `_shockBar` Slider bars.
-   - Assign optional `_panel` root GO.
-3. Play-test: complete 2+ matches → rolling-average labels update; bars reflect per-type ratio.
-
-**MasteryNotificationController wiring (T183) — Editor-session steps:**
-1. Add `MasteryNotificationController` to a persistent HUD GameObject.
-   - `_mastery`            → shared DamageTypeMasterySO.
-   - `_onMasteryUnlocked`  → same VoidGameEvent as DamageTypeMasterySO._onMasteryUnlocked.
-   - `_notificationPanel`  → banner root panel (starts inactive).
-   - `_notificationLabel`  → Text child of the banner.
-   - `_notificationDuration` → seconds (default 3).
-2. Play-test: accumulate enough damage of one type to hit its mastery threshold → "Physical MASTERED!" banner appears for 3 seconds.
+**InMatchObjectiveController wiring (T222) — Editor-session steps:**
+1. Create an `InMatchObjective` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Core ▶ InMatchObjective.
+   - Set `_objectiveTitle` (e.g. "Destroy Parts").
+   - Set `_targetCount` (e.g. 3).
+   - Wire `_onObjectiveComplete` → win-condition event or MatchManager.
+2. Add `InMatchObjectiveController` to the in-match HUD.
+   - `_objective`         → the InMatchObjectiveSO asset above.
+   - `_onProgressChanged` → VoidGameEvent on InMatchObjectiveSO.
+   - `_objectivePanel`    → root panel.
+   - `_titleLabel`        → Text for objective title.
+   - `_progressLabel`     → Text for "N / M".
+   - `_progressBar`       → Slider (0=start, 1=complete).
+   - `_completeLabel`     → Text shown when objective is done.
+3. Wire InMatchObjectiveSO.Increment() from part-destroyed / KillFeed events.
+4. Wire InMatchObjectiveSO.Reset() to MatchStarted event.
+5. Play-test: complete 3 objectives → "Complete!" label appears.
