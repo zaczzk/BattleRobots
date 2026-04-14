@@ -122,5 +122,17 @@ namespace BattleRobots.UI
 
         /// <summary>The assigned <see cref="MatchBonusObjectiveSO"/>. May be null.</summary>
         public MatchBonusObjectiveSO BonusObjective => _bonusObjective;
+
+        /// <summary>
+        /// Replaces the tracked objective and immediately refreshes the HUD.
+        /// Pass <c>null</c> to hide the panel.
+        /// Called by <see cref="BattleRobots.UI.BonusObjectiveSelectorController"/>
+        /// at match start to inject the player's chosen objective.
+        /// </summary>
+        public void SetObjective(MatchBonusObjectiveSO objective)
+        {
+            _bonusObjective = objective;
+            Refresh();
+        }
     }
 }

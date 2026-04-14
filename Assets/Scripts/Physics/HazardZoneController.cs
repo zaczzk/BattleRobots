@@ -52,6 +52,11 @@ namespace BattleRobots.Physics
                  "persistent effects while inside the hazard. Leave null for damage-only zones.")]
         [SerializeField] private HazardZoneStatusEffectConfig _statusEffectConfig;
 
+        [Header("Damage Tracker (optional)")]
+        [Tooltip("HazardDamageTrackerSO that accumulates per-type damage totals across " +
+                 "the match. Assign to enable the post-match HazardDamageHUDController.")]
+        [SerializeField] private HazardDamageTrackerSO _damageTracker;
+
         [Header("Events (optional)")]
         [Tooltip("Raised each time a damage tick fires. Wire an AudioManager or VFX handler " +
                  "to play a sizzle/spark effect without coupling to this component.")]
@@ -106,6 +111,7 @@ namespace BattleRobots.Physics
                 acc -= _config.TickInterval;
                 var info = new DamageInfo(_config.DamagePerTick, _config.DamageSourceId);
                 dr.TakeDamage(info);
+                _damageTracker?.AddDamage(_config.HazardType, _config.DamagePerTick);
                 _onHazardTriggered?.Raise();
 
                 // Apply optional status effect per tick (e.g. Burn on Lava, Slow on Acid).
