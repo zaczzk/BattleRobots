@@ -62,6 +62,8 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | M37 | Notification & Comparison Layer (AchievementUnlockNotificationController, PrestigeProgressHUDController, MatchHistoryDetailController, LoadoutCompareController) | Sprint 37 | **Done** |
 | M38 | Post-Match Grade, Career Insights & Synergy Advisor (BuildGradeConfig+BuildGradeController, CareerInsightsBannerController, MatchReplaySummarySO+MatchReplaySummaryController, PartSynergyAdvisorController) | Sprint 38 | **Done** |
 | M39 | In-Match HUD Layer (MatchTimerSO+MatchTimerController, RobotHealthBarController, WeaponCooldownSO+WeaponCooldownHUDController, PartDurabilityTrackerSO+PartDurabilityHUDController) | Sprint 39 | **Done** |
+| M40 | In-Match HUD Layer II (ComboCounterHUDController, AbilityChargeSO+AbilityChargeHUDController, InMatchObjectiveSO+InMatchObjectiveController) | Sprint 40 | **Done** |
+| M41 | In-Match HUD Layer III (MatchPhaseSO+MatchPhaseHUDController, ObjectiveProgressListController, TeamScoreSO+TeamScoreHUDController) | Sprint 41 | **Done** |
 
 ---
 
@@ -277,6 +279,9 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | T220 | ComboCounterHUDController — in-match HUD visualising the player's combo streak; subscribes _onComboChanged VoidGameEvent; reads ComboCounterSO (HitCount/MaxCombo/ComboMultiplier/ComboWindowRatio/IsComboActive); Update drives Tick; _comboPanel shown only when combo is active; _comboCountLabel "N hits"/em-dash; _multiplierLabel "×N.N"; _maxComboLabel "Best: N"; _windowBar Slider = ComboWindowRatio; zero alloc after Awake | 82 | **Done** | ComboCounterHUDController MB (BattleRobots.UI, DisallowMultipleComponent): optional _comboCounter ComboCounterSO (Data); optional _onComboChanged VoidGameEvent (In); optional _comboPanel + _comboCountLabel Text + _multiplierLabel Text + _maxComboLabel Text + _windowBar Slider (UI). Awake caches _refreshDelegate. OnEnable subscribes+Refresh(). OnDisable unsubscribes+hides _comboPanel. Update: _comboCounter?.Tick(Time.deltaTime). Refresh(): isActive=_comboCounter!=null&&IsComboActive; panel.SetActive(isActive); countLabel=isActive?"N hits":em-dash; multiplierLabel="×{M:F1}"; maxComboLabel="Best: N"; windowBar.value=ComboWindowRatio(0 when null). ComboCounter public. 12 new EditMode tests (ComboCounterHUDControllerTests). 3742 total tests across 284 test files. |
 | T221 | AbilityChargeSO + AbilityChargeHUDController — charge-up ability bar; SO tracks CurrentCharge/ChargeRatio/IsFullyCharged; AddCharge(damageDealt) accumulates damage×chargePerDamage, fires _onChargeChanged + _onFullyCharged (once per fill); Activate() discharges when full + fires _onActivated + _onChargeChanged; Reset fires _onChargeChanged; HUDController subscribes _onChargeChanged; _chargeBar Slider = ChargeRatio; _chargeLabel "READY!"/"N%"; _readyOverlay shown when full; zero alloc after Awake | 80 | **Done** | AbilityChargeSO SO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Combat/AbilityCharge"): _maxCharge [Min(1f)] default 100f; _chargePerDamage [Min(0f)] default 1f; _onChargeChanged + _onFullyCharged + _onActivated VoidGameEvent. OnEnable: _currentCharge=0+_fullyChargedFired=false. AddCharge(dmg): ≤0→return; old=IsFullyCharged; charge+=dmg×rate clamped max; raise changed; if newly full && !_fullyChargedFired: flag=true+raise fullyCharged. Activate(): !IsFullyCharged→return; charge=0+flag=false; raise activated+changed. Reset(): charge=0+flag=false; raise changed. AbilityChargeHUDController MB (BattleRobots.UI, DisallowMultipleComponent): optional _chargeSO AbilityChargeSO + _onChargeChanged VoidGameEvent + _chargeBar Slider + _chargeLabel Text + _readyOverlay. Awake caches _refreshDelegate. OnEnable subscribes+Refresh(). OnDisable unsubscribes+hides overlay. Refresh(): isReady=SO!=null&&IsFullyCharged; bar.value=ratio; label="READY!" or "N%"; overlay.SetActive(isReady). ChargeSO public. 8 SO tests + 6 controller tests = 14 new EditMode tests (AbilityChargeTests). 3756 total tests across 285 test files. |
 | T222 | InMatchObjectiveSO + InMatchObjectiveController — SO-driven objective tracker; _objectiveTitle + _targetCount [Min(1)] default 1; CurrentCount/IsComplete/Progress [0,1]; Increment(): no-op when complete, fires _onProgressChanged, fires _onObjectiveComplete when CurrentCount==TargetCount; Reset fires _onProgressChanged; Controller subscribes _onProgressChanged; _objectivePanel hidden when null; _titleLabel/"N / M" _progressLabel/_progressBar Slider/_completeLabel shown when complete; zero alloc after Awake | 78 | **Done** | InMatchObjectiveSO SO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Core/InMatchObjective"): _objectiveTitle string default "Objective" (fallback on empty); _targetCount [Min(1)] default 1; _onProgressChanged + _onObjectiveComplete VoidGameEvent. OnEnable: _currentCount=0. Increment(): IsComplete→return; count++; raise changed; IsComplete→raise complete. Reset(): count=0; raise changed. Progress=Clamp01(count/target). InMatchObjectiveController MB (BattleRobots.UI, DisallowMultipleComponent): optional _objective InMatchObjectiveSO + _onProgressChanged VoidGameEvent + _objectivePanel + _titleLabel Text + _progressLabel Text + _progressBar Slider + _completeLabel Text. Awake caches _refreshDelegate. OnEnable subscribes+Refresh(). OnDisable unsubscribes. Refresh(): null→hide panel; else show panel; title; "N / M" progress; bar.value; completeLabel.SetActive(IsComplete). Objective public. 8 SO tests + 6 controller tests = 14 new EditMode tests (InMatchObjectiveTests). 3770 total tests across 286 test files. T001–T222 Done. M1–M40 complete. |
+| T223 | MatchPhaseSO + MatchPhaseHUDController — SO-driven match phase tracker; MatchPhase enum (PreMatch/Active/SuddenDeath/PostMatch); SetPhase idempotent (no event on same phase); PhaseLabel returns display string; OnEnable resets to PreMatch; HUD controller subscribes _onPhaseChanged; _phaseLabel shows label or em-dash; _panel shown/hidden; zero alloc after Awake | 85 | **Done** | MatchPhase enum (BattleRobots.Core, in MatchPhaseSO.cs): PreMatch=0/Active=1/SuddenDeath=2/PostMatch=3. MatchPhaseSO SO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Combat/MatchPhase"): optional _onPhaseChanged VoidGameEvent; runtime _currentPhase (not serialised). OnEnable: _currentPhase=PreMatch. CurrentPhase/PhaseLabel (switch: Active→"Active"/SuddenDeath→"Sudden Death"/PostMatch→"Post-Match"/default→"Pre-Match") properties. SetPhase(phase): same phase→return; else set+raise _onPhaseChanged. MatchPhaseHUDController MB (BattleRobots.UI, DisallowMultipleComponent): optional _matchPhase MatchPhaseSO + _onPhaseChanged VoidGameEvent + _phaseLabel Text + _panel. Awake caches _refreshDelegate. OnEnable subscribes+Refresh(). OnDisable unsubscribes. Refresh(): null SO→_phaseLabel="—"; panel off; else _phaseLabel=PhaseLabel; panel on. MatchPhase public property. 8 SO tests + 8 controller tests = 16 new EditMode tests (MatchPhaseTests). 3786 total tests across 281 test files. |
+| T224 | ObjectiveProgressListController — multi-objective list HUD cycling through all active InMatchObjectiveSO[] entries; subscribes _onObjectiveChanged; Refresh: null/empty→hide panel; show panel; destroy stale rows; foreach obj: row Texts[0]=title/Texts[1]="N/M" or "DONE"; Texts[2] badge SetActive on complete; _allCompleteLabel activated when all done; _listContainer + _rowPrefab required for row building; zero alloc after Awake | 78 | **Done** | ObjectiveProgressListController MB (BattleRobots.UI, DisallowMultipleComponent): optional _objectives InMatchObjectiveSO[] (Data); optional _onObjectiveChanged VoidGameEvent (In); optional _listContainer Transform + _rowPrefab GameObject + _panel + _allCompleteLabel Text (UI). Awake caches _refreshDelegate. OnEnable subscribes+Refresh(). OnDisable unsubscribes. Refresh(): hasObjectives=non-null&&length>0; !hasObjectives||null container→hide panel+return; show panel; destroy stale children; null prefab→return; foreach non-null obj: Instantiate row; texts[0]=ObjectiveTitle; texts[1]=IsComplete?"DONE":"{current}/{target}"; texts[2].gameObject.SetActive(IsComplete) when ≥3 texts; allComplete=all objectives done; _allCompleteLabel?.gameObject.SetActive(allComplete). Objectives public. 12 new EditMode tests (ObjectiveProgressListControllerTests). 3798 total tests across 282 test files. |
+| T225 | TeamScoreSO + TeamScoreHUDController — runtime SO tracking two team scores; AddTeamAScore/AddTeamBScore: ≤0 delta ignored; ResetScores zeros both + raises event; LeadingTeam→"A"/"B"/"Tie"; OnEnable zeros scores; HUD controller subscribes _onScoreChanged; _teamALabel "A: N"/_teamBLabel "B: N"/_leadLabel "Team A Leads"/"Team B Leads"/"Tie"; _panel shown/hidden; zero alloc after Awake | 75 | **Done** | TeamScoreSO SO (BattleRobots.Core, CreateAssetMenu "BattleRobots/Core/TeamScore"): optional _onScoreChanged VoidGameEvent; runtime _teamAScore/_teamBScore int (not serialised). OnEnable: both=0. TeamAScore/TeamBScore/LeadingTeam properties (A>B→"A"; B>A→"B"; equal→"Tie"). AddTeamAScore(int): ≤0→return; add+raise. AddTeamBScore(int): ≤0→return; add+raise. ResetScores(): both=0+raise. TeamScoreHUDController MB (BattleRobots.UI, DisallowMultipleComponent): optional _teamScore TeamScoreSO + _onScoreChanged VoidGameEvent + _teamALabel Text + _teamBLabel Text + _leadLabel Text + _panel. Awake caches _refreshDelegate. OnEnable subscribes+Refresh(). OnDisable unsubscribes. Refresh(): null SO→panel off+return; panel on; teamALabel="A: N"; teamBLabel="B: N"; leadLabel=switch(LeadingTeam:A→"Team A Leads";B→"Team B Leads";default→"Tie"). TeamScore public. 8 SO tests + 6 controller tests = 14 new EditMode tests (TeamScoreTests). 3812 total tests across 283 test files. T001–T225 Done. M1–M41 complete. |
 | T091 | MatchModifierSO + MatchModifierCatalogSO + SelectedModifierSO + MatchModifierSelectionController — pre-match rule modifier system | 90 | **Done** | MatchModifierType enum (6 values: Standard/DoubleRewards/ExtendedTime/ShortTime/FragileArmor/Overdrive). MatchModifierSO SO (Core, CreateAssetMenu "BattleRobots/Match/MatchModifier"): DisplayName/Description; RewardMultiplier float ≥0.1 (default 1.0); TimeMultiplier float ≥0.1 (default 1.0); ArmorMultiplier float ≥0 (default 1.0); SpeedMultiplier float ≥0.1 (default 1.0); OnValidate clamps all multipliers to minimums + warns empty DisplayName. MatchModifierCatalogSO SO (Core, CreateAssetMenu "BattleRobots/Match/MatchModifierCatalog"): immutable IReadOnlyList<MatchModifierSO>; OnValidate warns null entries. SelectedModifierSO (Core, CreateAssetMenu "BattleRobots/Match/SelectedModifier"): mutable runtime SO; Select(modifier) sets Current+HasSelection+fires VoidGameEvent; Reset() clears silently; CurrentDisplayName → "Standard" fallback when unset/null. MatchModifierSelectionController MB (BattleRobots.UI): mirrors DifficultySelectionController pattern — prev/next wrap-around, optional _nameLabel+_descriptionLabel Text labels, ApplySelection on OnEnable, cached UnityAction delegates, no Update, no Physics refs. MatchManager patched: optional _selectedModifier field; HandleMatchStarted multiplies _timeRemaining by Current.TimeMultiplier after base duration resolved; caches _activeRoundDuration (post-modifier) to fix elapsed computation bug when time multiplier != 1; EndMatch applies Current.RewardMultiplier to totalReward after streak bonus (streak × modifier stacking). CombatStatsApplicator patched: optional _selectedModifier field; ApplyStats() scales base speed by Current.SpeedMultiplier and armor rating by Current.ArmorMultiplier (Mathf.Clamp [0,100]) before pushing to locomotion/DamageReceiver. All integrations fully null-safe; backwards-compatible (null _selectedModifier = multipliers all 1). MatchModifierSOTests (13 tests): 7 fresh-instance defaults; MatchModifierType_HasExactlySixValues; AllModifierTypes_CanBeAssignedAndRead; 4 reflection round-trips. MatchModifierCatalogSOTests (6 tests): not-null/empty/IReadOnlyList; count 1/2; insertion order. SelectedModifierSOTests (14 tests): 3 fresh-instance defaults; Select 8 paths (state/event/null/idempotent); Reset 3 paths (clears+silent). MatchModifierSelectionControllerTests (16 tests): initial index=0; NextModifier null/empty/increment/wrap/cycle; PreviousModifier null/empty/wrap/decrement; NextThenPrev returns start; SO write verification (next/prev); null SO no-throw. Total tests: 1292 across 97 files. |
 
 ---
@@ -308,6 +313,7 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 | M38 | PM Agent | 2026-04-14 | T212 BuildGradeConfig+BuildGradeController (14 tests) + T213 CareerInsightsBannerController (12 tests) + T214 MatchReplaySummarySO+MatchReplaySummaryController (16 tests) + T215 PartSynergyAdvisorController (14 tests). 56 new tests. 3666 total tests across 279 test files. M38 complete. |
 | M39 | PM Agent | 2026-04-14 | T216 MatchTimerSO+MatchTimerController (16 tests) + T217 RobotHealthBarController (14 tests) + T218 WeaponCooldownSO+WeaponCooldownHUDController (16 tests) + T219 PartDurabilityTrackerSO+PartDurabilityHUDController (18 tests). 64 new tests. 3730 total tests across 283 test files. M39 complete. |
 | M40 | PM Agent | 2026-04-14 | T220 ComboCounterHUDController (12 tests) + T221 AbilityChargeSO+AbilityChargeHUDController (14 tests) + T222 InMatchObjectiveSO+InMatchObjectiveController (14 tests). 40 new tests. 3770 total tests across 286 test files. M40 complete. |
+| M41 | PM Agent | 2026-04-14 | T223 MatchPhaseSO+MatchPhaseHUDController (16 tests) + T224 ObjectiveProgressListController (12 tests) + T225 TeamScoreSO+TeamScoreHUDController (14 tests). 42 new tests. 3812 total tests across 283 test files. M41 complete. |
 
 ---
 
@@ -581,56 +587,46 @@ uses ArticulationBody exclusively. The economy, save system, and event bus are S
 
 ## Session Handoff
 
-**Last completed:** T222 (InMatchObjectiveSO + InMatchObjectiveController; 14 EditMode tests). **3770 total tests across 286 test files.** T001–T222 Done. M1–M40 complete.
+**Last completed:** T225 (TeamScoreSO + TeamScoreHUDController; 14 EditMode tests). **3812 total tests across 283 test files.** T001–T225 Done. M1–M41 complete.
 
-**M40 In-Match HUD Layer II — ALL TASKS COMPLETE (T220–T222).**
-- T220: `ComboCounterHUDController` (UI MB: reads ComboCounterSO; Update ticks combo window; _comboPanel hidden when inactive; _comboCountLabel/×N.N multiplier/Best:N max/window bar Slider). 12 tests.
-- T221: `AbilityChargeSO` (Core SO: charge+=damage×rate; IsFullyCharged; _onFullyCharged once per fill; Activate discharges) + `AbilityChargeHUDController` (UI MB: bar=ChargeRatio; "READY!"/N% label; _readyOverlay). 14 tests.
-- T222: `InMatchObjectiveSO` (Core SO: TargetCount/CurrentCount/IsComplete/Progress; Increment no-op after complete; fires _onObjectiveComplete) + `InMatchObjectiveController` (UI MB: panel/title/progress "N / M"/bar/complete label). 14 tests.
+**M41 In-Match HUD Layer III — ALL TASKS COMPLETE (T223–T225).**
+- T223: `MatchPhaseSO` (Core SO: MatchPhase enum PreMatch/Active/SuddenDeath/PostMatch; SetPhase idempotent; PhaseLabel string; resets on OnEnable) + `MatchPhaseHUDController` (UI MB: _phaseLabel/em-dash when null; _panel shown/hidden). 16 tests.
+- T224: `ObjectiveProgressListController` (UI MB: InMatchObjectiveSO[] array; row list _listContainer/_rowPrefab; texts[0]=title/texts[1]="N/M"or"DONE"/texts[2]=badge; _allCompleteLabel activated when all done; panel hidden when null/empty). 12 tests.
+- T225: `TeamScoreSO` (Core SO: TeamAScore/TeamBScore; AddTeamAScore/AddTeamBScore guards ≤0; ResetScores; LeadingTeam "A"/"B"/"Tie") + `TeamScoreHUDController` (UI MB: _teamALabel "A: N"/_teamBLabel "B: N"/_leadLabel; panel shown/hidden). 14 tests.
 
-**Next milestone (M41):** Suggested directions: (a) `RobotStatusEffectHUDController` — per-active-status-effect icon row reading a `StatusEffectRegistrySO` or `StatusEffectStateSO`; (b) `ArenaHazardWarningController` — proximity-to-hazard banner driven by `HazardZoneSO` list; (c) `MatchPhaseController` — SO-driven match phase tracker (PreMatch/Active/PostMatch) with HUD phase label and phase-change VoidGameEvent; (d) `TeamScoreSO` + `TeamScoreHUDController` — team vs team score tracking with timed animations; (e) `ObjectiveProgressListController` — multi-objective list HUD showing all active `InMatchObjectiveSO` instances with completion badges.
+**Next milestone (M42):** Suggested directions: (a) `ArenaHazardWarningController` — proximity-to-hazard banner driven by `HazardZoneSO` list; distance check against transform list each tick; banner label shows hazard name + distance; auto-hide when safe; (b) `MatchEventLogSO` + `MatchEventLogController` — ring-buffer SO stores MatchEventEntry (eventType enum, description string, timestamp); controller builds newest-first row list; subscribes multiple VoidGameEvent sources; (c) `RobotRespawnSO` + `RespawnCountdownController` — tracks respawn count/cooldown; HUD shows countdown timer and respawns-remaining label; fires _onRespawnReady; (d) `MatchBonusObjectiveSO` + `BonusObjectiveHUDController` — optional bonus objectives (like "win without taking damage"); time-limited challenge with separate reward path; drives dedicated HUD panel.
 
-**ComboCounterHUDController wiring (T220) — Editor-session steps:**
-1. Add `ComboCounterHUDController` to the in-match HUD canvas.
-   - `_comboCounter`    → shared ComboCounterSO asset.
-   - `_onComboChanged`  → same VoidGameEvent raised by ComboCounterSO.
-   - `_comboPanel`      → root panel (can start inactive — hidden until first hit).
-   - `_comboCountLabel` → Text for "N hits".
-   - `_multiplierLabel` → Text for "×1.2".
-   - `_maxComboLabel`   → Text for "Best: N".
-   - `_windowBar`       → Slider for combo window countdown.
-2. Wire ComboCounterSO.Reset() to the MatchStarted VoidGameEvent listener.
-3. Wire ComboCounterSO.RecordHit() from a DamageGameEventListener on confirmed player hit.
-4. Play-test: hit 5 times → panel appears with "5 hits", "×1.1", "Best: 5".
+**MatchPhaseHUDController wiring (T223) — Editor-session steps:**
+1. Create a `MatchPhase` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Combat ▶ MatchPhase.
+   - Wire `_onPhaseChanged` → a shared VoidGameEvent asset (e.g. "OnMatchPhaseChanged").
+2. Add `MatchPhaseHUDController` to the in-match HUD canvas.
+   - `_matchPhase`     → the MatchPhaseSO asset above.
+   - `_onPhaseChanged` → same VoidGameEvent.
+   - `_phaseLabel`     → Text element (shows "Pre-Match", "Active", "Sudden Death", "Post-Match").
+   - `_panel`          → root panel.
+3. Call MatchPhaseSO.SetPhase(MatchPhase.Active) from MatchManager.HandleMatchStarted().
+4. Call MatchPhaseSO.SetPhase(MatchPhase.PostMatch) from MatchManager.EndMatch().
 
-**AbilityChargeHUDController wiring (T221) — Editor-session steps:**
-1. Create an `AbilityCharge` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Combat ▶ AbilityCharge.
-   - Set `_maxCharge` (default 100).
-   - Set `_chargePerDamage` (default 1 = 1 charge per damage point dealt).
-   - Wire `_onFullyCharged` → audio/VFX event.
-2. Add `AbilityChargeHUDController` to the in-match HUD.
-   - `_chargeSO`        → the AbilityChargeSO asset above.
-   - `_onChargeChanged` → VoidGameEvent on AbilityChargeSO.
-   - `_chargeBar`       → Slider (0=empty, 1=full).
-   - `_chargeLabel`     → Text ("READY!" or "N%").
-   - `_readyOverlay`    → panel/glow shown when fully charged.
-3. Wire AbilityChargeSO.AddCharge() from a damage-dealt event (pass damage amount).
-4. Wire AbilityChargeSO.Activate() to the player's ability input action.
-5. Wire AbilityChargeSO.Reset() to MatchStarted event.
+**ObjectiveProgressListController wiring (T224) — Editor-session steps:**
+1. Create two or more `InMatchObjective` SO assets for the objectives you want to track.
+2. Add `ObjectiveProgressListController` to the in-match HUD canvas.
+   - `_objectives`           → assign the InMatchObjectiveSO assets in the array.
+   - `_onObjectiveChanged`   → a shared VoidGameEvent raised by all the objective SOs.
+   - `_listContainer`        → Content Transform of a ScrollRect (or any parent Transform).
+   - `_rowPrefab`            → prefab with ≥2 Text children (title, progress) and optional 3rd (badge).
+   - `_panel`                → root panel.
+   - `_allCompleteLabel`     → Text activated when all objectives are done.
+3. Wire each InMatchObjectiveSO._onProgressChanged → the shared _onObjectiveChanged event.
 
-**InMatchObjectiveController wiring (T222) — Editor-session steps:**
-1. Create an `InMatchObjective` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Core ▶ InMatchObjective.
-   - Set `_objectiveTitle` (e.g. "Destroy Parts").
-   - Set `_targetCount` (e.g. 3).
-   - Wire `_onObjectiveComplete` → win-condition event or MatchManager.
-2. Add `InMatchObjectiveController` to the in-match HUD.
-   - `_objective`         → the InMatchObjectiveSO asset above.
-   - `_onProgressChanged` → VoidGameEvent on InMatchObjectiveSO.
-   - `_objectivePanel`    → root panel.
-   - `_titleLabel`        → Text for objective title.
-   - `_progressLabel`     → Text for "N / M".
-   - `_progressBar`       → Slider (0=start, 1=complete).
-   - `_completeLabel`     → Text shown when objective is done.
-3. Wire InMatchObjectiveSO.Increment() from part-destroyed / KillFeed events.
-4. Wire InMatchObjectiveSO.Reset() to MatchStarted event.
-5. Play-test: complete 3 objectives → "Complete!" label appears.
+**TeamScoreHUDController wiring (T225) — Editor-session steps:**
+1. Create a `TeamScore` SO asset: Assets ▶ Create ▶ BattleRobots ▶ Core ▶ TeamScore.
+   - Wire `_onScoreChanged` → a shared VoidGameEvent (e.g. "OnTeamScoreChanged").
+2. Add `TeamScoreHUDController` to the in-match HUD canvas.
+   - `_teamScore`     → the TeamScoreSO asset above.
+   - `_onScoreChanged`→ same VoidGameEvent.
+   - `_teamALabel`    → Text for "A: N".
+   - `_teamBLabel`    → Text for "B: N".
+   - `_leadLabel`     → Text for "Team A Leads" / "Team B Leads" / "Tie".
+   - `_panel`         → root panel.
+3. Call TeamScoreSO.AddTeamAScore(points) / AddTeamBScore(points) from scoring logic.
+4. Wire TeamScoreSO.ResetScores() to the MatchStarted event.
