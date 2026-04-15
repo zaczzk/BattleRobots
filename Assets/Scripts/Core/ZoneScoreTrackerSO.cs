@@ -35,6 +35,10 @@ namespace BattleRobots.Core
         private float _playerScore;
         private float _enemyScore;
 
+        // Career accumulators — loaded from SaveData on startup, accumulated each match.
+        private float _careerPlayerScore;
+        private float _careerEnemyScore;
+
         // ── Lifecycle ─────────────────────────────────────────────────────────
 
         private void OnEnable()
@@ -45,14 +49,20 @@ namespace BattleRobots.Core
 
         // ── Properties ────────────────────────────────────────────────────────
 
-        /// <summary>Total score accumulated by the player from zone control.</summary>
+        /// <summary>Total score accumulated by the player from zone control this match.</summary>
         public float PlayerScore => _playerScore;
 
-        /// <summary>Total score accumulated by the enemy from zone control.</summary>
+        /// <summary>Total score accumulated by the enemy from zone control this match.</summary>
         public float EnemyScore => _enemyScore;
 
-        /// <summary>Combined player + enemy score.</summary>
+        /// <summary>Combined player + enemy score this match.</summary>
         public float TotalScore => _playerScore + _enemyScore;
+
+        /// <summary>Cumulative career zone score for the player across all matches.</summary>
+        public float CareerPlayerScore => _careerPlayerScore;
+
+        /// <summary>Cumulative career zone score for the enemy across all matches.</summary>
+        public float CareerEnemyScore => _careerEnemyScore;
 
         /// <summary>Event raised whenever any score changes. May be null.</summary>
         public VoidGameEvent OnScoreUpdated => _onScoreUpdated;
@@ -84,14 +94,39 @@ namespace BattleRobots.Core
         }
 
         /// <summary>
-        /// Zeros both scores and fires <see cref="_onScoreUpdated"/>.
-        /// Call at match start or from a match-ended handler.
+        /// Zeros both per-match scores and fires <see cref="_onScoreUpdated"/>.
+        /// Does NOT clear career accumulators — call at match start or from a match-ended handler.
         /// </summary>
         public void Reset()
         {
             _playerScore = 0f;
             _enemyScore  = 0f;
             _onScoreUpdated?.Raise();
+        }
+
+        /// <summary>
+        /// Adds the current match's <see cref="PlayerScore"/> and <see cref="EnemyScore"/>
+        /// to the running career accumulators.
+        /// Call from <see cref="ZoneCareerPersistenceController"/> at match end before
+        /// persisting to <c>SaveData</c>.
+        /// Zero allocation.
+        /// </summary>
+        public void AccumulateToCareer()
+        {
+            _careerPlayerScore += _playerScore;
+            _careerEnemyScore  += _enemyScore;
+        }
+
+        /// <summary>
+        /// Restores career accumulators from <c>SaveData</c> at startup.
+        /// Bootstrapper-safe — fires no events; negative values are clamped to zero.
+        /// </summary>
+        /// <param name="playerScore">Persisted career player zone score.</param>
+        /// <param name="enemyScore">Persisted career enemy zone score.</param>
+        public void LoadSnapshot(float playerScore, float enemyScore)
+        {
+            _careerPlayerScore = Mathf.Max(0f, playerScore);
+            _careerEnemyScore  = Mathf.Max(0f, enemyScore);
         }
     }
 }

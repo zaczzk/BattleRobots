@@ -120,6 +120,12 @@ namespace BattleRobots.Core
                  "per-type accumulators and mastery flags from SaveData. Leave null to skip.")]
         [SerializeField] private DamageTypeMasterySO _masterySystem;
 
+        [Header("Zone Control Career Stats (optional — T277)")]
+        [Tooltip("Zone score tracker SO. LoadSnapshot called on startup to restore career " +
+                 "player/enemy zone totals from SaveData.careerPlayerZoneScore / careerEnemyZoneScore. " +
+                 "Leave null to skip (backwards-compatible).")]
+        [SerializeField] private ZoneScoreTrackerSO _zoneScoreTracker;
+
         [Header("Settings")]
         [Tooltip("Audio/gameplay settings SO. Loaded from disk on startup. " +
                  "Leave null to skip (settings will use inspector defaults).")]
@@ -249,6 +255,11 @@ namespace BattleRobots.Core
                 save.masteryThermalAccum,  save.masteryShockAccum,
                 save.masteryPhysicalDone,  save.masteryEnergyDone,
                 save.masteryThermalDone,   save.masteryShockDone);
+
+            // Restore career zone control totals (T277).
+            // LoadSnapshot is bootstrapper-safe (no events); old saves default to 0.
+            _zoneScoreTracker?.LoadSnapshot(
+                save.careerPlayerZoneScore, save.careerEnemyZoneScore);
 
             // On a brand-new save (inventory empty after load), unlock configured starter parts
             // and immediately persist them so they survive the next session.

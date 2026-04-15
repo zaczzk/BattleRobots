@@ -465,5 +465,23 @@ namespace BattleRobots.Core
         public bool masteryEnergyDone;
         public bool masteryThermalDone;
         public bool masteryShockDone;
+
+        // ── Zone Control Career Stats (T277) ──────────────────────────────────
+
+        /// <summary>
+        /// Cumulative career zone score earned by the player across all matches.
+        /// Rehydrated into <see cref="ZoneScoreTrackerSO"/> by <see cref="GameBootstrapper"/>
+        /// on startup via <see cref="ZoneScoreTrackerSO.LoadSnapshot"/>.
+        /// Default 0 — backwards-compatible with saves predating this field.
+        /// </summary>
+        public float careerPlayerZoneScore;
+
+        /// <summary>
+        /// Cumulative career zone score earned by the enemy across all matches.
+        /// Rehydrated into <see cref="ZoneScoreTrackerSO"/> by <see cref="GameBootstrapper"/>
+        /// on startup via <see cref="ZoneScoreTrackerSO.LoadSnapshot"/>.
+        /// Default 0 — backwards-compatible with saves predating this field.
+        /// </summary>
+        public float careerEnemyZoneScore;
     }
 }
