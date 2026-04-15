@@ -120,5 +120,17 @@ namespace BattleRobots.Core
             _isOnCooldown = false;
             _remaining    = 0f;
         }
+
+        /// <summary>
+        /// Overrides the configured cooldown duration at runtime.
+        /// Value is clamped to ≥ 0.1 s.
+        /// Useful for data-driven per-zone cooldown configuration via
+        /// <c>ZoneTimerExtensionController</c>.
+        /// </summary>
+        /// <param name="duration">New cooldown duration in seconds.</param>
+        public void SetCooldownDuration(float duration)
+        {
+            _cooldownDuration = Mathf.Max(0.1f, duration);
+        }
     }
 }
