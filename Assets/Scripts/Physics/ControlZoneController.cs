@@ -56,6 +56,7 @@ namespace BattleRobots.Physics
         private bool  _matchRunning;
         private bool  _isOccupied;
         private float _tickElapsed;
+        private float _captureTimeScale = 1f;
 
         // ── Cached delegates ──────────────────────────────────────────────────
 
@@ -137,7 +138,7 @@ namespace BattleRobots.Physics
 
             if (_isOccupied)
             {
-                _zone?.CaptureProgress(dt);
+                _zone?.CaptureProgress(dt * _captureTimeScale);
             }
             else if (_zone != null && _zone.IsCaptured)
             {
@@ -165,5 +166,18 @@ namespace BattleRobots.Physics
 
         /// <summary>True when a trigger collider is currently inside the zone.</summary>
         public bool IsOccupied => _isOccupied;
+
+        /// <summary>
+        /// Sets the capture-time scale multiplier applied to each Tick delta time.
+        /// Values &gt; 1 slow down capture; values &lt; 1 speed it up.
+        /// Clamped to a minimum of 0.1 to prevent zero or negative scaling.
+        /// </summary>
+        public void SetCaptureTimeScale(float scale)
+        {
+            _captureTimeScale = Mathf.Max(0.1f, scale);
+        }
+
+        /// <summary>Current capture time scale (default 1.0).</summary>
+        public float CaptureTimeScale => _captureTimeScale;
     }
 }
