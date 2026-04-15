@@ -143,6 +143,16 @@ namespace BattleRobots.Physics
         /// <summary>Seconds between each group toggle.</summary>
         public float ToggleInterval => _toggleInterval;
 
+        /// <summary>
+        /// Overrides the toggle interval at runtime (e.g. from
+        /// <see cref="BattleRobots.Physics.WaveHazardIntensifierController"/>).
+        /// Values below 1 second are clamped to 1 second.
+        /// </summary>
+        public void SetToggleInterval(float interval)
+        {
+            _toggleInterval = Mathf.Max(1f, interval);
+        }
+
         /// <summary>The assigned <see cref="HazardZoneGroupSO"/>. May be null.</summary>
         public HazardZoneGroupSO Group => _group;
     }
