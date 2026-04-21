@@ -1,0 +1,100 @@
+using System;
+using UnityEngine;
+using UnityEngine.UI;
+using BattleRobots.Core;
+
+namespace BattleRobots.UI
+{
+    [DisallowMultipleComponent]
+    public sealed class ZoneControlCapturePulleyController : MonoBehaviour
+    {
+        [Header("Data (optional)")]
+        [SerializeField] private ZoneControlCapturePulleySO _pulleySO;
+        [SerializeField] private PlayerWallet               _wallet;
+
+        [Header("Event Channels — In (optional)")]
+        [SerializeField] private VoidGameEvent _onPlayerZoneCaptured;
+        [SerializeField] private VoidGameEvent _onBotZoneCaptured;
+        [SerializeField] private VoidGameEvent _onMatchStarted;
+        [SerializeField] private VoidGameEvent _onPulleyLifted;
+
+        [Header("UI References (optional)")]
+        [SerializeField] private Text       _hoistLabel;
+        [SerializeField] private Text       _liftLabel;
+        [SerializeField] private Slider     _hoistBar;
+        [SerializeField] private GameObject _panel;
+
+        private Action _handlePlayerDelegate;
+        private Action _handleBotDelegate;
+        private Action _handleMatchStartedDelegate;
+        private Action _handleLiftedDelegate;
+
+        private void Awake()
+        {
+            _handlePlayerDelegate       = HandlePlayerCaptured;
+            _handleBotDelegate          = HandleBotCaptured;
+            _handleMatchStartedDelegate = HandleMatchStarted;
+            _handleLiftedDelegate       = Refresh;
+        }
+
+        private void OnEnable()
+        {
+            _onPlayerZoneCaptured?.RegisterCallback(_handlePlayerDelegate);
+            _onBotZoneCaptured?.RegisterCallback(_handleBotDelegate);
+            _onMatchStarted?.RegisterCallback(_handleMatchStartedDelegate);
+            _onPulleyLifted?.RegisterCallback(_handleLiftedDelegate);
+            Refresh();
+        }
+
+        private void OnDisable()
+        {
+            _onPlayerZoneCaptured?.UnregisterCallback(_handlePlayerDelegate);
+            _onBotZoneCaptured?.UnregisterCallback(_handleBotDelegate);
+            _onMatchStarted?.UnregisterCallback(_handleMatchStartedDelegate);
+            _onPulleyLifted?.UnregisterCallback(_handleLiftedDelegate);
+        }
+
+        private void HandlePlayerCaptured()
+        {
+            if (_pulleySO == null) return;
+            int bonus = _pulleySO.RecordPlayerCapture();
+            if (bonus > 0) _wallet?.AddFunds(bonus);
+            Refresh();
+        }
+
+        private void HandleBotCaptured()
+        {
+            if (_pulleySO == null) return;
+            _pulleySO.RecordBotCapture();
+            Refresh();
+        }
+
+        private void HandleMatchStarted()
+        {
+            _pulleySO?.Reset();
+            Refresh();
+        }
+
+        public void Refresh()
+        {
+            if (_pulleySO == null)
+            {
+                _panel?.SetActive(false);
+                return;
+            }
+
+            _panel?.SetActive(true);
+
+            if (_hoistLabel != null)
+                _hoistLabel.text = $"Hoists: {_pulleySO.Hoists}/{_pulleySO.HoistsNeeded}";
+
+            if (_liftLabel != null)
+                _liftLabel.text = $"Lifts: {_pulleySO.LiftCount}";
+
+            if (_hoistBar != null)
+                _hoistBar.value = _pulleySO.HoistProgress;
+        }
+
+        public ZoneControlCapturePulleySO PulleySO => _pulleySO;
+    }
+}
